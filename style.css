@@ -5,3 +5,5 @@ html,body{height:100%;overflow:hidden}body{display:flex;flex-direction:column}he
 
 /* Keep the manuscript anchored to the screen, independent of right tool panels. */
 #manuscript-scroll{position:absolute;left:50%;transform:translateX(-50%);top:0;bottom:0}.card-column{position:absolute;top:0;bottom:0}#right-panel{position:absolute;right:0;top:0;bottom:0}#right-panel.overlay{right:0}#page-count{font-size:12px;color:#625e54;white-space:nowrap}.chapter-pages{line-height:inherit}nav button[aria-current]{background:#345346;color:white}header #position{max-width:170px}@media(max-width:700px){#page-count{font-size:10px}header #position{max-width:60px}}
+
+#credential-controls{border-top:1px solid #d3ccbe;border-bottom:1px solid #d3ccbe;padding:10px 0;margin:14px 0}#connection .remember-choice{display:flex;align-items:center;gap:10px}#remember-token{width:20px;height:20px;margin:0;flex:none}

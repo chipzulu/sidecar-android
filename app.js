@@ -7,8 +7,9 @@ import {keepMarker} from './shared/keep-together.js';
 import {fitLayout} from './layout.js';
 import {paginate} from './pages.js';
 import {mountCards} from './cards.js';
+import {mountCredentials} from './credentials-ui.js';
 const $=id=>document.getElementById(id);
-let snapshot=null,model=null,index=-1,coverUrl='',busy=false,client=null,clientKey='',abort=null,disposeCards=()=>{},selectedScene=null,renderRevision=0,rendering=false;
+let snapshot=null,model=null,index=-1,coverUrl='',busy=false,credentialBusy=false,client=null,clientKey='',abort=null,disposeCards=()=>{},selectedScene=null,renderRevision=0,rendering=false;
 function message(text,error=false){$('status').textContent=text;$('status').classList.toggle('error',error);}
 function preference(key,value){try{if(value===undefined)return localStorage.getItem('sidecar-reader:'+key);localStorage.setItem('sidecar-reader:'+key,value);}catch{/* Reading remains usable without preferences. */}}
 function locationKey(){return snapshot?`${snapshot.repository.toLowerCase()}:${snapshot.branch}`:'';}
@@ -101,6 +102,7 @@ async function openBook(value,resume=true){
   if(coverUrl)URL.revokeObjectURL(coverUrl);coverUrl='';snapshot=value;model=bookModel(value);disposeCards();disposeCards=mountCards(value,{left:$('left-cards'),right:$('right-cards')},preference);
   if(model.cover){const type=/\.png$/i.test(model.cover.path)?'image/png':'image/jpeg';coverUrl=URL.createObjectURL(new Blob([model.cover.bytes],{type}));}
   document.title=model.title+' · Sidecar Reader';$('repository').value=value.repository;$('branch').value=value.branch;
+  credentials.refresh();
   $('book-status').textContent=`${model.title} · Offline copy downloaded ${new Date(value.downloadedAt).toLocaleString()} · ${value.commit.slice(0,8)} · ${value.files.length} files`;
   $('outline').replaceChildren();const cover=element('button','Cover');cover.dataset.scope='cover';cover.onclick=()=>navigate(-1);const entire=element('button','Entire Novel');entire.dataset.scope='novel';entire.onclick=()=>navigate(-2);$('outline').append(cover,entire);
   model.chapters.forEach((chapter,n)=>{const details=element('details'),summary=element('summary',chapter.name),children=element('div'),all=element('button','Read chapter');all.dataset.scope=`chapter:${chapter.key}`;all.onclick=()=>navigate(n);children.append(all);
@@ -117,15 +119,17 @@ $('previous').onclick=()=>step(-1);$('next').onclick=()=>step(1);
 let scrollTimer;$('manuscript-scroll').addEventListener('scroll',()=>{clearTimeout(scrollTimer);scrollTimer=setTimeout(()=>{remember();pageStatus();},100);},{passive:true});addEventListener('pagehide',remember);
 function textSize(value){const size=['18','21','24','28'].includes(value)?value:'21';document.documentElement.style.setProperty('--reading-size',size+'px');$('size').value=size;preference('size',size);}
 textSize(preference('size'));$('size').onchange=()=>{textSize($('size').value);repaginate();};
-function controls(){for(const id of ['repository','branch','token','download','forget'])$(id).disabled=busy;$('cancel').hidden=!busy;$('progress').hidden=!busy;}
+function controls(){for(const id of ['repository','branch','token','download','forget','remember-token','passphrase','confirm-passphrase','save-token','unlock-token','forget-saved-token'])$(id).disabled=busy||credentialBusy;$('cancel').hidden=!busy;$('progress').hidden=!busy;}
+function lockGitHub(){client=null;clientKey='';$('token').value='';}
+const credentials=mountCredentials({activate:(repository,branch,token)=>{client=readerClient(repository,branch,token);clientKey=JSON.stringify([repository,branch]);},lock:lockGitHub,message,onBusy:value=>{credentialBusy=value;controls();}});
 for(const id of ['repository','branch','token'])$(id).oninput=()=>{client=null;clientKey='';};
-$('forget').onclick=()=>{client=null;clientKey='';$('token').value='';message('Token forgotten. Your offline book remains available.');};
+$('forget').onclick=()=>{lockGitHub();credentials.clear();message('GitHub locked. Any encrypted saved token, your offline book and reading settings remain available.');};
 $('cancel').onclick=()=>abort?.abort();
 $('download').onclick=async()=>{
-  if(busy)return;busy=true;controls();abort=new AbortController();$('progress').removeAttribute('value');
+  if(busy||credentialBusy)return;busy=true;controls();abort=new AbortController();$('progress').removeAttribute('value');
   try{
     const repository=repositoryName($('repository').value),branch=$('branch').value.trim(),key=JSON.stringify([repository,branch]);
-    if(!client||clientKey!==key){client=readerClient(repository,branch,$('token').value);clientKey=key;$('token').value='';}
+    if(!client||clientKey!==key){if(!$('token').value&&credentials.hasSaved())throw Error('Unlock GitHub with your passphrase, then refresh the book.');client=readerClient(repository,branch,$('token').value);clientKey=key;$('token').value='';}
     if(snapshot&&(repository.toLowerCase()!==snapshot.repository.toLowerCase()||branch!==snapshot.branch)&&!confirm('Replace the offline book on this device with this repository? GitHub files are never changed.')){message('Download cancelled.');return;}
     message('Checking private repository and latest backup…');
     // Pass cancellation into the GET-only transport; token stays in its closure.

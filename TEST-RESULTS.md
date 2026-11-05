@@ -1,4 +1,17 @@
-# Reader 0.1.2 verification — 5 November 2026
+# Reader 0.1.3 verification — 5 November 2026
+
+- Ten unit tests passed, including four encryption tests: Unicode round-trip,
+  distinct random salt/IV/ciphertext, wrong passphrase/repository rejection,
+  tamper detection, parameter validation, and missing/weak-input rejection.
+- Chrome credential tests passed: confirmation mismatch, encrypted persistence,
+  locked state after reload, wrong then correct passphrase, refresh without token
+  re-entry, manual lock, forgetting, and saving/unlocking a replacement token.
+- Confirmed stored ciphertext contains neither the test token nor passphrase;
+  credential deletion preserves offline file bytes and reading settings.
+- Existing offline, layout, scopes, pagination and 122,400-word checks passed.
+  GitHub responses remained mocked. Samsung passphrase UI/unlock speed pending.
+
+## Prior 0.1.2 verification
 
 - Added Chrome checks for Entire Novel, true scene-only views, sequential page
   headings and total scope page estimates. Reopening retains Entire Novel scope.

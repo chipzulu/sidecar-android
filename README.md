@@ -1,4 +1,44 @@
-# Story Sidecar Reader 0.1.2
+# Story Sidecar Reader 0.1.3
+
+## New in 0.1.3 — Remember your GitHub token
+
+1. Open **GitHub**, enter the book repository and your token.
+2. Check **Remember token on this device**.
+3. Choose a passphrase (at least eight characters; a few memorable words are
+   preferable to a short PIN), enter it twice, then **Save token securely**.
+4. The token is now encrypted on this device and unlocked for the current session.
+   Press Download / refresh book as usual.
+5. After reopening, enter only your passphrase and press **Unlock GitHub**, then
+   refresh. Offline reading never requires unlocking.
+
+**Lock GitHub** clears the in-memory session but keeps the encrypted credential.
+**Forget saved token** removes that repository's saved credential and locks the
+session. It does not remove your offline book, reading settings or GitHub files,
+and it does not revoke the token on GitHub. If you forget the passphrase, forget
+the saved credential, create a replacement token in GitHub, and save it with a
+new passphrase. You can revoke the old token in GitHub as well.
+
+Saving is optional: entering a token and refreshing without checking Remember
+still works for the session only. One encrypted credential is kept per repository
+on this browser/device. Expired/revoked tokens still need replacement. Your browser
+or password manager may independently offer to save input; that is outside the app.
+
+The token uses browser Web Crypto AES-256-GCM, with a random 16-byte salt and
+12-byte IV per save. PBKDF2-HMAC-SHA256 (600,000 iterations) derives a non-exportable
+key from the passphrase. Authenticated data binds the ciphertext to its repository.
+Only ciphertext and public derivation parameters go into a separate IndexedDB
+credential database; the passphrase and key are never persisted. Input fields are
+cleared after use. This protects stored credentials, not a device/app already
+compromised while unlocked. A weak phrase can still be guessed offline.
+
+References: [Web Crypto deriveKey](https://developer.mozilla.org/en-US/docs/Web/API/SubtleCrypto/deriveKey),
+[OWASP cryptographic storage](https://cheatsheetseries.owasp.org/cheatsheets/Cryptographic_Storage_Cheat_Sheet.html),
+[PBKDF2 parameters](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html).
+
+Update the existing app repository with all `site/` contents, including the new
+`token-vault.js` and `credentials-ui.js`. Open online, close every reader tab/app
+window, then reopen. Configuration should show **Reader 0.1.3**. Do not clear site
+data; that would delete both the offline book and saved credentials.
 
 ## New in 0.1.2
 
@@ -52,7 +92,7 @@ Upload the new ZIP's `site/` CONTENTS into your existing public app repository
 (`sidecar-android`, or the name you chose). Keep the `shared/` folder. Include the
 new `pages.js`, `layout.js`, and `cards.js` files. Wait for Pages deployment.
 Open the app online, then close ALL its tabs/installed windows and reopen so the
-new service worker can activate. Configuration should show Reader 0.1.2.
+new service worker can activate. Configuration should show Reader 0.1.3.
 Do not clear site data: the downloaded book and reading preferences are retained.
 
 A read-only Android web app for your private GitHub book backup. No APK, no
@@ -86,12 +126,12 @@ test app. If you prefer another static HTTPS host, upload the same site files.
 - Outline: expand a chapter, choose Read chapter or a scene.
 - Next / Previous: move through chapters, starting with the cover.
 - GitHub: show connection controls; Download / refresh gets the latest backup.
-- Forget token: clear session credentials without removing the offline book.
+- Lock GitHub: clear session credentials without removing the offline book or encrypted credential.
 - One offline book is retained at a time. Changing repositories asks before
   replacing that copy. A failed or cancelled refresh preserves the previous copy.
-- No token is persisted by this app. Your browser/password manager may offer
-  to remember credentials; decline for this version. A fresh session needs a
-  token only to download/refresh, never to read the offline copy.
+- Tokens are persisted only when you explicitly save them with a passphrase,
+  and then only encrypted. A fresh session needs the passphrase (or a manually
+  entered token) to download/refresh, never to read the offline copy.
 
 ## What this version displays
 
@@ -112,7 +152,8 @@ Browser-only desktop settings are not in the GitHub snapshot.
 ## Privacy and limits
 
 Only GET requests to api.github.com; no proxy, analytics, external scripts or
-remote manuscript images. Tokens stay in memory; content is sanitized before
+remote manuscript images. Unlocked tokens stay in memory; optional saved tokens
+are encrypted with your passphrase. Manuscript content is sanitized before
 display. The public hosting repository contains app code only. The private book
 is saved in IndexedDB on the tablet, not uploaded to the hosting site. Public
 hosting under the same GitHub Pages origin shares browser origin access with
@@ -135,7 +176,9 @@ backup. This is not end-to-end encryption or an independent security audit.
 - [ ] Italics, blank paragraphs, quotes and block indents look correct.
 - [ ] Larger text is comfortable in portrait and landscape.
 - [ ] Airplane mode: close/reopen and read several chapters.
-- [ ] Reopen online: token is not saved, but the book and reading position remain.
+- [ ] Reopen online: saved credentials are locked; the book and reading position remain.
+- [ ] Unlock with the passphrase and refresh without pasting the token again.
+- [ ] Forget saved token, save a replacement, and verify the book stays intact.
 - [ ] Make a desktop change, Send to GitHub, refresh reader, confirm new text.
 - [ ] Wrong token or interrupted refresh leaves the earlier offline book readable.
 
