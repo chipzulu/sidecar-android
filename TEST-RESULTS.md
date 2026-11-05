@@ -1,4 +1,15 @@
-# Reader 0.1.0 verification — 4 November 2026
+# Reader 0.1.1 verification — 5 November 2026
+
+- Six reader unit tests passed, including four concurrent requests maximum,
+  duplicate-content request reuse, and manuscript-first layout allocation.
+- Chrome integration additionally verified multi-page splitting preserves the
+  exact source text and bold spans, equal page body heights without overflowing,
+  a fitting keep group on one page, manuscript-only vertical scrolling, right-hand
+  Configuration, both card columns on a wide monitor, and narrow-screen overlay.
+- Wide and 390px screenshots inspected. Samsung download speed remains to be
+  measured by the user; no real-network performance multiplier is claimed.
+
+## Existing checks retained
 
 - Four unit tests passed: GET-only pinned snapshot download, byte/hash checks,
   reuse of unchanged files, rejection of public repositories/truncated lists/
@@ -13,6 +24,6 @@
 - A 390px-wide screenshot was inspected: controls and reading surface fit without
   horizontal overflow. Shared modules are copied directly from desktop sources.
 
-Still pending: hosting on HTTPS and actual Samsung/Chrome tests with the user's
-private backup, particularly installation, offline lifecycle, large-book download
-time, and real manuscript formatting. No claim of exact desktop/Word pagination.
+Reader 0.1.0 was confirmed working by the user on the real device. The new 0.1.1
+layout/pagination and download improvement still need the user's Samsung test.
+No claim of exact desktop/Word pagination.

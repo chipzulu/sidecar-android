@@ -27,15 +27,20 @@ export function readerClient(repository,branch,token,{fetcher=fetch,signal}={}) 
     if(entries.length>10000||entries.some(e=>e.size>25*1024*1024)||entries.reduce((n,e)=>n+(e.size||0),0)>100*1024*1024)throw Error('Reader limit: 25 MiB per file, 100 MiB per book, 10,000 files. Previous book retained.');
     if(!entries.some(e=>/^Book\/Chapters\/.+\.html?$/i.test(e.path)&&!e.path.split('/').slice(2,-1).some(p=>p.toLowerCase()==='notes')))throw Error('No manuscript scenes found under Book/Chapters. Send a desktop Sidecar backup first.');
     const cache=new Map((previous?.repository.toLowerCase()===name.toLowerCase()&&previous?.branch===branch?previous.files:[]).map(f=>[f.sha,f.bytes]));
-    const files=[];let completed=0,total=0;
-    for(const entry of entries){
+    const priority=e=>/Book\/Cards\/cover\.(png|jpe?g)$/i.test(e.path)?0:e.path.startsWith('Book/Chapters/')?1:2;
+    entries.sort((a,b)=>priority(a)-priority(b));
+    const files=new Array(entries.length),pending=new Map();let completed=0,total=0,cursor=0,failure=null;
+    async function worker(){while(!failure&&cursor<entries.length){const slot=cursor++,entry=entries[slot];try{
       if(activeSignal?.aborted)throw Error('Download cancelled. Previous offline book retained.');
       progress({completed,total:entries.length,path:entry.path});let bytes=cache.get(entry.sha);
-      if(!bytes){const blob=await get(`/git/blobs/${entry.sha}`);if(blob.encoding!=='base64')throw Error('Unsupported GitHub file encoding.');bytes=Uint8Array.from(atob(blob.content.replace(/\s/g,'')),c=>c.charCodeAt(0));}
+      if(!bytes){if(!pending.has(entry.sha))pending.set(entry.sha,(async()=>{const blob=await get(`/git/blobs/${entry.sha}`);if(blob.encoding!=='base64')throw Error('Unsupported GitHub file encoding.');return Uint8Array.from(atob(blob.content.replace(/\s/g,'')),c=>c.charCodeAt(0));})());bytes=await pending.get(entry.sha);}
       total+=bytes.length;if(bytes.length>25*1024*1024||total>100*1024*1024)throw Error('Downloaded book exceeds the reader size limit.');
       if(await blobSha(bytes)!==entry.sha)throw Error(`File verification failed: ${entry.path}. Previous offline book retained.`);
-      cache.set(entry.sha,bytes);files.push({path:entry.path,sha:entry.sha,bytes});completed++;
-    }
+      cache.set(entry.sha,bytes);files[slot]={path:entry.path,sha:entry.sha,bytes};completed++;
+      progress({completed,total:entries.length,path:entry.path});
+    }catch(error){failure ||= error;}}}
+    await Promise.all(Array.from({length:Math.min(4,entries.length)},()=>worker()));
+    if(failure)throw failure;
     progress({completed,total:entries.length,path:'Saving verified offline copy…'});
     return {repository:name,branch,commit:ref.object.sha,downloadedAt:new Date().toISOString(),files};
   }

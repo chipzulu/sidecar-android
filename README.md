@@ -1,17 +1,51 @@
-# Story Sidecar Reader 0.1.0
+# Story Sidecar Reader 0.1.1
+
+## New in 0.1.1
+
+- Downloads use up to four concurrent GitHub file requests, deduplicate identical
+  file contents and reuse unchanged files. All hashes must still pass before the
+  offline snapshot is replaced. Real speed depends on GitHub and your connection.
+- Equal-height manuscript pages, with an independent vertical scrollbar. Previous
+  and Next chapter buttons now live in the top menu. Page numbers are local to the
+  selected chapter, not publication numbering. Headings, subtitles and blank lines
+  consume the selected line budget; the running page heading is outside that budget.
+  Long paragraphs split without losing emphasis; fitting keep/quote groups stay
+  together, oversized groups split. This is reading pagination, not Word layout.
+- Outline and Configuration share the right-hand panel. Configuration sets page
+  width, lines per page (15–60), and no cards / left cards / cards on both sides.
+  When Configuration is open, drag the green handle on the page's right edge or
+  use its arrow keys to resize. Text size remains in the top bar.
+- The page width wins, capped at the screen. Card columns narrow and have their
+  own internal scrolling; when less than 150 px per column remains, the right
+  cards then left cards hide temporarily. They return when space returns. The
+  right tool panel overlays the page only when it cannot fit beside it.
+- Two read-only card slots per column. Select an image or Markdown card in each
+  slot; select “Choose a card…” to clear it. Text cards have basic headings/plain
+  paragraph rendering; full desktop Markdown/checklist/search tools are not ported.
+- Layout and card choices stay on this device. Opening a panel doesn't reflow
+  the manuscript unless its actual width changes.
+
+### Update the existing installation
+
+Upload the new ZIP's `site/` CONTENTS into your existing public app repository
+(`sidecar-android`, or the name you chose). Keep the `shared/` folder. Include the
+new `pages.js`, `layout.js`, and `cards.js` files. Wait for Pages deployment.
+Open the app online, then close ALL its tabs/installed windows and reopen so the
+new service worker can activate. Configuration should show Reader 0.1.1.
+Do not clear site data: the downloaded book and reading preferences are retained.
 
 A read-only Android web app for your private GitHub book backup. No APK, no
 writing controls, no GitHub uploads. Independent of desktop release 0.1.126.
 
 ## Install from GitHub Pages
 
-1. Create a PUBLIC repository named `sidecar-reader` for the application code.
+1. Create a PUBLIC repository named `sidecar-android` for the application code.
    Your existing `thetingstedcipher` book repository must remain PRIVATE.
 2. Extract this ZIP. Upload everything INSIDE `site/` into the public repository
    root. Preserve the `shared/` subfolder. Do not upload the ZIP itself.
 3. Settings → Pages → Deploy from a branch → main → /(root) → Save.
 4. Wait for the HTTPS address, normally
-   `https://chipzulu.github.io/sidecar-reader/`.
+   `https://chipzulu.github.io/sidecar-android/`.
 5. On the tablet open that address in Chrome, not the index.html file in Downloads.
 6. Enter `chipzulu/thetingstedcipher`, branch `main`, and a fine-grained token
    restricted to that private repository with **Contents: Read-only**.
@@ -47,9 +81,10 @@ z00 back matter, hidden ! section headings, scene subtitles, emphasis and block
 indents. Equals-marked italics are rendered as italics; keep-group markers are
 hidden. Original bytes are retained unchanged.
 
-Reading scrolls chapter by chapter. It does not reproduce the desktop page count
-or print layout. Notes, other cards, images and translations are downloaded for
-snapshot completeness but do not yet have separate viewer panels. Git cannot
+Reading scrolls through pages within the selected chapter. It does not reproduce
+the desktop page count or print layout. Notes and translations are downloaded for
+snapshot completeness but do not yet have separate viewer panels. Cards can be
+shown in the read-only reference slots. Git cannot
 represent empty folders. Local desktop .git history is not part of the backup.
 Browser-only desktop settings are not in the GitHub snapshot.
 
