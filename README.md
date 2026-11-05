@@ -1,4 +1,25 @@
-# Story Sidecar Reader 0.1.1
+# Story Sidecar Reader 0.1.2
+
+## New in 0.1.2
+
+- Outline now offers **Entire Novel**, **Read chapter**, and true single-scene
+  selection. A scene selection displays only that scene, not its entire chapter.
+  The selected entry is highlighted. Scope and reading position survive reopening.
+- The menu shows **Page X / Y · estimate** for the selected scope. Entire Novel
+  uses continuous numbering, with each chapter/section starting a new page. The
+  cover is separate and is not counted. Chapter and scene views start at page 1.
+  Width, text size and line-budget changes recalculate the displayed estimate.
+  This is a reading estimate, not a guarantee of Word/publication pagination.
+- Previous/Next step pages in Entire Novel, chapters in chapter view, and scenes
+  in scene view. Whole-novel pagination yields between chapters so another
+  selection can interrupt it without leaving stale pages behind.
+- The manuscript stays centred on the screen when Outline/Configuration opens.
+  The tool panel is anchored to the far right. Cards use the space on their side;
+  on narrow screens the tool panel overlays rather than moving the manuscript.
+
+Update by uploading `site/` contents to the existing app repository. Open online,
+close ALL reader tabs/windows, and reopen. Configuration shows **Reader 0.1.2**.
+Keep site data to preserve the offline book. No desktop update is needed.
 
 ## New in 0.1.1
 
@@ -6,8 +27,8 @@
   file contents and reuse unchanged files. All hashes must still pass before the
   offline snapshot is replaced. Real speed depends on GitHub and your connection.
 - Equal-height manuscript pages, with an independent vertical scrollbar. Previous
-  and Next chapter buttons now live in the top menu. Page numbers are local to the
-  selected chapter, not publication numbering. Headings, subtitles and blank lines
+  and Next buttons now live in the top menu. Page numbers describe the selected
+  reading scope, not publication numbering. Headings, subtitles and blank lines
   consume the selected line budget; the running page heading is outside that budget.
   Long paragraphs split without losing emphasis; fitting keep/quote groups stay
   together, oversized groups split. This is reading pagination, not Word layout.
@@ -31,7 +52,7 @@ Upload the new ZIP's `site/` CONTENTS into your existing public app repository
 (`sidecar-android`, or the name you chose). Keep the `shared/` folder. Include the
 new `pages.js`, `layout.js`, and `cards.js` files. Wait for Pages deployment.
 Open the app online, then close ALL its tabs/installed windows and reopen so the
-new service worker can activate. Configuration should show Reader 0.1.1.
+new service worker can activate. Configuration should show Reader 0.1.2.
 Do not clear site data: the downloaded book and reading preferences are retained.
 
 A read-only Android web app for your private GitHub book backup. No APK, no
@@ -81,7 +102,7 @@ z00 back matter, hidden ! section headings, scene subtitles, emphasis and block
 indents. Equals-marked italics are rendered as italics; keep-group markers are
 hidden. Original bytes are retained unchanged.
 
-Reading scrolls through pages within the selected chapter. It does not reproduce
+Reading scrolls through pages within the selected novel, chapter or scene. It does not reproduce
 the desktop page count or print layout. Notes and translations are downloaded for
 snapshot completeness but do not yet have separate viewer panels. Cards can be
 shown in the read-only reference slots. Git cannot

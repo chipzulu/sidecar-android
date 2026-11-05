@@ -1,4 +1,16 @@
-# Reader 0.1.1 verification — 5 November 2026
+# Reader 0.1.2 verification — 5 November 2026
+
+- Added Chrome checks for Entire Novel, true scene-only views, sequential page
+  headings and total scope page estimates. Reopening retains Entire Novel scope.
+- Measured manuscript x-coordinate before/after opening Configuration: unchanged.
+  The panel ends at the right workspace edge; no unused gap beyond it.
+- Synthetic 122,400-word book: all 40 chapters and 120 scenes rendered; all words
+  retained, 760 measured pages at the test settings, no overflowing page bodies.
+  Desktop Chrome completed that pagination in about 1.4 seconds and yielded 43
+  times. This is a synthetic desktop result, not a Samsung speed claim.
+- Six reader unit tests and the expanded Chrome integration suite passed.
+
+## Prior 0.1.1 verification
 
 - Six reader unit tests passed, including four concurrent requests maximum,
   duplicate-content request reuse, and manuscript-first layout allocation.

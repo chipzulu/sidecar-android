@@ -1,9 +1,9 @@
 // Measured pagination. Split only DOM text ranges, preserving emphasis and bytes of text.
 function textPoint(root,offset){const walk=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);let node,last;while(node=walk.nextNode()){last=node;if(offset<=node.length)return[node,offset];offset-=node.length;}return last?[last,last.length]:[root,0];}
 function part(node,start,end){const result=node.cloneNode(false),range=document.createRange();if(start===0)range.setStart(node,0);else range.setStart(...textPoint(node,start));if(end===node.textContent.length)range.setEnd(node,node.childNodes.length);else range.setEnd(...textPoint(node,end));result.append(range.cloneContents());return result;}
-export function paginate(source,host,{lines=28,title=''}={}){
+export function paginate(source,host,{lines=28,title='',startPage=0}={}){
   host.replaceChildren();const lineHeight=parseFloat(getComputedStyle(host).lineHeight);const height=lineHeight*lines;
-  let body,pageNumber=0;
+  let body,pageNumber=startPage;
   function next(){const page=document.createElement('article');page.className='reading-page';const header=document.createElement('div');header.className='page-heading';header.textContent=`${title} / ${++pageNumber}`;body=document.createElement('div');body.className='page-body scene';body.style.height=height+'px';page.append(header,body);host.append(page);}
   function fits(){return body.scrollHeight<=height+1;}
   const queue=[...source.children].map(n=>n.cloneNode(true));next();
@@ -23,5 +23,5 @@ export function paginate(source,host,{lines=28,title=''}={}){
     const first=part(node,0,best);body.append(first);
     if(best<length){const rest=part(node,best,length);rest.classList.add('continued');queue.unshift(rest);next();}
   }
-  return pageNumber;
+  return pageNumber-startPage;
 }
