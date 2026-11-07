@@ -1,3 +1,4 @@
+import {annotationInbox} from './shared/annotation-inbox.js';
 export function repositoryName(value) {
   const name=value.trim().replace(/^https:\/\/github\.com\//i,'').replace(/\/$/,'').replace(/\.git$/,'');
   if(!/^[a-z\d-]+\/[a-z\d_.-]+$/i.test(name)||['.','..'].includes(name.split('/')[1]))throw Error('Enter OWNER/REPOSITORY or its GitHub HTTPS address.');
@@ -44,5 +45,5 @@ export function readerClient(repository,branch,token,{fetcher=fetch,signal}={}) 
     progress({completed,total:entries.length,path:'Saving verified offline copy…'});
     return {repository:name,branch,commit:ref.object.sha,downloadedAt:new Date().toISOString(),files};
   }
-  return {download};
+  return {download,inbox:annotationInbox(name,branch,token,fetcher)};
 }

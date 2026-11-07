@@ -9,9 +9,11 @@ import {paginate} from './pages.js';
 import {mountCards} from './cards.js';
 import {mountCredentials} from './credentials-ui.js';
 import {readDraft, writeScene} from './writing.js';
+import {mountHighlights} from './highlights.js';
 const $=id=>document.getElementById(id);
 let snapshot=null,model=null,index=-1,coverUrl='',busy=false,credentialBusy=false,client=null,clientKey='',abort=null,disposeCards=()=>{},selectedScene=null,renderRevision=0,rendering=false;
 function message(text,error=false){$('status').textContent=text;$('status').classList.toggle('error',error);}
+const highlights=mountHighlights({reader:$('reader'),viewport:$('manuscript-scroll'),status:message});
 function preference(key,value){try{if(value===undefined)return localStorage.getItem('sidecar-reader:'+key);localStorage.setItem('sidecar-reader:'+key,value);}catch{/* Reading remains usable without preferences. */}}
 function locationKey(){return snapshot?`${snapshot.repository.toLowerCase()}:${snapshot.branch}`:'';}
 function remember(){if(snapshot&&!rendering)preference('position:'+locationKey(),JSON.stringify({scope:index===-2?'novel':selectedScene?'scene':index===-1?'cover':'chapter',chapter:model.chapters[index]?.key??null,scene:selectedScene,y:$('manuscript-scroll').scrollTop}));}
@@ -69,7 +71,7 @@ function pageStatus(){
 async function render(which,scenePath=null,scroll=true,preserve=false){
   const revision=++renderRevision,scroller=$('manuscript-scroll'),fraction=scroller.scrollTop/Math.max(1,scroller.scrollHeight-scroller.clientHeight);
   index=which===-2?-2:Math.max(-1,Math.min(model.chapters.length-1,which));selectedScene=index>=0&&model.chapters[index].scenes.some(s=>s.path===scenePath)?scenePath:null;
-  $('edit-scene').hidden=index===-1;const reader=$('reader');reader.replaceChildren();rendering=true;reader.setAttribute('aria-busy','true');
+  $('highlight-toggle').hidden=index===-1;$('edit-scene').hidden=index===-1;const reader=$('reader');reader.replaceChildren();rendering=true;reader.setAttribute('aria-busy','true');
   const name=index===-2?'Entire Novel':index===-1?model.title:selectedScene?model.chapters[index].scenes.find(s=>s.path===selectedScene).name:model.chapters[index].name;
   for(const [id,direction] of [['previous','Previous'],['next','Next']]){const label=`${direction} ${index===-2?'page':selectedScene?'scene':'chapter'}`;$(id).title=label;$(id).setAttribute('aria-label',label);}
   $('position').textContent=name;$('position').title=name;$('page-count').textContent=index===-1?'':'Estimating pages…';
@@ -92,7 +94,7 @@ async function render(which,scenePath=null,scroll=true,preserve=false){
     $('previous').disabled=index===-1;$('next').disabled=index>=model.chapters.length-1&&!selectedScene;
     if(selectedScene){const all=model.chapters.flatMap(c=>c.scenes);const sceneIndex=all.findIndex(s=>s.path===selectedScene);$('previous').disabled=sceneIndex===0;$('next').disabled=sceneIndex===all.length-1;}
   }catch(error){if(revision===renderRevision){$('page-count').textContent='Page estimate unavailable';message(error.message,true);setOpen('connection',true);}}
-  finally{if(revision===renderRevision){rendering=false;reader.setAttribute('aria-busy','false');pageStatus();remember();}}
+  finally{if(revision===renderRevision){rendering=false;reader.setAttribute('aria-busy','false');pageStatus();remember();highlights.rebuild();}}
 }
 let tappedBlock=null;
 $('reader').addEventListener('click',event=>{tappedBlock=event.target.closest('[data-block]');});
@@ -117,7 +119,7 @@ function step(direction){
   navigate(index+direction);
   }
 async function openBook(value,resume=true){
-  if(coverUrl)URL.revokeObjectURL(coverUrl);coverUrl='';snapshot=value;model=bookModel(value);
+  if(coverUrl)URL.revokeObjectURL(coverUrl);coverUrl='';snapshot=value;model=bookModel(value);highlights.load(value);
   for(const chapter of model.chapters)for(const scene of chapter.scenes){
     const draft=readDraft(value,scene);
     if(draft)scene.html=draft.html;
@@ -142,11 +144,18 @@ $('previous').onclick=()=>step(-1);$('next').onclick=()=>step(1);
 let scrollTimer;$('manuscript-scroll').addEventListener('scroll',()=>{clearTimeout(scrollTimer);scrollTimer=setTimeout(()=>{remember();pageStatus();},100);},{passive:true});addEventListener('pagehide',remember);
 function textSize(value){const size=['18','21','24','28'].includes(value)?value:'21';document.documentElement.style.setProperty('--reading-size',size+'px');$('size').value=size;preference('size',size);}
 textSize(preference('size'));$('size').onchange=()=>{textSize($('size').value);repaginate();};
-function controls(){for(const id of ['repository','branch','token','download','forget','remember-token','passphrase','confirm-passphrase','save-token','unlock-token','forget-saved-token'])$(id).disabled=busy||credentialBusy;$('cancel').hidden=!busy;$('progress').hidden=!busy;}
+function controls(){for(const id of ['repository','branch','token','download','send-highlights','forget','remember-token','passphrase','confirm-passphrase','save-token','unlock-token','forget-saved-token'])$(id).disabled=busy||credentialBusy;$('cancel').hidden=!busy||!abort;$('progress').hidden=!busy;}
 function lockGitHub(){client=null;clientKey='';$('token').value='';}
 const credentials=mountCredentials({activate:(repository,branch,token)=>{client=readerClient(repository,branch,token);clientKey=JSON.stringify([repository,branch]);},lock:lockGitHub,message,onBusy:value=>{credentialBusy=value;controls();}});
 for(const id of ['repository','branch','token'])$(id).oninput=()=>{client=null;clientKey='';};
 $('forget').onclick=()=>{lockGitHub();credentials.clear();message('GitHub locked. Any encrypted saved token, your offline book and reading settings remain available.');};
+$('send-highlights').onclick=async()=>{
+  if(!snapshot||!client||clientKey!==JSON.stringify([snapshot.repository,snapshot.branch])){message('Unlock GitHub for the open book first.',true);return;}
+  if(busy||credentialBusy)return;
+  busy=true;controls();
+  try{const count=await highlights.send(client.inbox);message(count?'Sent '+count+' highlight note(s). On PC choose Get tablet highlights.':'All highlight notes have been sent.');}
+  catch(e){message(e.message,true);}finally{busy=false;controls();}
+};
 $('cancel').onclick=()=>abort?.abort();
 $('download').onclick=async()=>{
   if(busy||credentialBusy)return;busy=true;controls();abort=new AbortController();$('progress').removeAttribute('value');

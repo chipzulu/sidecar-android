@@ -1,3 +1,9 @@
+## Reader 0.1.5 — Highlight notes
+
+Select words in one scene on the reading page and tap Highlight. Choose a colour and optionally write a note with the ONYX keyboard. Tap the painted text to open its note. Tap Highlight without selecting words to browse saved notes. To move one, open it, tap Reattach, select its new passage and confirm with Reattach highlight.
+
+Local highlights work offline. To transfer them, unlock the book repository with a fine-grained token with Contents read and write. Under GitHub choose Send highlights. PC Sidecar 0.1.128 can import them with Versioning → Get tablet highlights. Files are Markdown in Book/Notes. After editing a note on PC, Send to GitHub and refresh the book on Android. A locally changed note on PC is preserved if a competing edit arrives. A note whose passage disappears keeps its quotation, and you can reattach it on the tablet.
+
 ## Reader 0.1.4 — Write a scene on the tablet
 
 Open a scene from Outline, or tap a paragraph while reading a chapter or the whole novel. Choose **Edit scene**, tap where you want to write, and use the pen in the ONYX input method. **Done** returns to paginated reading. Committed edits are saved in this browser on the tablet. You can reopen the app offline. Keep browser site data to keep drafts. Drafts are separate from downloaded files and are shown when the same repository, branch and scene path are opened again. To take a draft back to the PC in this version, select and copy the scene text.
