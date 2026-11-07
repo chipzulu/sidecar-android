@@ -4,6 +4,21 @@ export function mountHighlights({reader,viewport,status}){
   const $=id=>document.getElementById(id);
   const dialog=$('highlight-dialog'),body=$('highlight-body'),color=$('highlight-color');
   let book, rows={}, active=null, captured=null, reattach=null, sending=false;
+  const tools=$('highlight-tools'), hint=$('highlight-hint');
+  let firstWord=null;
+  function stopPicking(){
+    window.CSS?.highlights?.delete('pending-word');firstWord=null;captured=null;reattach=null;tools.hidden=true;
+    $('highlight-toggle').textContent='Highlight';
+    $('highlight-toggle').setAttribute('aria-pressed','false');
+  }
+  function startPicking(){
+    firstWord=null;tools.hidden=false;
+    $('highlight-toggle').textContent='Apply highlight';
+    $('highlight-toggle').setAttribute('aria-pressed','true');
+    hint.textContent='Tap the first word, then the last word.';
+  }
+  $('highlight-cancel').onclick=stopPicking;
+  $('browse-highlights').onclick=()=>{stopPicking();list();};
   function roots(path){return [...reader.querySelectorAll('p[data-block]')].filter(p=>p.dataset.scene===path);}
   const brush=mountBrush({viewport,rootsFor:roots,onOpen:open,hover:true});
   function key(){return 'sidecar-highlights:'+JSON.stringify([book.repository.toLowerCase(),book.branch]);}
@@ -13,7 +28,7 @@ export function mountHighlights({reader,viewport,status}){
     brush.rebuild(Object.values(rows).map(row=>row.note));
   }
   function load(snapshot){
-    book=snapshot;active=captured=reattach=null;rows=JSON.parse(localStorage.getItem(key())||'{}');
+    book=snapshot;stopPicking();active=null;rows=JSON.parse(localStorage.getItem(key())||'{}');
     for(const file of snapshot.files){
       if(!file.path.startsWith('Book/Notes/')||!isHighlightFile(file.path.slice(11)))continue;
       const note=decodeNote(new TextDecoder().decode(file.bytes));if(!note)continue;
@@ -48,7 +63,7 @@ export function mountHighlights({reader,viewport,status}){
     $('highlight-message').textContent=box.childElementCount?'Choose a highlight':'Select words in one scene to highlight them.';
     dialog.showModal();
   }
-  $('reattach-highlight').onclick=()=>{reattach=active;dialog.close();$('highlight-toggle').textContent='Reattach highlight';};
+  $('reattach-highlight').onclick=()=>{reattach=active;dialog.close();getSelection().removeAllRanges();startPicking();};
   function capture(){
     const sel=getSelection();if(!sel.rangeCount||sel.isCollapsed)return null;
     const range=sel.getRangeAt(0);
@@ -57,14 +72,47 @@ export function mountHighlights({reader,viewport,status}){
     if(!from||!to||!reader.contains(from)||from.dataset.scene!==to.dataset.scene)return null;
     return selectionAnchor(from.dataset.scene,roots(from.dataset.scene),range);
   }
+  function apply(anchor){
+    const note={...(reattach?rows[reattach].note:{id:crypto.randomUUID(),body:'',color:'honey'}),...anchor};
+    try{save(note);stopPicking();getSelection().removeAllRanges();open(note);}
+    catch(e){hint.textContent='Could not save highlight: '+e.message;status(e.message,true);}
+  }
   $('highlight-toggle').onpointerdown=()=>{captured=capture();};
   $('highlight-toggle').onclick=()=>{
     const anchor=captured||capture();captured=null;
-    if(!anchor){if(reattach){reattach=null;$('highlight-toggle').textContent='Highlight';}list();return;}
-    const note={...(reattach?rows[reattach].note:{id:crypto.randomUUID(),body:'',color:'honey'}),...anchor};
-    try{save(note);reattach=null;$('highlight-toggle').textContent='Highlight';getSelection().removeAllRanges();open(note);}
-    catch(e){status(e.message,true);}
+    if(anchor){apply(anchor);return;}
+    startPicking();
   };
+  // Two taps work with a finger or a pen without relying on Android selection handles.
+  viewport.addEventListener('click',event=>{
+    if(tools.hidden)return;
+    const block=event.target.closest('p[data-block]');
+    if(!block)return;
+    event.stopImmediatePropagation();
+    if(capture())return; // Native long-press or drag: let the reader adjust and press Apply.
+    const caret=document.caretRangeFromPoint(event.clientX,event.clientY);
+    const node=caret?.startContainer;
+    if(node?.nodeType!==Node.TEXT_NODE||!block.contains(node))return;
+    const text=node.data;
+    let left=Math.min(caret.startOffset,text.length-1);
+    if(/\s/.test(text[left])&&left>0)left--;
+    if(left<0||/\s/.test(text[left]))return;
+    let right=left+1;
+    while(left>0&&!/\s/.test(text[left-1]))left--;
+    while(right<text.length&&!/\s/.test(text[right]))right++;
+    const word=document.createRange();word.setStart(node,left);word.setEnd(node,right);
+    const path=block.dataset.scene;
+    if(!firstWord||!firstWord.range.startContainer.isConnected||firstWord.path!==path){
+      firstWord={path,range:word};hint.textContent='Now tap the last word. Tap the same word again for one word.';
+      if(window.Highlight&&CSS.highlights)CSS.highlights.set('pending-word',new Highlight(word));
+      return;
+    }
+    const earlier=word.compareBoundaryPoints(Range.START_TO_START,firstWord.range)<0;
+    const start=earlier?word:firstWord.range,end=earlier?firstWord.range:word;
+    const range=document.createRange();range.setStart(start.startContainer,start.startOffset);range.setEnd(end.endContainer,end.endOffset);
+    const anchor=selectionAnchor(path,roots(path),range);
+    if(anchor)apply(anchor);
+  },true);
   return {load,rebuild:()=>brush.rebuild(),async send(inbox){
     if(sending)return; sending=true;
     const owner=book;let count=0;

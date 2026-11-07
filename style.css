@@ -15,3 +15,5 @@ html,body{height:100%;overflow:hidden}body{display:flex;flex-direction:column}he
 .draft-bar small{margin-left:auto}
 #writing-prose{flex:1;min-height:0;overflow:auto;outline:0;padding:1em clamp(20px,4vw,52px) 3em;font:var(--reading-size)/1.65 Georgia,serif;overflow-wrap:anywhere;scroll-padding-block:2em}
 #highlight-dialog{width:min(30em,88vw);max-height:80dvh;overflow:auto;background:#fffbee;color:#332f28;border:1px solid #cbbd9f;border-radius:8px}#highlight-dialog label,#highlight-list button{display:block;margin:.5em 0}#highlight-body{display:block;width:100%;font:18px/1.4 Georgia,serif}#highlight-quote{border-left:3px solid #bd9843;margin:.5em 0;padding:.5em 1em;max-height:5em;overflow:auto}#highlight-done{float:right}#highlight-message{display:block;margin:.5em 0}
+
+#highlight-tools{padding:.35em .7em;background:#f4eedc;font-size:.9em}::highlight(pending-word){background:#dbc579}

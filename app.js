@@ -69,6 +69,7 @@ function pageStatus(){
   if(index===-2){$('previous').disabled=current===0;$('next').disabled=current===pages.length-1;}
 }
 async function render(which,scenePath=null,scroll=true,preserve=false){
+  if(!document.getElementById("highlight-tools").hidden)document.getElementById("highlight-cancel").click();
   const revision=++renderRevision,scroller=$('manuscript-scroll'),fraction=scroller.scrollTop/Math.max(1,scroller.scrollHeight-scroller.clientHeight);
   index=which===-2?-2:Math.max(-1,Math.min(model.chapters.length-1,which));selectedScene=index>=0&&model.chapters[index].scenes.some(s=>s.path===scenePath)?scenePath:null;
   $('highlight-toggle').hidden=index===-1;$('edit-scene').hidden=index===-1;const reader=$('reader');reader.replaceChildren();rendering=true;reader.setAttribute('aria-busy','true');
