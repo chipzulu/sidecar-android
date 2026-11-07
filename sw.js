@@ -1,4 +1,4 @@
-const CACHE='sidecar-reader-0.1.5';
+const CACHE='sidecar-reader-0.1.6';
 const FILES=['./','./index.html','./style.css','./app.js','./writing.js','./highlights.js','./shared/annotation-brush.js','./shared/annotation-inbox.js','./shared/annotation-brush.css','./api.js','./model.js','./storage.js','./pages.js','./layout.js','./cards.js','./token-vault.js','./credentials-ui.js','./manifest.webmanifest','./icon.svg','./icon-192.png','./icon-512.png','./shared/structure.js','./shared/clock-names.js','./shared/html-format.js','./shared/keep-together.js','./shared/manuscript-format.js','./shared/italic-markers.js','./shared/file-text.js'];
 self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(FILES))));
 self.addEventListener('activate',event=>event.waitUntil(self.clients.claim()));

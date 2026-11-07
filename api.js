@@ -11,12 +11,32 @@ export async function blobSha(bytes) {
 export function readerClient(repository,branch,token,{fetcher=fetch,signal}={}) {
   let activeSignal=signal;
   const name=repositoryName(repository);if(!branch.trim())throw Error('Enter a branch, usually main.');if(!token.trim())throw Error('Enter a read-only GitHub token.');
+  const credential=token.trim();
+  if(/[^!-~]/.test(credential))throw Error('The pasted token contains a space, line break, or unusual character. Copy the token again.');
   async function get(path){
-    let response;
-    try{response=await fetcher(`https://api.github.com/repos/${name}${path}`,{method:'GET',credentials:'omit',redirect:'error',cache:'no-store',signal:activeSignal?AbortSignal.any([activeSignal,AbortSignal.timeout(45000)]):AbortSignal.timeout(45000),headers:{Accept:'application/vnd.github+json',Authorization:`Bearer ${token.trim()}`}});}
-    catch{throw Error(activeSignal?.aborted?'Download cancelled. Your previous offline book is retained.':'Could not reach GitHub. Your previous offline book is retained.');}
-    if(!response.ok)throw Error(({401:'Token expired or invalid.',403:'GitHub denied access or rate limited requests. Check read permission or try later.',404:'Private repository or branch not found. Check the address and token access.'})[response.status]||`GitHub returned HTTP ${response.status}. Previous offline book retained.`);
-    return response.json();
+    const parent=activeSignal, controller=new AbortController();
+    const cancel=()=>controller.abort();
+    if(parent?.aborted)cancel();
+    parent?.addEventListener('abort',cancel,{once:true});
+    let timedOut=false;
+    const timer=setTimeout(()=>{timedOut=true;cancel();},45000);
+    try{
+      let response;
+      try{
+        response=await fetcher(`https://api.github.com/repos/${name}${path}`,{
+          method:'GET',credentials:'omit',redirect:'error',cache:'no-store',signal:controller.signal,
+          headers:{Accept:'application/vnd.github+json',Authorization:'Bearer '+credential}
+        });
+      }catch{
+        throw Error(globalThis.navigator?.onLine===false?'The tablet is offline. Reconnect to Wi-Fi and retry.':'The browser could not connect to api.github.com. Open https://api.github.com in Chrome on this tablet to check the connection.');
+      }
+      if(!response.ok)throw Error(({401:'Token expired or invalid.',403:'GitHub denied access or rate limited requests. Check read permission or try later.',404:'Private repository or branch not found. Check the address and token access.'})[response.status]||`GitHub returned HTTP ${response.status}.`);
+      return await response.json();
+    }catch(error){
+      if(parent?.aborted)throw Error('Download cancelled. Your previous offline book is retained.');
+      if(timedOut)throw Error('GitHub took more than 45 seconds to respond. Retry the download.');
+      throw error;
+    }finally{clearTimeout(timer);parent?.removeEventListener('abort',cancel);}
   }
   async function download(previous,progress=()=>{},downloadSignal=signal) {
     activeSignal=downloadSignal;
