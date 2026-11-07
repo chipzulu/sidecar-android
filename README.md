@@ -1,3 +1,7 @@
+## Reader 0.1.4 — Write a scene on the tablet
+
+Open a scene from Outline, or tap a paragraph while reading a chapter or the whole novel. Choose **Edit scene**, tap where you want to write, and use the pen in the ONYX input method. **Done** returns to paginated reading. Committed edits are saved in this browser on the tablet. You can reopen the app offline. Keep browser site data to keep drafts. Drafts are separate from downloaded files and are shown when the same repository, branch and scene path are opened again. To take a draft back to the PC in this version, select and copy the scene text.
+
 # Story Sidecar Reader 0.1.3
 
 ## New in 0.1.3 — Remember your GitHub token

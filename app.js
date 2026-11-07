@@ -8,6 +8,7 @@ import {fitLayout} from './layout.js';
 import {paginate} from './pages.js';
 import {mountCards} from './cards.js';
 import {mountCredentials} from './credentials-ui.js';
+import {readDraft, writeScene} from './writing.js';
 const $=id=>document.getElementById(id);
 let snapshot=null,model=null,index=-1,coverUrl='',busy=false,credentialBusy=false,client=null,clientKey='',abort=null,disposeCards=()=>{},selectedScene=null,renderRevision=0,rendering=false;
 function message(text,error=false){$('status').textContent=text;$('status').classList.toggle('error',error);}
@@ -52,8 +53,8 @@ function chapterSource(chapter,scenePath){
       const subtitle=sceneHeadingParts(scene.filename).subtitle;if(subtitle){const h=element('h2',subtitle,'scene-subtitle');h.dataset.scene=scene.path;source.append(h);}
       const prose=element('div',undefined,'scene');prose.append(sceneFragmentFromHtml(scene.html));
       convertItalicMarkers(prose,'decode');let group=null;
-      for(const block of [...prose.children]){const marker=keepMarker(block.textContent);if(marker){if(marker==='start'){group=element('div',undefined,'keep-unit');group.dataset.scene=scene.path;source.append(group);}else group=null;continue;}
-        block.dataset.scene=scene.path;if(block.tagName==='BLOCKQUOTE'){block.classList.add('quote-unit');for(const p of block.children){p.classList.add('quote-line');p.dataset.scene=scene.path;}}
+      for(const [blockIndex,block] of [...prose.children].entries()){block.dataset.block=String(blockIndex);const marker=keepMarker(block.textContent);if(marker){if(marker==='start'){group=element('div',undefined,'keep-unit');group.dataset.scene=scene.path;source.append(group);}else group=null;continue;}
+        block.dataset.scene=scene.path;if(block.tagName==='BLOCKQUOTE'){block.classList.add('quote-unit');for(const p of block.children){p.dataset.block=String(blockIndex);p.classList.add('quote-line');p.dataset.scene=scene.path;}}
         (group||source).append(block);}
     }
     return source;
@@ -68,7 +69,7 @@ function pageStatus(){
 async function render(which,scenePath=null,scroll=true,preserve=false){
   const revision=++renderRevision,scroller=$('manuscript-scroll'),fraction=scroller.scrollTop/Math.max(1,scroller.scrollHeight-scroller.clientHeight);
   index=which===-2?-2:Math.max(-1,Math.min(model.chapters.length-1,which));selectedScene=index>=0&&model.chapters[index].scenes.some(s=>s.path===scenePath)?scenePath:null;
-  const reader=$('reader');reader.replaceChildren();rendering=true;reader.setAttribute('aria-busy','true');
+  $('edit-scene').hidden=index===-1;const reader=$('reader');reader.replaceChildren();rendering=true;reader.setAttribute('aria-busy','true');
   const name=index===-2?'Entire Novel':index===-1?model.title:selectedScene?model.chapters[index].scenes.find(s=>s.path===selectedScene).name:model.chapters[index].name;
   for(const [id,direction] of [['previous','Previous'],['next','Next']]){const label=`${direction} ${index===-2?'page':selectedScene?'scene':'chapter'}`;$(id).title=label;$(id).setAttribute('aria-label',label);}
   $('position').textContent=name;$('position').title=name;$('page-count').textContent=index===-1?'':'Estimating pages…';
@@ -93,13 +94,35 @@ async function render(which,scenePath=null,scroll=true,preserve=false){
   }catch(error){if(revision===renderRevision){$('page-count').textContent='Page estimate unavailable';message(error.message,true);setOpen('connection',true);}}
   finally{if(revision===renderRevision){rendering=false;reader.setAttribute('aria-busy','false');pageStatus();remember();}}
 }
+let tappedBlock=null;
+$('reader').addEventListener('click',event=>{tappedBlock=event.target.closest('[data-block]');});
+$('edit-scene').onclick=()=>{
+  if(rendering||busy)return;
+  const viewport=$('manuscript-scroll').getBoundingClientRect();
+  const visible=node=>node.getBoundingClientRect().bottom>viewport.top&&node.getBoundingClientRect().top<viewport.bottom;
+  const blocks=[...$('reader').querySelectorAll('[data-block]')];
+  const anchor=tappedBlock?.isConnected&&visible(tappedBlock)?tappedBlock:blocks.find(visible)||blocks[0];
+  const path=anchor?.dataset.scene||selectedScene;
+  const scene=model.chapters.flatMap(chapter=>chapter.scenes).find(item=>item.path===path);
+  if(!scene)return;
+  writeScene(snapshot,scene,Number(anchor?.dataset.block)||0,async block=>{
+    await render(index,selectedScene,false,true);
+    const nodes=[...$('reader').querySelectorAll('[data-block]')].filter(node=>node.dataset.scene===path);
+    (nodes.find(node=>Number(node.dataset.block)===block)||nodes.at(-1))?.scrollIntoView({block:'nearest'});
+  });
+};
 function step(direction){
   if(index===-2){const pages=[...$('reader').querySelectorAll('.reading-page')],scroller=$('manuscript-scroll'),top=scroller.getBoundingClientRect().top;const current=Math.max(0,pages.findIndex(page=>page.getBoundingClientRect().bottom>top+1));const target=pages[Math.max(0,Math.min(pages.length-1,current+direction))];if(target)scroller.scrollTop+=target.getBoundingClientRect().top-top;pageStatus();return;}
   if(selectedScene){const all=model.chapters.flatMap((c,n)=>c.scenes.map(s=>({path:s.path,chapter:n}))),current=all.findIndex(s=>s.path===selectedScene),next=all[current+direction];if(next)navigate(next.chapter,next.path);return;}
   navigate(index+direction);
   }
 async function openBook(value,resume=true){
-  if(coverUrl)URL.revokeObjectURL(coverUrl);coverUrl='';snapshot=value;model=bookModel(value);disposeCards();disposeCards=mountCards(value,{left:$('left-cards'),right:$('right-cards')},preference);
+  if(coverUrl)URL.revokeObjectURL(coverUrl);coverUrl='';snapshot=value;model=bookModel(value);
+  for(const chapter of model.chapters)for(const scene of chapter.scenes){
+    const draft=readDraft(value,scene);
+    if(draft)scene.html=draft.html;
+  }
+  disposeCards();disposeCards=mountCards(value,{left:$('left-cards'),right:$('right-cards')},preference);
   if(model.cover){const type=/\.png$/i.test(model.cover.path)?'image/png':'image/jpeg';coverUrl=URL.createObjectURL(new Blob([model.cover.bytes],{type}));}
   document.title=model.title+' · Sidecar Reader';$('repository').value=value.repository;$('branch').value=value.branch;
   credentials.refresh();
