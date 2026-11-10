@@ -43,7 +43,7 @@ const CLIPBOARD_BLOCK_ELEMENTS = new Set([
   "UL"
 ]);
 
-function cleanInline(source, targetDocument) {
+function cleanInline(source, targetDocument, keepAnnotations) {
   if (source.nodeType === Node.TEXT_NODE) {
     return targetDocument.createTextNode(source.nodeValue || "");
   }
@@ -55,25 +55,27 @@ function cleanInline(source, targetDocument) {
   if (source.tagName === "BR") return targetDocument.createElement("br");
 
   const styledItalic = source.tagName === "SPAN" && /italic/i.test(source.style?.fontStyle || "");
-  const fragmentOrElement = INLINE_ELEMENTS.has(source.tagName) || styledItalic
+  const annotation = keepAnnotations && source.tagName === 'MARK' && /^[a-f0-9-]{36}$/.test(source.dataset.annotation || '');
+  const fragmentOrElement = annotation ? targetDocument.createElement('mark') : INLINE_ELEMENTS.has(source.tagName) || styledItalic
     ? targetDocument.createElement(styledItalic || source.tagName === "I" ? "em" : source.tagName === "B" ? "strong" : source.tagName.toLowerCase())
     : targetDocument.createDocumentFragment();
 
+  if (annotation) fragmentOrElement.dataset.annotation = source.dataset.annotation;
   for (const child of source.childNodes) {
-    const cleanChild = cleanInline(child, targetDocument);
+    const cleanChild = cleanInline(child, targetDocument, keepAnnotations);
     if (cleanChild) fragmentOrElement.append(cleanChild);
   }
   return fragmentOrElement;
 }
 
-function paragraphFrom(source, targetDocument) {
+function paragraphFrom(source, targetDocument, keepAnnotations) {
   const paragraph = targetDocument.createElement("p");
   const indent = normalizeBlockIndent(source.getAttribute?.("data-indent"));
   if (indent) paragraph.dataset.indent = String(indent);
   const quoteGroup = source.getAttribute?.("data-quote-group");
   if (/^[1-9]\d*$/.test(quoteGroup || "")) paragraph.dataset.quoteGroup = quoteGroup;
   for (const child of source.childNodes) {
-    const cleanChild = cleanInline(child, targetDocument);
+    const cleanChild = cleanInline(child, targetDocument, keepAnnotations);
     if (cleanChild) paragraph.append(cleanChild);
   }
   if (!paragraph.textContent && !paragraph.querySelector("br")) {
@@ -82,22 +84,22 @@ function paragraphFrom(source, targetDocument) {
   return paragraph;
 }
 
-function blockquoteFrom(source, targetDocument) {
+function blockquoteFrom(source, targetDocument, keepAnnotations) {
   const quote = targetDocument.createElement("blockquote");
   let hasParagraph = false;
 
   for (const child of source.childNodes) {
     if (child.nodeType === Node.ELEMENT_NODE && PARAGRAPH_ELEMENTS.has(child.tagName)) {
-      quote.append(paragraphFrom(child, targetDocument));
+      quote.append(paragraphFrom(child, targetDocument, keepAnnotations));
       hasParagraph = true;
     }
   }
 
-  if (!hasParagraph) quote.append(paragraphFrom(source, targetDocument));
+  if (!hasParagraph) quote.append(paragraphFrom(source, targetDocument, keepAnnotations));
   return quote;
 }
 
-function appendRootNode(source, destination, targetDocument) {
+function appendRootNode(source, destination, targetDocument, keepAnnotations) {
   if (source.nodeType === Node.TEXT_NODE) {
     if (!source.nodeValue?.trim()) return;
     const paragraph = targetDocument.createElement("p");
@@ -110,12 +112,12 @@ function appendRootNode(source, destination, targetDocument) {
   if (source.hasAttribute("data-sidecar-chrome")) return;
 
   if (PARAGRAPH_ELEMENTS.has(source.tagName)) {
-    destination.append(paragraphFrom(source, targetDocument));
+    destination.append(paragraphFrom(source, targetDocument, keepAnnotations));
     return;
   }
 
   if (source.tagName === "BLOCKQUOTE") {
-    destination.append(blockquoteFrom(source, targetDocument));
+    destination.append(blockquoteFrom(source, targetDocument, keepAnnotations));
     return;
   }
 
@@ -126,19 +128,19 @@ function appendRootNode(source, destination, targetDocument) {
 
   if (INLINE_ELEMENTS.has(source.tagName)) {
     const paragraph = targetDocument.createElement("p");
-    const cleanChild = cleanInline(source, targetDocument);
+    const cleanChild = cleanInline(source, targetDocument, keepAnnotations);
     if (cleanChild) paragraph.append(cleanChild);
     destination.append(paragraph);
     return;
   }
 
-  for (const child of source.childNodes) appendRootNode(child, destination, targetDocument);
+  for (const child of source.childNodes) appendRootNode(child, destination, targetDocument, keepAnnotations);
 }
 
-export function sceneFragmentFromHtml(html, targetDocument = document) {
+export function sceneFragmentFromHtml(html, targetDocument = document, keepAnnotations = false) {
   const parsed = new DOMParser().parseFromString(html || "", "text/html");
   const fragment = targetDocument.createDocumentFragment();
-  for (const child of parsed.body.childNodes) appendRootNode(child, fragment, targetDocument);
+  for (const child of parsed.body.childNodes) appendRootNode(child, fragment, targetDocument, keepAnnotations);
   if (!fragment.childNodes.length) {
     const paragraph = targetDocument.createElement("p");
     paragraph.append(targetDocument.createElement("br"));

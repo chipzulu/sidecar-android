@@ -1,4 +1,6 @@
-import {decodeNote,encodeNote,isHighlightFile,mountBrush,noteFilename,selectionAnchor} from './shared/annotation-brush.js';
+import {attach,unwrap,inlineFragment,sceneNotes,annotatedHtml} from './inline-notes.js';
+import {storeAnnotatedScene} from './writing.js';
+import {decodeNote,encodeNote,isHighlightFile,noteFilename,selectionAnchor} from './shared/annotation-brush.js';
 
 export function mountHighlights({reader,viewport,status}){
   const $=id=>document.getElementById(id);
@@ -20,31 +22,98 @@ export function mountHighlights({reader,viewport,status}){
   $('highlight-cancel').onclick=stopPicking;
   $('browse-highlights').onclick=()=>{stopPicking();list();};
   function roots(path){return [...reader.querySelectorAll('p[data-block]')].filter(p=>p.dataset.scene===path);}
-  const brush=mountBrush({viewport,rootsFor:roots,onOpen:open,hover:true});
+  let scenes=new Map();
+  const tip=document.createElement('aside');tip.className='annotation-tip';tip.hidden=true;document.body.append(tip);
+  reader.addEventListener('pointermove',event=>{
+    const mark=event.target.closest('mark[data-annotation]'),note=rows[mark?.dataset.annotation]?.note;
+    tip.hidden=!note||event.pointerType==='touch'||!tools.hidden;
+    if(!tip.hidden){
+      tip.textContent=note.body||note.quote;
+      tip.style.left=Math.max(4,Math.min(event.clientX,innerWidth-280))+'px';
+      tip.style.top=Math.max(4,Math.min(event.clientY+18,innerHeight-80))+'px';
+    }
+  });
+  reader.addEventListener('pointerleave',()=>tip.hidden=true);
+  viewport.addEventListener('scroll',()=>tip.hidden=true,{passive:true});
+  reader.addEventListener('click',event=>{
+    const note=rows[event.target.closest('mark[data-annotation]')?.dataset.annotation]?.note;
+    if(note&&tools.hidden&&getSelection().isCollapsed){tip.hidden=true;open(note);}
+  });
   function key(){return 'sidecar-highlights:'+JSON.stringify([book.repository.toLowerCase(),book.branch]);}
   function persist(next){
     localStorage.setItem(key(),JSON.stringify(next));
     rows=next;
-    brush.rebuild(Object.values(rows).map(row=>row.note));
+
   }
-  function load(snapshot){
+  function load(snapshot,model){
+    scenes=new Map(model.chapters.flatMap(c=>c.scenes.map(s=>[s.path,s])));
     book=snapshot;stopPicking();active=null;rows=JSON.parse(localStorage.getItem(key())||'{}');
+    const updates=new Map();
     for(const file of snapshot.files){
       if(!file.path.startsWith('Book/Notes/')||!isHighlightFile(file.path.slice(11)))continue;
       const note=decodeNote(new TextDecoder().decode(file.bytes));if(!note)continue;
       const prior=rows[note.id];
+      if(prior?.discarded)continue;
       if(!prior||(!prior.dirty&&(prior.remote===file.sha||prior.main!==file.sha))){
+        updates.set(note.id,note);
         rows[note.id]={note,dirty:false,remote:prior?.remote,main:file.sha,base:file.sha};
       }
     }
-    brush.rebuild(Object.values(rows).map(row=>row.note));
+    for(const scene of scenes.values())sceneEdited(scene);
+    for(const [id,incoming] of updates){
+      const row=rows[id];
+      if(row.inline && (incoming.color!==row.note.color||incoming.body!==row.note.body)){
+        row.note={...row.note,color:incoming.color,body:incoming.body};
+        writeInline(row.note,false);
+      }
+    }
+    // Only old notes without an inline record need quotation-based migration.
+    for(const row of Object.values(rows)){
+      if(row.discarded)continue;
+      const scene=scenes.get(row.note.path);
+      if(scene&&!row.inline){writeInline(row.note,true,true);row.inline=true;}
+      if(!scene)row.note.unattached=true;
+    }
   }
-  function save(note){
+  function sceneEdited(scene){
+    for(const n of sceneNotes(scene.html)){
+      const prior=rows[n.id]||{};
+      rows[n.id]={...prior,inline:true,note:{...n,path:scene.path}};
+    }
+  }
+  function writeInline(note,place,legacy=false){
+    const scene=scenes.get(note.path);
+    if(!scene)throw Error('Open the original scene or reattach this note to another passage.');
+    const root=document.createElement('div');root.append(inlineFragment(scene.html));
+    if(place){
+      unwrap([root],note.id);
+      const ok=attach([root],note,{raw:true,legacy});
+      if(!ok&&!legacy)throw Error('The selection changed. Select the passage again.');
+    }
+    note.unattached=!root.querySelector('mark[data-annotation="'+note.id+'"]');
+    const notes=sceneNotes(scene.html).filter(n=>n.id!==note.id);
+    storeAnnotatedScene(book,scene,annotatedHtml(root,[...notes,note]));
+  }
+  function save(note,place=false){
     const old=rows[note.id]||{};
     const next={...note,base:old.dirty?old.note.base:(old.base||old.main||old.remote||null)};
-    persist({...rows,[note.id]:{...old,note:next,dirty:true}});
+    if(scenes.has(next.path)||place)writeInline(next,place);
+    if(place){
+      if(old.note && old.note.path!==next.path){
+        const prior=scenes.get(old.note.path);
+        if(prior){
+          const root=document.createElement('div');root.append(inlineFragment(prior.html));unwrap([root],next.id);
+          storeAnnotatedScene(book,prior,annotatedHtml(root,sceneNotes(prior.html).filter(n=>n.id!==next.id)));
+        }
+        unwrap(roots(old.note.path),next.id);
+      }
+      const blocks=roots(next.path);unwrap(blocks,next.id);attach(blocks,next);
+    }
+    for(const m of reader.querySelectorAll('mark[data-annotation="'+next.id+'"]'))m.dataset.color=next.color;
+    persist({...rows,[note.id]:{...old,inline:true,note:next,dirty:true}});
   }
   function open(note){
+    $('discard-unattached').hidden=!note.unattached;
     active=note.id;$('highlight-quote').textContent=note.quote;body.value=note.body;color.value=note.color;
     $('highlight-list').hidden=true;$('highlight-fields').hidden=false;
     $('highlight-message').textContent='Saved on this tablet';
@@ -59,10 +128,23 @@ export function mountHighlights({reader,viewport,status}){
   dialog.oncancel=e=>{e.preventDefault();$('highlight-done').click();};
   function list(){
     active=null;$('highlight-fields').hidden=true;const box=$('highlight-list');box.hidden=false;box.replaceChildren();
-    for(const {note} of Object.values(rows)){const button=document.createElement('button');button.textContent=note.quote;button.onclick=()=>open(note);box.append(button);}
+    for(const {note} of Object.values(rows).filter(row=>!row.discarded)){const button=document.createElement('button');button.textContent=(note.unattached?'Unattached · ':'')+note.quote;button.onclick=()=>open(note);box.append(button);}
     $('highlight-message').textContent=box.childElementCount?'Choose a highlight':'Select words in one scene to highlight them.';
     dialog.showModal();
   }
+  $('discard-unattached').onclick=()=>{
+    const note=rows[active]?.note;
+    if(!note?.unattached||!confirm('Discard this unattached note on this tablet?'))return;
+    try{
+      const scene=scenes.get(note.path);
+      if(scene){
+        const root=document.createElement('div');root.append(inlineFragment(scene.html));unwrap([root],active);
+        storeAnnotatedScene(book,scene,annotatedHtml(root,sceneNotes(scene.html).filter(n=>n.id!==active)));
+      }
+      persist({...rows,[active]:{discarded:true}});
+      active=null;dialog.close();
+    }catch(e){$('highlight-message').textContent=e.message;}
+  };
   $('reattach-highlight').onclick=()=>{reattach=active;dialog.close();getSelection().removeAllRanges();startPicking();};
   function capture(){
     const sel=getSelection();if(!sel.rangeCount||sel.isCollapsed)return null;
@@ -74,7 +156,7 @@ export function mountHighlights({reader,viewport,status}){
   }
   function apply(anchor){
     const note={...(reattach?rows[reattach].note:{id:crypto.randomUUID(),body:'',color:'honey'}),...anchor};
-    try{save(note);stopPicking();getSelection().removeAllRanges();open(note);}
+    try{save(note,true);stopPicking();getSelection().removeAllRanges();open(note);}
     catch(e){hint.textContent='Could not save highlight: '+e.message;status(e.message,true);}
   }
   $('highlight-toggle').onpointerdown=()=>{captured=capture();};
@@ -113,10 +195,10 @@ export function mountHighlights({reader,viewport,status}){
     const anchor=selectionAnchor(path,roots(path),range);
     if(anchor)apply(anchor);
   },true);
-  return {load,rebuild:()=>brush.rebuild(),async send(inbox){
+  return {load,sceneEdited,async send(inbox){
     if(sending)return; sending=true;
     const owner=book;let count=0;
-    try{for(const row of Object.values(rows).filter(r=>r.dirty)){
+    try{for(const row of Object.values(rows).filter(r=>r.dirty&&!r.note.unattached)){
       const note=row.note,sha=await inbox.send(noteFilename(note.id),encodeNote(note),row.remote);
       if(owner!==book)throw Error('Book changed. Retry from the original book.');
       const latest=rows[note.id];

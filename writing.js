@@ -1,4 +1,5 @@
-import {sceneFragmentFromHtml, serializeScene, htmlForPlainTextPaste} from './shared/html-format.js';
+import {inlineFragment,sceneNotes,annotatedHtml,colourMarks} from './inline-notes.js';
+import {htmlForPlainTextPaste} from './shared/html-format.js';
 
 const dialog = document.getElementById('writing-page');
 const prose = document.getElementById('writing-prose');
@@ -19,7 +20,7 @@ export function readDraft(book, scene) {
 function save() {
   if (!current || !dirty || composing) return;
   try {
-    const html = serializeScene(prose);
+    const html = annotatedHtml(prose,current.notes);
     localStorage.setItem(current.key, JSON.stringify({html, base: current.base}));
     current.scene.html = html;
     dirty = false;
@@ -29,11 +30,18 @@ function save() {
   }
 }
 
+export function storeAnnotatedScene(book,scene,html){
+  const draft=readDraft(book,scene);
+  localStorage.setItem(draftKey(book,scene),JSON.stringify({html,base:draft?.base||scene.sha}));
+  scene.html=html;
+}
+
 export function writeScene(book, scene, blockIndex, finished) {
   const previous = readDraft(book, scene);
-  current = {key: draftKey(book, scene), scene, base: previous?.base || scene.sha, finished};
+  current = {key: draftKey(book, scene), scene, notes:sceneNotes(scene.html), base: previous?.base || scene.sha, finished};
   dirty = composing = false;
-  prose.replaceChildren(sceneFragmentFromHtml(scene.html));
+  prose.replaceChildren(inlineFragment(scene.html));
+  colourMarks(prose,current.notes);
   document.getElementById('draft-title').textContent = scene.name;
   status.textContent = previous?.base && previous.base !== scene.sha
     ? 'Local draft · the downloaded scene has changed'

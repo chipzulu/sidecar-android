@@ -1,7 +1,7 @@
 import {readerClient,repositoryName} from './api.js';
 import {bookModel,chapterHeadingParts,sceneHeadingParts} from './model.js';
-import {readBook,saveBook} from './storage.js';
-import {sceneFragmentFromHtml} from './shared/html-format.js';
+import {readBook,saveBook,bookIdentity,readBookIdentity} from './storage.js';
+import {inlineFragment,sceneNotes,colourMarks} from './inline-notes.js';
 import {convertItalicMarkers} from './shared/italic-markers.js';
 import {keepMarker} from './shared/keep-together.js';
 import {fitLayout} from './layout.js';
@@ -53,7 +53,7 @@ function chapterSource(chapter,scenePath){
     for(const [n,scene] of scenes.entries()){
       if(n)source.append(element('div','* * *','scene-break'));
       const subtitle=sceneHeadingParts(scene.filename).subtitle;if(subtitle){const h=element('h2',subtitle,'scene-subtitle');h.dataset.scene=scene.path;source.append(h);}
-      const prose=element('div',undefined,'scene');prose.append(sceneFragmentFromHtml(scene.html));
+      const prose=element('div',undefined,'scene');prose.append(inlineFragment(scene.html));colourMarks(prose,sceneNotes(scene.html));
       convertItalicMarkers(prose,'decode');let group=null;
       for(const [blockIndex,block] of [...prose.children].entries()){block.dataset.block=String(blockIndex);const marker=keepMarker(block.textContent);if(marker){if(marker==='start'){group=element('div',undefined,'keep-unit');group.dataset.scene=scene.path;source.append(group);}else group=null;continue;}
         block.dataset.scene=scene.path;if(block.tagName==='BLOCKQUOTE'){block.classList.add('quote-unit');for(const p of block.children){p.dataset.block=String(blockIndex);p.classList.add('quote-line');p.dataset.scene=scene.path;}}
@@ -69,7 +69,7 @@ function pageStatus(){
   if(index===-2){$('previous').disabled=current===0;$('next').disabled=current===pages.length-1;}
 }
 async function render(which,scenePath=null,scroll=true,preserve=false){
-  if(!document.getElementById("highlight-tools").hidden)document.getElementById("highlight-cancel").click();
+  if((which!==index||scenePath!==selectedScene)&&!document.getElementById("highlight-tools").hidden)document.getElementById("highlight-cancel").click();
   const revision=++renderRevision,scroller=$('manuscript-scroll'),fraction=scroller.scrollTop/Math.max(1,scroller.scrollHeight-scroller.clientHeight);
   index=which===-2?-2:Math.max(-1,Math.min(model.chapters.length-1,which));selectedScene=index>=0&&model.chapters[index].scenes.some(s=>s.path===scenePath)?scenePath:null;
   $('highlight-toggle').hidden=index===-1;$('edit-scene').hidden=index===-1;const reader=$('reader');reader.replaceChildren();rendering=true;reader.setAttribute('aria-busy','true');
@@ -95,7 +95,7 @@ async function render(which,scenePath=null,scroll=true,preserve=false){
     $('previous').disabled=index===-1;$('next').disabled=index>=model.chapters.length-1&&!selectedScene;
     if(selectedScene){const all=model.chapters.flatMap(c=>c.scenes);const sceneIndex=all.findIndex(s=>s.path===selectedScene);$('previous').disabled=sceneIndex===0;$('next').disabled=sceneIndex===all.length-1;}
   }catch(error){if(revision===renderRevision){$('page-count').textContent='Page estimate unavailable';message(error.message,true);setOpen('connection',true);}}
-  finally{if(revision===renderRevision){rendering=false;reader.setAttribute('aria-busy','false');pageStatus();remember();highlights.rebuild();}}
+  finally{if(revision===renderRevision){rendering=false;reader.setAttribute('aria-busy','false');pageStatus();remember();}}
 }
 let tappedBlock=null;
 $('reader').addEventListener('click',event=>{tappedBlock=event.target.closest('[data-block]');});
@@ -109,6 +109,7 @@ $('edit-scene').onclick=()=>{
   const scene=model.chapters.flatMap(chapter=>chapter.scenes).find(item=>item.path===path);
   if(!scene)return;
   writeScene(snapshot,scene,Number(anchor?.dataset.block)||0,async block=>{
+    highlights.sceneEdited(scene);
     await render(index,selectedScene,false,true);
     const nodes=[...$('reader').querySelectorAll('[data-block]')].filter(node=>node.dataset.scene===path);
     (nodes.find(node=>Number(node.dataset.block)===block)||nodes.at(-1))?.scrollIntoView({block:'nearest'});
@@ -120,16 +121,18 @@ function step(direction){
   navigate(index+direction);
   }
 async function openBook(value,resume=true){
-  if(coverUrl)URL.revokeObjectURL(coverUrl);coverUrl='';snapshot=value;model=bookModel(value);highlights.load(value);
+  if(client && clientKey!==JSON.stringify([value.repository,value.branch]))lockGitHub();
+  if(coverUrl)URL.revokeObjectURL(coverUrl);coverUrl='';snapshot=value;model=bookModel(value);
   for(const chapter of model.chapters)for(const scene of chapter.scenes){
     const draft=readDraft(value,scene);
     if(draft)scene.html=draft.html;
   }
+  highlights.load(value,model);
   disposeCards();disposeCards=mountCards(value,{left:$('left-cards'),right:$('right-cards')},preference);
   if(model.cover){const type=/\.png$/i.test(model.cover.path)?'image/png':'image/jpeg';coverUrl=URL.createObjectURL(new Blob([model.cover.bytes],{type}));}
   document.title=model.title+' · Sidecar Reader';$('repository').value=value.repository;$('branch').value=value.branch;
   credentials.refresh();
-  $('book-status').textContent=`${model.title} · Offline copy downloaded ${new Date(value.downloadedAt).toLocaleString()} · ${value.commit.slice(0,8)} · ${value.files.length} files`;
+  $('book-status').textContent=`${model.title} · ${value.repository} (${value.branch}) · Offline copy downloaded ${new Date(value.downloadedAt).toLocaleString()} · ${value.commit.slice(0,8)} · ${value.files.length} files`;
   $('outline').replaceChildren();const cover=element('button','Cover');cover.dataset.scope='cover';cover.onclick=()=>navigate(-1);const entire=element('button','Entire Novel');entire.dataset.scope='novel';entire.onclick=()=>navigate(-2);$('outline').append(cover,entire);
   model.chapters.forEach((chapter,n)=>{const details=element('details'),summary=element('summary',chapter.name),children=element('div'),all=element('button','Read chapter');all.dataset.scope=`chapter:${chapter.key}`;all.onclick=()=>navigate(n);children.append(all);
     for(const scene of chapter.scenes){const button=element('button',scene.name);button.dataset.scope=scene.path;button.onclick=()=>navigate(n,scene.path);children.append(button);}details.append(summary,children);$('outline').append(details);});
@@ -154,7 +157,7 @@ $('send-highlights').onclick=async()=>{
   if(!snapshot||!client||clientKey!==JSON.stringify([snapshot.repository,snapshot.branch])){message('Unlock GitHub for the open book first.',true);return;}
   if(busy||credentialBusy)return;
   busy=true;controls();
-  try{const count=await highlights.send(client.inbox);message(count?'Sent '+count+' highlight note(s). On PC choose Get tablet highlights.':'All highlight notes have been sent.');}
+  try{const count=await highlights.send(client.inbox);message(count?'Sent '+count+' highlight note(s). On PC choose Get tablet highlights.':'No attached highlight notes waiting to send.');}
   catch(e){message(e.message,true);}finally{busy=false;controls();}
 };
 $('cancel').onclick=()=>abort?.abort();
@@ -163,15 +166,40 @@ $('download').onclick=async()=>{
   try{
     const repository=repositoryName($('repository').value),branch=$('branch').value.trim(),key=JSON.stringify([repository,branch]);
     if(!client||clientKey!==key){if(!$('token').value&&credentials.hasSaved())throw Error('Unlock GitHub with your passphrase, then refresh the book.');client=readerClient(repository,branch,$('token').value);clientKey=key;$('token').value='';}
-    if(snapshot&&(repository.toLowerCase()!==snapshot.repository.toLowerCase()||branch!==snapshot.branch)&&!confirm('Replace the offline book on this device with this repository? GitHub files are never changed.')){message('Download cancelled.');return;}
+    if(snapshot&&(repository.toLowerCase()!==snapshot.repository.toLowerCase()||branch!==snapshot.branch)&&!confirm(`Open ${repository} (${branch}) in place of ${model.title} on this tablet?`)){message('Download cancelled.');return;}
     message('Checking private repository and latest backup…');
     // Pass cancellation into the GET-only transport; token stays in its closure.
     const next=await client.download(snapshot,p=>{if(abort.signal.aborted)throw Error('Download cancelled. Previous offline book retained.');$('progress').max=Math.max(1,p.total);$('progress').value=p.completed;message(`Downloading ${p.completed} of ${p.total} files · ${p.path}`);},abort.signal);
     if(abort.signal.aborted)throw Error('Download cancelled. Previous offline book retained.');
     const verified=bookModel(next);if(!verified.chapters.length)throw Error('No readable manuscript found.');
-    await saveBook(next);remember();await openBook(next);message('Book verified and saved for offline reading. No GitHub files were changed.');
+    await saveBook(next);bookUpdates.postMessage('saved');remember();await openBook(next);message('Book verified and saved for offline reading. No GitHub files were changed.');
     navigator.storage?.persist?.().catch(()=>{});
-  }catch(error){message(error.message,true);setOpen('connection',true);}finally{busy=false;controls();abort=null;}
+  }catch(error){message(error.message,true);setOpen('connection',true);}finally{busy=false;controls();abort=null;void reconcileBook();}
 };
+// The installed reader and Chrome can share the database while keeping separate pages in memory.
+const bookUpdates=new BroadcastChannel('sidecar-reader-book');
+let checking=false, checkAgain=false;
+function canSwitchBook(){return !busy&&!credentialBusy&&!document.querySelector('dialog[open]');}
+async function reconcileBook(){
+  if(!canSwitchBook())return;
+  if(checking){checkAgain=true;return;}
+  checking=true;
+  try{
+    const identity=await readBookIdentity();
+    if(identity && identity!==bookIdentity(snapshot)){
+      const latest=await readBook();
+      if(latest&&canSwitchBook()&&bookIdentity(latest)!==bookIdentity(snapshot)){
+        remember();await openBook(latest);
+      }
+    }
+  }catch(error){message(error.message,true);}
+  finally{checking=false;if(checkAgain){checkAgain=false;void reconcileBook();}}
+}
 try{const saved=await readBook();if(saved)await openBook(saved);}catch(error){message(error.message,true);}
+bookUpdates.onmessage=reconcileBook;
+window.addEventListener('pageshow',reconcileBook);
+window.addEventListener('focus',reconcileBook);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)reconcileBook();});
+document.addEventListener('close',reconcileBook,true);
+void reconcileBook();
 if('serviceWorker'in navigator&&isSecureContext){try{await navigator.serviceWorker.register('./sw.js');await navigator.serviceWorker.ready;$('offline').textContent='Reader cached for offline opening. Use Chrome → Install app / Add to Home screen.';}catch{$('offline').textContent='Offline app setup failed. Reopen online and try again.';}}else $('offline').textContent='Open this app from an HTTPS website to enable offline installation.';
