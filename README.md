@@ -1,10 +1,16 @@
-# Story Sidecar Android Reader 0.1.16
+# Story Sidecar Android Reader 0.1.17
 
-## Handwriting in 0.1.16
+## Native BOOX test integration in 0.1.17
+
+In normal Chrome/browser use, drawing follows the 0.1.16 path. Inside the separate **Sidecar BOOX Test** Android app, the reader negotiates a native pen connection. **BOOX native pen** above the handwriting area means native setup completed; **Browser pen** shows fallback and its reason. The wrapper uses its own local storage, so connect and download the book once there. A normal website cannot activate native E-Ink acceleration by itself.
+
+See the separate wrapper README for APK installation and device tests. Native hardware performance has not been measured in this workspace. Existing notes, local recovery, GitHub transfer and desktop compatibility retain their formats.
+
+## Handwriting foundation from 0.1.16
 
 Stroke capture is separated from saving and manuscript layout. Existing ink stays in place after pen-up; only the active stroke is painted on animation frames. Each completed stroke gets a local recovery checkpoint. Scene HTML is updated after an 800 ms pause, or when leaving the note or hiding the app. Failed saves remain visibly reported and can be retried.
 
-The writing area stays still between letters. Use **More space** to extend it. There is no native BOOX hardware acceleration in this release; responsiveness needs device testing. See `INK-INPUT.md` for the future adapter contract.
+The writing area stays still between letters. Use **More space** to extend it. Chrome uses browser input; native acceleration requires the separate test wrapper and physical device testing. See `INK-INPUT.md` for the future adapter contract.
 
 Version 0.1.12 fixed repeated welcome-screen reloads when opening a book downloaded by an older reader. The reader derives the missing identity from the stored book and preserves its drafts and highlights. If the loop prevents opening Configuration, use the update-page link below in Chrome.
 
@@ -13,7 +19,7 @@ Version 0.1.12 fixed repeated welcome-screen reloads when opening a book downloa
 1. On the PC, extract the Reader ZIP. Upload the **contents of `site/`** to the root of the **app repository** (`sidecar-android` for this installation). Keep the `shared/` folder. The root should contain `index.html`, `sw.js`, `update.html`, and `update-reader.js` alongside the other app files.
 2. Commit the upload and wait for GitHub Pages to finish publishing.
 3. On the tablet, open **Configuration → Check for app update**. If the installed version has no update button, open Chrome and visit the [Sidecar update page](https://chipzulu.github.io/sidecar-android/update.html). For another installation, open `update.html` under its own Pages address.
-4. Wait for **Reader 0.1.16 is ready**, then tap **Open reader**. Configuration shows the installed version.
+4. Wait for **Reader 0.1.17 is ready**, then tap **Open reader**. Configuration shows the installed version.
 
 Keep the reader’s site data when updating. Clearing it can delete local scene drafts, highlights, the offline book, and saved credentials. If the update page says “Try again,” check that Pages has finished deploying and that the tablet is online. A 404 for `update.html` usually means the file has not reached the published site or was uploaded inside an extra `site/` folder.
 
@@ -67,6 +73,7 @@ Handwriting recognition is not included. Test pen responsiveness on your BOOX; t
 
 | Reader | Change |
 | --- | --- |
+| 0.1.17 | Add optional native BOOX pen adapter with negotiation, geometry/exclusions, stroke acknowledgement and browser fallback. |
 | 0.1.16 | Separate input adapter, retain ink, defer scene rewrites and keep the writing area stationary. |
 | 0.1.15 | Restored 0.1.13 input for comparison; user reported similar responsiveness. |
 | 0.1.14 | Experimental incremental drawing; user reported substantially slower BOOX pen response. |

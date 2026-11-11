@@ -1,8 +1,8 @@
 import {inkSvg,appendStroke,validInk} from './shared/annotation-ink.js';
-import {browserInkInput} from './ink-input.js';
+import {adaptiveInkInput} from './ink-native.js';
 
 // Input adapters provide completed strokes. Persistence never runs during pointer movement.
-export function inkPad(host, initial, save, inputFactory=browserInkInput) {
+export function inkPad(host, initial, save, inputFactory=adaptiveInkInput) {
   let ink=structuredClone(initial||{version:1,width:800,height:300,strokes:[]});
   let count=ink.strokes.reduce((n,s)=>n+s.length,0),timer=0,pending=false,failed=false;
   const svg=inkSvg(ink),toolbar=document.createElement('div'),status=document.createElement('small');
@@ -28,14 +28,14 @@ export function inkPad(host, initial, save, inputFactory=browserInkInput) {
     ink={...ink,strokes:[...ink.strokes,points]};count+=points.length;
     checkpoint();return true;
   }
+  host.append(toolbar,svg,status);
   const input=inputFactory(svg,{height:()=>ink.height,remaining:()=>ink.strokes.length>=2000?0:24000-count,begin:()=>clearTimeout(timer),complete});
   function button(label,action){const b=document.createElement('button');b.type='button';b.textContent=label;b.onclick=()=>{if(!input.active())action();};toolbar.append(b);}
   button('Undo stroke',()=>{if(!ink.strokes.length)return;count-=ink.strokes.at(-1).length;ink={...ink,strokes:ink.strokes.slice(0,-1)};svg.lastElementChild?.remove();checkpoint();});
   button('More space',()=>{ink={...ink,height:Math.min(12000,ink.height+200)};svg.setAttribute('viewBox','0 0 800 '+ink.height);checkpoint();});
   button('Clear handwriting',()=>{if(!ink.strokes.length||!confirm('Clear the handwriting in this annotation?'))return;ink={version:1,width:800,height:300,strokes:[]};count=0;svg.replaceChildren();svg.setAttribute('viewBox','0 0 800 300');checkpoint();});
-  function finish(){input.finish();return flush();}
+  function finish(){if(input.finish()===false){message("Finish the pen stroke before closing this note.");return false;}return flush();}
   const hidden=()=>{if(document.hidden)finish();};
   window.addEventListener('pagehide',finish);document.addEventListener('visibilitychange',hidden);
-  host.append(toolbar,svg,status);
   return {save:finish,dispose(){clearTimeout(timer);input.dispose();window.removeEventListener('pagehide',finish);document.removeEventListener('visibilitychange',hidden);}};
 }
