@@ -1,11 +1,11 @@
-# Story Sidecar Android Reader 0.1.10
+# Story Sidecar Android Reader 0.1.11
 
 ## Update an installed BOOX or Android reader
 
 1. On the PC, extract the Reader ZIP. Upload the **contents of `site/`** to the root of the **app repository** (`sidecar-android` for this installation). Keep the `shared/` folder. The root should contain `index.html`, `sw.js`, `update.html`, and `update-reader.js` alongside the other app files.
 2. Commit the upload and wait for GitHub Pages to finish publishing.
 3. On the tablet, open **Configuration → Check for app update**. If the installed version has no update button, open Chrome and visit the [Sidecar update page](https://chipzulu.github.io/sidecar-android/update.html). For another installation, open `update.html` under its own Pages address.
-4. Wait for **Reader 0.1.10 is ready**, then tap **Open reader**. Configuration shows the installed version.
+4. Wait for **Reader 0.1.11 is ready**, then tap **Open reader**. Configuration shows the installed version.
 
 Keep the reader’s site data when updating. Clearing it can delete local scene drafts, highlights, the offline book, and saved credentials. If the update page says “Try again,” check that Pages has finished deploying and that the tablet is online. A 404 for `update.html` usually means the file has not reached the published site or was uploaded inside an extra `site/` folder.
 
@@ -28,9 +28,11 @@ If a refresh fails:
 
 ## Remember the GitHub token
 
-Select **Remember token on this device**, enter the same passphrase twice (at least eight characters), then choose **Save token securely**. After reopening the reader, enter the passphrase and choose **Unlock GitHub** before refreshing or sending highlights. Offline reading works while locked.
+Paste a token and select **Remember token on this device** if you want automatic access after reopening. Choose **Save token**, or download directly. Leave the checkbox clear for this session only. The saved token is hidden from the interface and stored in browser storage without passphrase encryption.
 
-**Lock GitHub** ends the unlocked session. **Forget saved token** removes the encrypted credential for that repository from this browser. If you forget the passphrase, use that button and save a replacement token. You may use the same passphrase on PC and tablet. Each device keeps its own encrypted token. The reader uses AES-256-GCM and PBKDF2-SHA256 with 600,000 iterations and a fresh salt and IV for each save.
+**Replace token** opens an empty input. **Cancel** keeps the previous token. **Forget token** removes the credential from this device and ends its active session. It preserves the downloaded book. Tokens saved by older versions with a passphrase require a replacement token.
+
+**Remove book from this device…** deletes the current offline book, its local drafts and annotations after confirmation. It preserves GitHub files and the saved token. This release still holds one downloaded manuscript at a time.
 
 ## Read and write
 
@@ -50,7 +52,7 @@ To transfer highlights, choose **GitHub → Send highlights** on the tablet. On 
 
 | Reader | Change |
 | --- | --- |
-| 0.1.10 | Tablet scene drafts store marked passages and their notes inline. Hover or tap the mark. Deleted passages leave an unattached note under Saved highlights. |
+| 0.1.11 | Tablet scene drafts store marked passages and their notes inline. Hover or tap the mark. Deleted passages leave an unattached note under Saved highlights. |
 | 0.1.9 | The installed reader and other open tabs pick up the newly downloaded book. The book status shows its repository and branch. |
 | 0.1.8 | Highlight first, then tap the first and last words on the reading page. |
 | 0.1.7 | Dedicated update page and Configuration update link for installed readers. |

@@ -1,31 +1,87 @@
 import {repositoryName} from './api.js';
-import {sealToken,unsealToken,readCredential,writeCredential} from './token-vault.js';
+import {readCredential,writeCredential} from './token-vault.js';
+
 export function mountCredentials({activate,lock,message,onBusy}){
-  const $=id=>document.getElementById(id);let working=false,revision=0,exists=false;
-  function clear(){for(const id of ['passphrase','confirm-passphrase'])$(id).value='';}
-  function fields(){const remember=$('remember-token').checked;$('passphrase-label').hidden=!remember&&!exists;$('confirm-label').hidden=!remember;$('save-token').hidden=!remember;$('unlock-token').hidden=!exists;$('forget-saved-token').hidden=!exists;}
-  async function refresh(){const current=++revision;try{const repo=repositoryName($('repository').value);const record=await readCredential(repo);if(current!==revision)return;exists=Boolean(record);$('credential-status').textContent=exists?'Encrypted token saved for this repository. Unlock it after reopening.':'No token saved for this repository.';}catch{if(current!==revision)return;exists=false;$('credential-status').textContent='Enter a repository to check saved credentials.';}fields();}
-  async function run(action){if(working)return;working=true;onBusy(true);message('Working on the saved credential…');try{await action();}catch(error){message(error.message,true);}finally{clear();working=false;onBusy(false);fields();}}
-  $('remember-token').onchange=()=>{clear();fields();};
-  $('save-token').onclick=()=>run(async()=>{
-    const repo=repositoryName($('repository').value),branch=$('branch').value.trim(),token=$('token').value.trim(),pass=$('passphrase').value;
+  const $=id=>document.getElementById(id);
+  let revision=0,working=false,record=null,editing=false,session=null;
+  const repo=()=>repositoryName($('repository').value);
+  function fields(){
+    const saved=record?.kind==='remembered-token'&&typeof record.token==='string';
+    const active=session?.repository===safeRepo();
+    $('token-entry').hidden=!editing&&(saved||active);
+    $('replace-token').hidden=editing||!(saved||active);
+    $('forget-saved-token').hidden=!record&&!active;
+    $('cancel-token').hidden=!editing||!(saved||active||record);
+    $('save-token').textContent=$('remember-token').checked?'Save token':'Use token';
+    $('credential-status').textContent=record&&!saved
+      ?'The previous token used a passphrase. Paste a replacement token.'
+      :saved?'Token saved on this device. Ready to use.'
+      :active?'Token in use for this session. Not saved.'
+      :'No token saved. Paste a GitHub token to connect.';
+  }
+  function safeRepo(){try{return repo();}catch{return '';}}
+  async function refresh(){
+    const request=++revision,repository=safeRepo();
+    editing=false;record=null;$('token').value='';
+    if(session?.repository!==repository){session=null;lock();}
+    fields();
+    if(!repository)return;
+    try{
+      const value=await readCredential(repository);
+      if(request!==revision)return;
+      record=value||null;fields();
+    }catch(e){if(request===revision)message(e.message,true);}
+  }
+  async function ensure(){
+    const repository=repo(),branch=$('branch').value.trim();
+    ++revision;
     if(!branch)throw Error('Enter a branch, usually main.');
-    if(pass!==$('confirm-passphrase').value)throw Error('The passphrases do not match. Please enter them again.');
-    const record=await sealToken(repo,token,pass);await writeCredential(repo,record);
-    activate(repo,branch,token);$('token').value='';$('remember-token').checked=false;await refresh();
-    message('Token encrypted and saved on this device. GitHub is unlocked for this session; you can refresh the book.');
+    const typed=$('token').value.trim();
+    let token=typed;
+    if(!typed){
+      if(session?.repository===repository)token=session.token;
+      else {
+        const saved=await readCredential(repository);
+        if(saved?.kind==='remembered-token')token=saved.token;
+        else if(saved)throw Error('Paste a replacement token for this book. The previous token used a passphrase.');
+      }
+    }
+    if(!token)throw Error('Paste a GitHub token for this book.');
+    if(token.length>4096)throw Error('The token is too long. Paste only the GitHub token.');
+    // Construct the client before persisting, so malformed input cannot replace a saved token.
+    activate(repository,branch,token);
+    if(typed){
+      try{
+        const next=$('remember-token').checked?{kind:'remembered-token',token}:null;
+        await writeCredential(repository,next);record=next;
+      }catch(e){lock();throw e;}
+    }
+    session={repository,token};editing=false;$('token').value='';fields();
+  }
+  async function run(action){
+    if(working)return;
+    working=true;onBusy(true);
+    try{await action();}catch(e){message(e.message,true);}
+    finally{working=false;onBusy(false);fields();}
+  }
+  $('save-token').onclick=()=>run(async()=>{
+    await ensure();message('Token ready. Download or refresh the book to check GitHub access.');
   });
-  $('unlock-token').onclick=()=>run(async()=>{
-    const repo=repositoryName($('repository').value),branch=$('branch').value.trim();if(!branch)throw Error('Enter a branch, usually main.');
-    const record=await readCredential(repo);if(!record)throw Error('No saved token for this repository. Enter a new token.');
-    const token=await unsealToken(repo,record,$('passphrase').value);activate(repo,branch,token);$('token').value='';message('GitHub unlocked for this session. You can refresh the book.');
-  });
+  $('replace-token').onclick=()=>{
+    editing=true;$('token').value='';$('remember-token').checked=Boolean(record);
+    fields();$('token').focus();
+  };
+  $('cancel-token').onclick=()=>{editing=false;$('token').value='';fields();};
   $('forget-saved-token').onclick=()=>run(async()=>{
-    const repo=repositoryName($('repository').value);
-    if(!confirm(`Forget the saved token for ${repo}? Your offline book and reading settings will stay intact. This does not revoke the token on GitHub.`)){message('Saved token retained.');return;}
-    await writeCredential(repo,null);lock();$('token').value='';$('remember-token').checked=false;await refresh();message('Saved token removed. Your book and settings are unchanged. Enter a new token and choose a new passphrase whenever you want.');
+    const repository=repo();
+    await writeCredential(repository,null);
+    record=null;session=null;lock();editing=false;$('token').value='';$('remember-token').checked=false;
+    message('Token forgotten on this device. Your downloaded book remains available.');
   });
-  $('passphrase').onkeydown=event=>{if(event.key==='Enter'&&!$('remember-token').checked&&exists){event.preventDefault();$('unlock-token').click();}};
-  $('repository').addEventListener('input',()=>{clear();refresh();});
-  fields();refresh();return {refresh,clear,hasSaved:()=>exists};
+  $('remember-token').onchange=fields;
+  $('token').oninput=()=>{editing=true;};
+  $('token').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();$('save-token').click();}};
+  $('repository').addEventListener('input',()=>{void refresh();});
+  fields();void refresh();
+  return {refresh,ensure};
 }
