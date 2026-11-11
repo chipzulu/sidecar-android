@@ -1,4 +1,10 @@
-# Story Sidecar Android Reader 0.1.15
+# Story Sidecar Android Reader 0.1.16
+
+## Handwriting in 0.1.16
+
+Stroke capture is separated from saving and manuscript layout. Existing ink stays in place after pen-up; only the active stroke is painted on animation frames. Each completed stroke gets a local recovery checkpoint. Scene HTML is updated after an 800 ms pause, or when leaving the note or hiding the app. Failed saves remain visibly reported and can be retried.
+
+The writing area stays still between letters. Use **More space** to extend it. There is no native BOOX hardware acceleration in this release; responsiveness needs device testing. See `INK-INPUT.md` for the future adapter contract.
 
 Version 0.1.12 fixed repeated welcome-screen reloads when opening a book downloaded by an older reader. The reader derives the missing identity from the stored book and preserves its drafts and highlights. If the loop prevents opening Configuration, use the update-page link below in Chrome.
 
@@ -7,7 +13,7 @@ Version 0.1.12 fixed repeated welcome-screen reloads when opening a book downloa
 1. On the PC, extract the Reader ZIP. Upload the **contents of `site/`** to the root of the **app repository** (`sidecar-android` for this installation). Keep the `shared/` folder. The root should contain `index.html`, `sw.js`, `update.html`, and `update-reader.js` alongside the other app files.
 2. Commit the upload and wait for GitHub Pages to finish publishing.
 3. On the tablet, open **Configuration → Check for app update**. If the installed version has no update button, open Chrome and visit the [Sidecar update page](https://chipzulu.github.io/sidecar-android/update.html). For another installation, open `update.html` under its own Pages address.
-4. Wait for **Reader 0.1.15 is ready**, then tap **Open reader**. Configuration shows the installed version.
+4. Wait for **Reader 0.1.16 is ready**, then tap **Open reader**. Configuration shows the installed version.
 
 Keep the reader’s site data when updating. Clearing it can delete local scene drafts, highlights, the offline book, and saved credentials. If the update page says “Try again,” check that Pages has finished deploying and that the tablet is online. A 404 for `update.html` usually means the file has not reached the published site or was uploaded inside an extra `site/` folder.
 
@@ -42,9 +48,9 @@ Paste a token and select **Remember token on this device** if you want automatic
 
 Tap a paragraph, choose **Edit scene**, then tap where you want to write. On BOOX, choose the pen in the ONYX keyboard and handwrite in its scribe field. Recognized words appear at the cursor. **Done** returns to paginated reading. Committed edits are saved as a local draft associated with the repository, branch, and scene path. To take a prose draft back to the PC in this release, copy the scene text.
 
-## Pen regression fix in 0.1.15
+## Recovery compatibility
 
-This release restores the drawing and per-stroke saving behaviour from 0.1.13 after 0.1.14 proved substantially slower on BOOX. It also recovers pending handwriting records created by 0.1.14. Update through the update page and keep the existing site data.
+Pending handwriting records created by 0.1.14 are recovered on opening the book. Keep existing site data when updating.
 
 ## Highlight and annotate
 
@@ -52,7 +58,7 @@ Tap **Highlight**, then the first and last words of a passage. A handwriting are
 
 **Annotations on/off** shows or hides the highlights and handwritten notes together. Reading pages temporarily grow to hold open handwritten notes. Turning annotations off restores their usual height. Notes stay attached to their passage as the manuscript is paginated. Deleted passages leave an unattached note available under **Highlight → Saved highlights**.
 
-Choose **GitHub → Send annotations** to send handwriting and typed notes. On PC Sidecar **0.1.152** or later, use **Versioning → Get tablet highlights**. Open a highlight or pin its annotation card to see the handwriting and type a transcription alongside it. The PC **Annotations on/off** button controls manuscript highlights and pinned annotation cards.
+Choose **GitHub → Send annotations** to send handwriting and typed notes. On PC Sidecar **0.1.132** or later, use **Versioning → Get tablet highlights**. Open a highlight or pin its annotation card to see the handwriting and type a transcription alongside it. The PC **Annotations on/off** button controls manuscript highlights and pinned annotation cards.
 
 Handwriting recognition is not included. Test pen responsiveness on your BOOX; the browser saves the original strokes for offline reading and GitHub transfer.
 
@@ -61,7 +67,8 @@ Handwriting recognition is not included. Test pen responsiveness on your BOOX; t
 
 | Reader | Change |
 | --- | --- |
-| 0.1.15 | Restore 0.1.13 pen handling after the BOOX performance regression; recover pending 0.1.14 notes. |
+| 0.1.16 | Separate input adapter, retain ink, defer scene rewrites and keep the writing area stationary. |
+| 0.1.15 | Restored 0.1.13 input for comparison; user reported similar responsiveness. |
 | 0.1.14 | Experimental incremental drawing; user reported substantially slower BOOX pen response. |
 | 0.1.13 | Handwritten annotations beneath the prose, original-stroke GitHub transfer, PC display and an annotation visibility layer. |
 | 0.1.12 | Fix repeated reloads for books saved without a separate identity record. |
