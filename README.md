@@ -1,11 +1,13 @@
-# Story Sidecar Android Reader 0.1.11
+# Story Sidecar Android Reader 0.1.12
+
+Version 0.1.12 fixes repeated welcome-screen reloads when opening a book downloaded by an older reader. The reader derives the missing identity from the stored book and preserves its drafts and highlights. If the loop prevents opening Configuration, use the update-page link below in Chrome.
 
 ## Update an installed BOOX or Android reader
 
 1. On the PC, extract the Reader ZIP. Upload the **contents of `site/`** to the root of the **app repository** (`sidecar-android` for this installation). Keep the `shared/` folder. The root should contain `index.html`, `sw.js`, `update.html`, and `update-reader.js` alongside the other app files.
 2. Commit the upload and wait for GitHub Pages to finish publishing.
 3. On the tablet, open **Configuration → Check for app update**. If the installed version has no update button, open Chrome and visit the [Sidecar update page](https://chipzulu.github.io/sidecar-android/update.html). For another installation, open `update.html` under its own Pages address.
-4. Wait for **Reader 0.1.11 is ready**, then tap **Open reader**. Configuration shows the installed version.
+4. Wait for **Reader 0.1.12 is ready**, then tap **Open reader**. Configuration shows the installed version.
 
 Keep the reader’s site data when updating. Clearing it can delete local scene drafts, highlights, the offline book, and saved credentials. If the update page says “Try again,” check that Pages has finished deploying and that the tablet is online. A 404 for `update.html` usually means the file has not reached the published site or was uploaded inside an extra `site/` folder.
 
@@ -52,7 +54,7 @@ To transfer highlights, choose **GitHub → Send highlights** on the tablet. On 
 
 | Reader | Change |
 | --- | --- |
-| 0.1.11 | Tablet scene drafts store marked passages and their notes inline. Hover or tap the mark. Deleted passages leave an unattached note under Saved highlights. |
+| 0.1.12 | Tablet scene drafts store marked passages and their notes inline. Hover or tap the mark. Deleted passages leave an unattached note under Saved highlights. |
 | 0.1.9 | The installed reader and other open tabs pick up the newly downloaded book. The book status shows its repository and branch. |
 | 0.1.8 | Highlight first, then tap the first and last words on the reading page. |
 | 0.1.7 | Dedicated update page and Configuration update link for installed readers. |

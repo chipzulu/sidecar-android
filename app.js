@@ -195,7 +195,10 @@ async function reconcileBook(){
   checking=true;
   try{
     const identity=await readBookIdentity();
-    if(!identity&&snapshot){location.reload();return;}
+    if(!identity&&snapshot){
+      const current=await readBook();
+      if(!current&&canSwitchBook()){location.reload();return;}
+    }
     if(identity && identity!==bookIdentity(snapshot)){
       const latest=await readBook();
       if(latest&&canSwitchBook()&&bookIdentity(latest)!==bookIdentity(snapshot)){
