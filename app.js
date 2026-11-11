@@ -13,14 +13,18 @@ import {mountHighlights} from './highlights.js';
 const $=id=>document.getElementById(id);
 let snapshot=null,model=null,index=-1,coverUrl='',busy=false,credentialBusy=false,client=null,clientKey='',abort=null,disposeCards=()=>{},selectedScene=null,renderRevision=0,rendering=false;
 function message(text,error=false){$('status').textContent=text;$('status').classList.toggle('error',error);}
-const highlights=mountHighlights({reader:$('reader'),viewport:$('manuscript-scroll'),status:message});
+const highlights=mountHighlights({reader:$('reader'),viewport:$('manuscript-scroll'),status:message,onWriting:()=>{if(dock)setOpen(dock,false);}});
 function preference(key,value){try{if(value===undefined)return localStorage.getItem('sidecar-reader:'+key);localStorage.setItem('sidecar-reader:'+key,value);}catch{/* Reading remains usable without preferences. */}}
 function locationKey(){return snapshot?`${snapshot.repository.toLowerCase()}:${snapshot.branch}`:'';}
 function remember(){if(snapshot&&!rendering)preference('position:'+locationKey(),JSON.stringify({scope:index===-2?'novel':selectedScene?'scene':index===-1?'cover':'chapter',chapter:model.chapters[index]?.key??null,scene:selectedScene,y:$('manuscript-scroll').scrollTop}));}
 let pageWidth=Math.max(280,Number(preference('page-width'))||740),pageLines=Math.max(15,Math.min(60,Number(preference('page-lines'))||28)),cardMode=preference('card-layout')||'none',dock='';
 let layoutTimer,lastPageWidth=0;
 function repaginate(){if(!model||index===-1)return;return render(index,selectedScene,false,true);}
-function layout(){const available=document.querySelector('.layout').clientWidth;const fit=fitLayout(available,pageWidth,cardMode,Boolean(dock));
+function layout(){
+  const headerBottom=document.querySelector('header').getBoundingClientRect().bottom;
+  $('connection').style.top=(headerBottom+8)+'px';
+  $('connection').style.maxHeight=Math.max(80,innerHeight-headerBottom-20)+'px';
+  const available=document.querySelector('.layout').clientWidth;const fit=fitLayout(available,pageWidth,cardMode,Boolean(dock));
   document.documentElement.style.setProperty('--page-width',fit.page+'px');
   for(const [id,width] of [['left-cards',fit.left],['right-cards',fit.right]]){$(id).hidden=!width;$(id).style.width=width+'px';}
   const edge=(available-fit.page-32)/2;
@@ -69,10 +73,11 @@ function pageStatus(){
   if(index===-2){$('previous').disabled=current===0;$('next').disabled=current===pages.length-1;}
 }
 async function render(which,scenePath=null,scroll=true,preserve=false){
+  if(!highlights.beforeRender())return;
   if((which!==index||scenePath!==selectedScene)&&!document.getElementById("highlight-tools").hidden)document.getElementById("highlight-cancel").click();
   const revision=++renderRevision,scroller=$('manuscript-scroll'),fraction=scroller.scrollTop/Math.max(1,scroller.scrollHeight-scroller.clientHeight);
   index=which===-2?-2:Math.max(-1,Math.min(model.chapters.length-1,which));selectedScene=index>=0&&model.chapters[index].scenes.some(s=>s.path===scenePath)?scenePath:null;
-  $('highlight-toggle').hidden=index===-1;$('edit-scene').hidden=index===-1;const reader=$('reader');reader.replaceChildren();rendering=true;reader.setAttribute('aria-busy','true');
+  $('highlight-toggle').hidden=index===-1;$('annotations-layer').hidden=index===-1;$('edit-scene').hidden=index===-1;const reader=$('reader');reader.replaceChildren();rendering=true;reader.setAttribute('aria-busy','true');
   const name=index===-2?'Entire Novel':index===-1?model.title:selectedScene?model.chapters[index].scenes.find(s=>s.path===selectedScene).name:model.chapters[index].name;
   for(const [id,direction] of [['previous','Previous'],['next','Next']]){const label=`${direction} ${index===-2?'page':selectedScene?'scene':'chapter'}`;$(id).title=label;$(id).setAttribute('aria-label',label);}
   $('position').textContent=name;$('position').title=name;$('page-count').textContent=index===-1?'':'Estimating pages…';
@@ -91,6 +96,7 @@ async function render(which,scenePath=null,scroll=true,preserve=false){
       }
     }
     if(revision!==renderRevision)return;
+    highlights.repaint();
     if(preserve)scroller.scrollTop=fraction*Math.max(0,scroller.scrollHeight-scroller.clientHeight);else if(scroll)scroller.scrollTop=0;
     $('previous').disabled=index===-1;$('next').disabled=index>=model.chapters.length-1&&!selectedScene;
     if(selectedScene){const all=model.chapters.flatMap(c=>c.scenes);const sceneIndex=all.findIndex(s=>s.path===selectedScene);$('previous').disabled=sceneIndex===0;$('next').disabled=sceneIndex===all.length-1;}
@@ -121,6 +127,7 @@ function step(direction){
   navigate(index+direction);
   }
 async function openBook(value,resume=true){
+  if(!highlights.beforeRender())throw Error('Save the handwriting before switching books.');
   if(client && clientKey!==JSON.stringify([value.repository,value.branch]))lockGitHub();
   if(coverUrl)URL.revokeObjectURL(coverUrl);coverUrl='';snapshot=value;model=bookModel(value);
   for(const chapter of model.chapters)for(const scene of chapter.scenes){

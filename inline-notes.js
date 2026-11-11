@@ -1,3 +1,4 @@
+import {validInk} from './shared/annotation-ink.js';
 import {sceneFragmentFromHtml} from './shared/html-format.js';
 import {markerPairs} from './shared/italic-markers.js';
 import {keepMarker} from './shared/keep-together.js';
@@ -8,7 +9,7 @@ export function sceneNotes(html){
   const tag=new DOMParser().parseFromString(html,'text/html').querySelector('template[data-sidecar-annotations]');
   if(!tag)return [];
   const notes=JSON.parse(tag.dataset.sidecarAnnotations);
-  return notes.filter(n=>/^[a-f0-9-]{36}$/.test(n.id)&&['sage','rose','honey'].includes(n.color)&&typeof n.body==='string'&&typeof n.quote==='string');
+  return notes.filter(n=>validInk(n.ink)&&/^[a-f0-9-]{36}$/.test(n.id)&&['sage','rose','honey'].includes(n.color)&&typeof n.body==='string'&&typeof n.quote==='string');
 }
 export function inlineFragment(html){return sceneFragmentFromHtml(html,document,true);}
 export function annotatedHtml(root,notes){

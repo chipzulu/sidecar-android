@@ -20,3 +20,11 @@ html,body{height:100%;overflow:hidden}body{display:flex;flex-direction:column}he
 
 mark[data-annotation]{color:inherit;background:linear-gradient(178deg,transparent 9%,var(--ink,#d8b84e85) 16%,var(--ink,#d8b84e85) 83%,transparent 92%);border-radius:.18em;box-decoration-break:clone;-webkit-box-decoration-break:clone}
 mark[data-color="sage"]{--ink:#91b47e88}mark[data-color="rose"]{--ink:#d3919c88}
+
+.ink-note { margin:.6em 0 1em; padding:.45em; background:#faf7eb; border:1px solid #cbbf9f; border-radius:5px; font:16px/1.4 system-ui; text-indent:0; }
+.ink-actions { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:6px; }
+.annotation-ink { display:block; width:100%; height:auto; background:transparent; }
+.ink-note svg { touch-action:none; user-select:none; }
+.ink-note small { display:block; }
+.annotations-hidden mark[data-annotation] { background:transparent!important; }
+.annotations-hidden .ink-note { display:none; }

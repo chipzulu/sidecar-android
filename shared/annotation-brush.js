@@ -1,3 +1,4 @@
+import {validInk} from './annotation-ink.js';
 import {markerPairs} from './italic-markers.js';
 const colors = {honey:'#d6ac39', sage:'#8bb378', rose:'#d38d93'};
 export const noteFilename = id => 'Highlight ' + id + '.md';
@@ -13,6 +14,7 @@ export function decodeNote(text) {
     if (!isHighlightFile(noteFilename(n.id)) || typeof n.path !== 'string' || !n.path.startsWith('Book/Chapters/') ||
         !Object.hasOwn(colors,n.color) || typeof n.quote !== 'string' || !n.quote ||
         !Number.isSafeInteger(n.start) || n.start < 0 || typeof n.before !== 'string' || typeof n.after !== 'string') return null;
+    if(!validInk(n.ink))return null;
     return {...n,body:text.slice(match[0].length)};
   } catch { return null; }
 }
