@@ -69,7 +69,7 @@ export function mountHighlights({reader,viewport,status,onWriting}){
     done.onclick=()=>{if(closePad())repaint();};
     typed.onclick=()=>{if(closePad()){repaint();open(rows[note.id].note);}};
     actions.className='ink-actions';actions.append(done,typed);box.append(actions);
-    pad=inkPad(box,note.ink,ink=>save({...rows[note.id].note,ink}));
+    pad=inkPad(box,note.ink,(ink,finalize)=>checkpointInk(note.id,ink,finalize));
     const bounds=box.getBoundingClientRect(),view=viewport.getBoundingClientRect();
     if(bounds.height>view.height||bounds.top<view.top)viewport.scrollTop+=bounds.top-view.top;
     else if(bounds.bottom>view.bottom)viewport.scrollTop+=bounds.bottom-view.bottom;
@@ -111,6 +111,22 @@ export function mountHighlights({reader,viewport,status,onWriting}){
     rows=next;
 
   }
+  function checkpointInk(id,ink,finalize){
+    const old=rows[id];
+    if(old.note.ink!==ink){
+      const note={...old.note,ink,base:old.dirty?old.note.base:(old.base||old.main||old.remote||null)};
+      // A completed stroke is durable immediately, without parsing the scene.
+      persist({...rows,[id]:{...old,note,dirty:true,needsInline:true}});
+    }
+    if(finalize)mergeInk();
+  }
+  function mergeInk(){
+    for(const [id,row] of Object.entries(rows)){
+      if(!row.needsInline||row.discarded||!scenes.has(row.note.path))continue;
+      writeInline(row.note,false);
+      persist({...rows,[id]:{...row,needsInline:false}});
+    }
+  }
   function load(snapshot,model){
     scenes=new Map(model.chapters.flatMap(c=>c.scenes.map(s=>[s.path,s])));
     book=snapshot;stopPicking();active=null;rows=JSON.parse(localStorage.getItem(key())||'{}');
@@ -125,6 +141,7 @@ export function mountHighlights({reader,viewport,status,onWriting}){
         rows[note.id]={note,dirty:false,remote:prior?.remote,main:file.sha,base:file.sha};
       }
     }
+    mergeInk();
     for(const scene of scenes.values())sceneEdited(scene);
     for(const [id,incoming] of updates){
       const row=rows[id];
@@ -269,6 +286,8 @@ export function mountHighlights({reader,viewport,status,onWriting}){
     const anchor=selectionAnchor(path,roots(path),range);
     if(anchor)apply(anchor);
   },true);
+  window.addEventListener('pagehide',()=>{if(pad)pad.save();});
+  document.addEventListener('visibilitychange',()=>{if(document.hidden&&pad)pad.save();});
   return {load,sceneEdited,beforeRender:closePad,repaint,async send(inbox){
     if(!closePad())throw Error('Save the handwriting before sending.');
     if(sending)return; sending=true;
