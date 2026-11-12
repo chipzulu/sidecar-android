@@ -1,3 +1,4 @@
+import {annotationGestures} from './annotation-gestures.js';
 import {inkSvg} from './shared/annotation-ink.js';
 
 import {inkPad} from './ink-pad.js';
@@ -24,7 +25,7 @@ export function mountHighlights({reader,viewport,status,onWriting}){
 
   const tools=$('highlight-tools'), hint=$('highlight-hint');
 
-  let firstWord=null, pad=null;
+  let firstWord=null, pad=null, editingId=null;
 
   let annotationsVisible=localStorage.getItem('sidecar-annotations-visible')!=='false';
 
@@ -56,7 +57,7 @@ export function mountHighlights({reader,viewport,status,onWriting}){
 
     if(pad&&!pad.save())return false;
 
-    pad?.dispose();pad=null;return true;
+    pad?.dispose();pad=null;editingId=null;reader.querySelectorAll(".ink-note.editing").forEach(n=>n.classList.remove("editing"));return true;
 
   }
 
@@ -92,68 +93,52 @@ export function mountHighlights({reader,viewport,status,onWriting}){
 
   }
 
-  function repaint(){
-
-    clearPanels();
-
-    if(!annotationsVisible)return;
-
-    for(const {note,discarded} of Object.values(rows)){
-
-      if(discarded||!note.ink?.strokes.length)continue;
-
-      const box=document.createElement('aside'),edit=document.createElement('button');
-
-      edit.textContent='Edit annotation';edit.onclick=()=>openWriting(note);
-
-      box.append(inkSvg(note.ink),edit);
-
-      if(note.body){const text=document.createElement('div');text.textContent=note.body;box.append(text);}
-
-      insert(note,box);
-
-    }
-
+  function corner(note,box){
+    const button=document.createElement('button');button.className='note-collapse';
+    const collapsed=Boolean(rows[note.id]?.collapsed);
+    button.textContent=collapsed?'▸':'▾';button.title=collapsed?'Expand note':'Collapse note';button.setAttribute('aria-label',button.title);button.setAttribute('aria-expanded',String(!collapsed));
+    button.onclick=e=>{e.stopPropagation();if(!closePad())return;persist({...rows,[note.id]:{...rows[note.id],collapsed:!collapsed}});repaint();};
+    box.append(button);
   }
-
+  function repaint(){
+    clearPanels();if(!annotationsVisible)return;
+    for(const {note,discarded,collapsed} of Object.values(rows)){
+      if(discarded||!note)continue;
+      for(const mark of reader.querySelectorAll('mark[data-annotation="'+note.id+'"]'))mark.dataset.anchorKind=note.anchorKind||'highlight';
+      if(!note.ink)continue;
+      const box=document.createElement('aside');if(!insert(note,box))continue;
+      corner(note,box);
+      if(collapsed){box.classList.add('collapsed');const label=document.createElement('span');label.textContent='Handwritten note';box.append(label);}
+      else {box.append(inkSvg(note.ink));if(note.body){const text=document.createElement('div');text.textContent=note.body;box.append(text);}}
+      box.tabIndex=0;box.setAttribute('aria-label','Handwritten note. Tap to edit.');
+      box.onclick=()=>{if(collapsed){persist({...rows,[note.id]:{...rows[note.id],collapsed:false}});repaint();}else openWriting(rows[note.id].note);};
+      box.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();box.click();}};
+    }
+  }
   function openWriting(note){
-
     if(!closePad())return;
-
-    onWriting?.();
-
-    annotationsVisible=true;setLayer();tip.hidden=true;
-
+    if(!note.ink){save({...note,ink:{version:1,width:800,height:300,strokes:[]}});note=rows[note.id].note;}
+    onWriting?.();annotationsVisible=true;setLayer();tip.hidden=true;
+    if(rows[note.id]?.collapsed)persist({...rows,[note.id]:{...rows[note.id],collapsed:false}});
     repaint();reader.querySelector('.ink-note[data-note="'+note.id+'"]')?.remove();
-
-    const box=document.createElement('aside'),actions=document.createElement('div');
-
-    if(!insert(note,box)){open(note);return;}
-
-    const done=document.createElement('button'),typed=document.createElement('button');
-
-    done.textContent='Done';typed.textContent='Typed note';
-
-    done.onclick=()=>{if(closePad())repaint();};
-
-    typed.onclick=()=>{if(closePad()){repaint();open(rows[note.id].note);}};
-
-    actions.className='ink-actions';actions.append(done,typed);box.append(actions);
-
+    const box=document.createElement('aside');if(!insert(note,box)){open(note);return;}
+    box.classList.add('editing');corner(note,box);editingId=note.id;
     pad=inkPad(box,note.ink,(ink,finalize)=>{
-      const old=rows[note.id];
-      if(finalize){mergeInk();return;}
+      const old=rows[note.id];if(finalize){mergeInk();return;}
       const next={...old.note,ink,base:old.dirty?old.note.base:(old.base||old.main||old.remote||null)};
       persist({...rows,[note.id]:{...old,note:next,inline:true,dirty:true,needsInline:true}});
-    });
-
+    },undefined,{quiet:true,onHold:()=>{if(!box.isConnected||editingId!==note.id)return;const r=box.getBoundingClientRect();showMenu(r.right-20,r.top+20,null,note.id);}});
     const bounds=box.getBoundingClientRect(),view=viewport.getBoundingClientRect();
-
     if(bounds.height>view.height||bounds.top<view.top)viewport.scrollTop+=bounds.top-view.top;
-
     else if(bounds.bottom>view.bottom)viewport.scrollTop+=bounds.bottom-view.bottom;
-
   }
+  // Ending handwriting is a tap outside, never a dot inside the writing area.
+  document.addEventListener('pointerdown',e=>{
+    if(pad&&!e.target.closest('.ink-note.editing,.annotation-menu')){
+      if(!closePad()){e.preventDefault();return;}
+      repaint();
+    }
+  },true);
 
   function stopPicking(){
 
@@ -213,7 +198,7 @@ export function mountHighlights({reader,viewport,status,onWriting}){
 
     const note=rows[event.target.closest('mark[data-annotation]')?.dataset.annotation]?.note;
 
-    if(annotationsVisible&&note&&tools.hidden&&getSelection().isCollapsed){tip.hidden=true;note.ink?.strokes.length?openWriting(note):open(note);}
+    if(annotationsVisible&&note&&tools.hidden&&getSelection().isCollapsed){tip.hidden=true;openWriting(note);}
 
   });
 
@@ -240,7 +225,7 @@ export function mountHighlights({reader,viewport,status,onWriting}){
 
     scenes=new Map(model.chapters.flatMap(c=>c.scenes.map(s=>[s.path,s])));
 
-    book=snapshot;stopPicking();active=null;rows=JSON.parse(localStorage.getItem(key())||'{}');
+    book=snapshot;stopPicking();lastCreated=null;active=null;rows=JSON.parse(localStorage.getItem(key())||'{}');
 
     const updates=new Map();
 
@@ -258,7 +243,7 @@ export function mountHighlights({reader,viewport,status,onWriting}){
 
         updates.set(note.id,note);
 
-        rows[note.id]={note,dirty:false,remote:prior?.remote,main:file.sha,base:file.sha};
+        rows[note.id]={...prior,note,dirty:false,remote:prior?.remote,main:file.sha,base:file.sha};
 
       }
 
@@ -365,7 +350,7 @@ export function mountHighlights({reader,viewport,status,onWriting}){
 
     }
 
-    for(const m of reader.querySelectorAll('mark[data-annotation="'+next.id+'"]'))m.dataset.color=next.color;
+    for(const m of reader.querySelectorAll('mark[data-annotation="'+next.id+'"]')){m.dataset.color=next.color;m.dataset.anchorKind=next.anchorKind||'highlight';}
 
     persist({...rows,[note.id]:{...old,inline:true,note:next,dirty:true}});
 
@@ -467,16 +452,56 @@ export function mountHighlights({reader,viewport,status,onWriting}){
 
   }
 
-  function apply(anchor){
+  function apply(anchor,write=true){
 
     const note={...(reattach?rows[reattach].note:{id:crypto.randomUUID(),body:'',color:'honey'}),...anchor};
 
-    try{save(note,true);stopPicking();getSelection().removeAllRanges();openWriting(note);}
+    try{save(note,true);lastCreated=note.id;stopPicking();getSelection().removeAllRanges();if(write)openWriting(rows[note.id].note);else repaint();}
 
     catch(e){hint.textContent='Could not save highlight: '+e.message;status(e.message,true);}
 
   }
 
+  const menu=document.createElement('dialog');menu.className='annotation-menu';document.body.append(menu);
+  let lastCreated=null,menuPress=false;
+  const gestures=annotationGestures(reader,{
+    menu:showMenu,
+    select:({path,range},write)=>{status('');const anchor=selectionAnchor(path,roots(path),range);if(anchor)apply(anchor,write);},
+    cancel:()=>status('Reading mode')
+  });
+  function undoNote(id){
+    if(id===editingId&&pad){pad.undo();return;}
+    const n=rows[id]?.note;
+    if(n?.ink?.strokes.length){save({...n,ink:{...n.ink,strokes:n.ink.strokes.slice(0,-1)}});repaint();return;}
+    if(lastCreated){
+      const row=rows[lastCreated],note=row?.note,scene=note&&scenes.get(note.path);if(!scene)return;
+      const root=document.createElement('div');root.append(inlineFragment(scene.html));unwrap([root],note.id);
+      storeAnnotatedScene(book,scene,annotatedHtml(root,sceneNotes(scene.html).filter(n=>n.id!==note.id)));
+      unwrap(roots(note.path),note.id);persist({...rows,[note.id]:{...row,discarded:true,note:{...note,unattached:true}}});lastCreated=null;repaint();
+    }
+  }
+  function showMenu(x,y,at=null,noteId=null){
+    if(menu.open)menu.close();menuPress=false;menu.replaceChildren();
+    const add=(label,action)=>{const b=document.createElement('button');b.textContent=label;b.type='button';b.onclick=()=>{menu.close();try{action();}catch(e){status(e.message,true);}};menu.append(b);};
+    if(noteId){
+      add('Undo',()=>undoNote(noteId));
+      add('More space',()=>{if(editingId!==noteId)openWriting(rows[noteId].note);pad?.more();});
+      add('Edit typed note',()=>{if(closePad()){repaint();open(rows[noteId].note);}});
+    }else if(at){
+      add('Add note here',()=>{const anchor=selectionAnchor(at.path,roots(at.path),at.range);if(anchor)apply({...anchor,anchorKind:'point'});});
+      add('Highlight and annotate',()=>{if(!closePad())return;stopPicking();gestures.setMode('note');status('Draw across the words to highlight and annotate. Tap without dragging to cancel.');});
+      add('Highlight only',()=>{if(!closePad())return;stopPicking();gestures.setMode('highlight');status('Draw across the words to highlight. Tap without dragging to cancel.');});
+      if(lastCreated)add('Undo',()=>undoNote(null));
+    }
+    if(!menu.childElementCount)return;
+    menu.showModal();const r=menu.getBoundingClientRect();menu.style.left=Math.max(6,Math.min(x,innerWidth-r.width-6))+'px';menu.style.top=Math.max(6,Math.min(y,innerHeight-r.height-6))+'px';
+  }
+  menu.addEventListener('pointerdown',()=>{menuPress=true;});
+  menu.addEventListener('click',e=>{if(e.detail>0&&!menuPress){e.preventDefault();e.stopImmediatePropagation();}menuPress=false;},true);
+  menu.onclick=e=>{if(e.target===menu)menu.close();};
+  reader.addEventListener('contextmenu',e=>{
+    const box=e.target.closest('.ink-note');if(!box)return;e.preventDefault();showMenu(e.clientX,e.clientY,null,box.dataset.note);
+  });
   $('highlight-toggle').onpointerdown=()=>{captured=capture();};
 
   $('highlight-toggle').onclick=()=>{
@@ -553,7 +578,7 @@ export function mountHighlights({reader,viewport,status,onWriting}){
 
   },true);
 
-  return {load,sceneEdited,beforeRender:closePad,repaint,async send(inbox){
+  return {load,sceneEdited,beforeRender:()=>{gestures.setMode(null);if(menu.open)menu.close();return closePad();},repaint,async send(inbox){
 
     if(!closePad())throw Error('Save the handwriting before sending.');
 

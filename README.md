@@ -1,4 +1,19 @@
-# Story Sidecar Android Reader 0.1.17
+# Story Sidecar Android Reader 0.1.18
+
+## Quiet annotations in 0.1.18
+
+The existing **BOOX Test 0.1.0 APK** works with this release; update the reader through GitHub Pages, then Configuration → Check for app update inside the APK. No APK reinstall is needed.
+
+- Hold the pen on prose to open **Add note here**, **Highlight and annotate**, or **Highlight only**. A mouse right-click also opens the menu.
+- **Add note here** creates an inline note attached to nearby text without highlighting it. Its internal anchor is an adjacent character, so deleting that character can leave the note unattached for review. Empty/whitespace-only paragraphs are not position anchors yet.
+- For either highlighting action, drag across the passage. The paint follows the selection and settles on words. A tap without dragging cancels the mode. Selection stays within one scene; cross-page selection requires the target text to be reachable in the viewport (automatic edge scrolling is not included).
+- Tap an expanded handwritten note to edit. A stronger border indicates the active pad. Tap outside to save and finish; the note stays visible.
+- Press **▾** in the corner to collapse. **▸** expands it. Collapse state is remembered on this device for each book.
+- No permanent Done/Edit/Undo toolbar is shown in the note. Hold the pen still inside the active writing area and lift to open **Undo**, **More space**, and **Edit typed note**. Inactive notes also accept a right-click/normal context-menu gesture. Short pen taps remain ink dots.
+- **Undo** in the note menu removes the last stroke. The prose menu can undo the most recently created local highlight/note in this session. Undo is local; it does not revoke an annotation already sent to GitHub.
+- Handwriting does not open the keyboard. **Edit typed note** is an explicit text-editing action and can use the normal Android keyboard.
+
+Handwriting, highlights, offline recovery and GitHub transfer keep the existing format. PC Sidecar **0.1.134** understands the unpainted position anchor. Freehand arrows/drawing layers and floating thumbnails are deferred.
 
 ## Native BOOX test integration in 0.1.17
 
@@ -19,7 +34,7 @@ Version 0.1.12 fixed repeated welcome-screen reloads when opening a book downloa
 1. On the PC, extract the Reader ZIP. Upload the **contents of `site/`** to the root of the **app repository** (`sidecar-android` for this installation). Keep the `shared/` folder. The root should contain `index.html`, `sw.js`, `update.html`, and `update-reader.js` alongside the other app files.
 2. Commit the upload and wait for GitHub Pages to finish publishing.
 3. On the tablet, open **Configuration → Check for app update**. If the installed version has no update button, open Chrome and visit the [Sidecar update page](https://chipzulu.github.io/sidecar-android/update.html). For another installation, open `update.html` under its own Pages address.
-4. Wait for **Reader 0.1.17 is ready**, then tap **Open reader**. Configuration shows the installed version.
+4. Wait for **Reader 0.1.18 is ready**, then tap **Open reader**. Configuration shows the installed version.
 
 Keep the reader’s site data when updating. Clearing it can delete local scene drafts, highlights, the offline book, and saved credentials. If the update page says “Try again,” check that Pages has finished deploying and that the tablet is online. A 404 for `update.html` usually means the file has not reached the published site or was uploaded inside an extra `site/` folder.
 

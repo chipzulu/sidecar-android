@@ -57,11 +57,11 @@ export function attach(roots,note,{raw=false,legacy=false}={}){
     const a=Math.max(0,start-part.start),b=Math.min(part.length,start+note.quote.length-part.start);
     if(a>=b)continue;
     const range=document.createRange();range.setStart(part.node,part.from+a);range.setEnd(part.node,part.from+b);
-    const mark=document.createElement('mark');mark.dataset.annotation=note.id;mark.dataset.color=note.color;range.surroundContents(mark);
+    const mark=document.createElement('mark');mark.dataset.annotation=note.id;mark.dataset.color=note.color;mark.dataset.anchorKind=note.anchorKind||'highlight';range.surroundContents(mark);
   }
   return true;
 }
 export function colourMarks(root,notes){
   const colors=new Map(notes.map(n=>[n.id,n.color]));
-  for(const mark of root.querySelectorAll('mark[data-annotation]'))mark.dataset.color=colors.get(mark.dataset.annotation)||'honey';
+  for(const mark of root.querySelectorAll('mark[data-annotation]')){mark.dataset.color=colors.get(mark.dataset.annotation)||'honey';mark.dataset.anchorKind=notes.find(n=>n.id===mark.dataset.annotation)?.anchorKind||'highlight';}
 }

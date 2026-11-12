@@ -28,3 +28,15 @@ mark[data-color="sage"]{--ink:#91b47e88}mark[data-color="rose"]{--ink:#d3919c88}
 .ink-note small { display:block; }
 .annotations-hidden mark[data-annotation] { background:transparent!important; }
 .annotations-hidden .ink-note { display:none; }
+.ink-note { position:relative; padding-top:1.6em; }
+.ink-note.editing { border:2px solid #416953; box-shadow:0 0 0 1px #41695333; }
+.ink-note .note-collapse { position:absolute; right:3px; top:2px; padding:0 .35em; min-height:24px; font-size:20px; border:0; background:transparent; color:#416953; }
+.ink-note.collapsed { padding:.4em 2em .4em .7em; cursor:pointer; font-size:13px; }
+.ink-note:not(.editing) { cursor:pointer; }
+.annotation-menu { position:fixed; margin:0; padding:.35em; border:1px solid #b8ac93; border-radius:7px; max-width:calc(100vw - 12px); background:#faf7eb; box-shadow:0 4px 18px #0003; }
+.annotation-menu::backdrop { background:transparent; }
+.annotation-menu button { display:block; width:100%; text-align:left; margin:.15em 0; }
+.annotation-highlighting p[data-block] { touch-action:none; user-select:none; }
+::highlight(annotation-drag) { background:#d8b84e85; }
+mark[data-anchor-kind=point] { background:transparent!important; }
+.ink-actions[hidden] { display:none; }
