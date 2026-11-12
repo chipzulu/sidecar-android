@@ -486,6 +486,8 @@ export function mountHighlights({reader,viewport,status,onWriting}){
     if(menu.open)menu.close();menuPress=false;menu.replaceChildren();
     const add=(label,action)=>{const b=document.createElement('button');b.textContent=label;b.type='button';b.onclick=()=>{menu.close();try{action();}catch(e){status(e.message,true);}};menu.append(b);};
     if(noteId){
+      add('Pen',()=>{if(editingId!==noteId)openWriting(rows[noteId].note);pad?.setTool('pen');});
+      add('Eraser',()=>{if(editingId!==noteId)openWriting(rows[noteId].note);pad?.setTool('eraser');});
       add('Undo',()=>undoNote(noteId));
       if(editingId===noteId)add('Cancel changes',()=>{
         const original=structuredClone(editStart);

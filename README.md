@@ -1,4 +1,12 @@
-# Story Sidecar Android Reader 0.1.20
+# Story Sidecar Android Reader 0.1.21
+
+## 0.1.21 — whole-stroke eraser
+
+Hold the note’s corner triangle (or right-click in a browser) and choose **Eraser**. Move the pen’s circular cursor across handwriting to erase whole strokes. Touch/palm input is ignored; a mouse also works for desktop testing. Choose **Pen** from the same menu to write again. **Undo** restores a complete erasing drag, including all strokes it removed. The last 50 actions are undoable during the editing session. ✓ accepts and Cancel changes restores the editing-session starting contents.
+
+The eraser uses a 36 CSS-pixel-wide circle. On BOOX it temporarily closes native raw drawing and uses browser pen events; selecting Pen reconnects the fast native handwriting adapter. No new APK is needed. Physical eraser ends/buttons and partial-stroke cutting are not included in this first step. Existing note storage and PC transfer formats are unchanged.
+
+Upload the ZIP’s site contents to GitHub Pages, then update inside the installed APK or browser Reader. Automated browser and mock-native tests cover erasing, palm rejection, grouped Undo, tool switching and the existing annotation/refresh flow. Physical BOOX eraser responsiveness still needs a device check.
 
 ## 0.1.20 — explicit handwriting finish and fresh-copy refresh
 
