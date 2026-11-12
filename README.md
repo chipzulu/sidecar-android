@@ -1,4 +1,14 @@
-# Story Sidecar Android Reader 0.1.21
+# Story Sidecar Android Reader 0.1.22
+
+## 0.1.22 — eraser responsiveness
+
+The eraser is now an outlined octagon, using odd/even ray-crossing tests plus segment crossings so long strokes and fast eraser movements are not missed. It has the same 36 CSS-pixel width, with slightly narrower diagonal corners than the previous circle.
+
+The cursor updates once per display frame; all sampled movement segments are retained for erasing. Note geometry is cached during a drag, stroke bounds are prepared once, and only erased stroke elements are removed. No per-sample note measurements or full-note redraws. Undo still restores a whole erasing drag; palm input remains ignored.
+
+A local maximum-note geometry benchmark (2,000 strokes / 24,000 points / 150 movement samples) measured 65.3 ms before and 9.5 ms after. This is desktop computation time, not measured BOOX pen-to-display latency. Browser and simulated-native checks pass; physical tablet response needs testing.
+
+Update the site files and use the existing APK’s Reader updater. No APK reinstall is needed. Erasing still uses browser pen input; selecting Pen restores native handwriting. The SDK’s native eraser path was investigated but is not enabled in this release.
 
 ## 0.1.21 — whole-stroke eraser
 

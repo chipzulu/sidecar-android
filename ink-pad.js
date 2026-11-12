@@ -1,12 +1,12 @@
 import {inkSvg,appendStroke,validInk} from './shared/annotation-ink.js';
 import {adaptiveInkInput} from './ink-native.js';
-import {eraserInput,strokeTouchesSweep} from './ink-eraser.js';
+import {eraserInput,strokeTouchesSweep,eraserSweep,prepareStroke} from './ink-eraser.js';
 
 // Input adapters provide completed strokes. Persistence never runs during pointer movement.
 export function inkPad(host, initial, save, inputFactory=adaptiveInkInput, {quiet=false,onHold}={}) {
   let ink=structuredClone(initial||{version:1,width:800,height:300,strokes:[]});
   let count=ink.strokes.reduce((n,s)=>n+s.length,0),timer=0,pending=false,failed=false,started=0,nativeStroke=false;
-  let input,mode='pen',eraseStart=null;const history=[];
+  let input,mode='pen',eraseStart=null,eraseLines=[];const history=[];
   function remember(){history.push(ink);if(history.length>50)history.shift();}
   const svg=inkSvg(ink),toolbar=document.createElement('div'),status=document.createElement('small');
   svg.setAttribute('aria-label','Write your annotation with a pen');toolbar.className='ink-actions';toolbar.hidden=quiet;status.setAttribute('role','status');
@@ -41,7 +41,7 @@ export function inkPad(host, initial, save, inputFactory=adaptiveInkInput, {quie
     svg.querySelectorAll('polyline').forEach(n=>n.remove());
     for(const stroke of ink.strokes)appendStroke(svg,stroke);
     // Keep the eraser cursor above permanent ink.
-    const cursor=svg.querySelector('circle');if(cursor)svg.append(cursor);
+    const cursor=svg.querySelector('polygon');if(cursor)svg.append(cursor);
     svg.setAttribute('viewBox','0 0 800 '+ink.height);count=ink.strokes.reduce((n,s)=>n+s.length,0);
   }
   function setTool(next){
@@ -49,17 +49,18 @@ export function inkPad(host, initial, save, inputFactory=adaptiveInkInput, {quie
     if(input&&next===mode)return true;
     input?.dispose();mode=next;host.dataset.inkTool=mode;
     if(mode==='pen')input=inputFactory(svg,{height:()=>ink.height,remaining:()=>ink.strokes.length>=2000?0:24000-count,begin:(source)=>{nativeStroke=source?.native===true;started=performance.now();clearTimeout(timer);},complete});
-    else input=eraserInput(svg,{
-      begin(){eraseStart=null;clearTimeout(timer);},
+    else {ink.strokes.forEach(prepareStroke);input=eraserInput(svg,{
+      begin(){eraseStart=null;eraseLines=[...svg.querySelectorAll('polyline')];clearTimeout(timer);},
       sweep(a,b,r){
-        const lines=svg.querySelectorAll('polyline');
-        const remaining=ink.strokes.filter((s,i)=>{if(!strokeTouchesSweep(s,a,b,r))return true;lines[i]?.remove();return false;});
+        const area=eraserSweep(a,b,r),keptLines=[];
+        const remaining=ink.strokes.filter((s,i)=>{if(!strokeTouchesSweep(s,area)){keptLines.push(eraseLines[i]);return true;}eraseLines[i]?.remove();return false;});
+        eraseLines=keptLines;
         if(remaining.length===ink.strokes.length)return;
         if(!eraseStart){eraseStart=ink;remember();}
         ink={...ink,strokes:remaining};count=remaining.reduce((n,s)=>n+s.length,0);
       },
       end(){if(eraseStart){eraseStart=null;checkpoint();}}
-    });
+    });}
     message(mode==='eraser'?'Eraser · whole strokes · choose Pen in the note menu to write':'Pen');return true;
   }
   setTool('pen');
