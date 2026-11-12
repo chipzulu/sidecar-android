@@ -49,7 +49,7 @@ export function inkPad(host, initial, save, inputFactory=adaptiveInkInput, {quie
     if(input&&next===mode)return true;
     input?.dispose();mode=next;host.dataset.inkTool=mode;
     if(mode==='pen')input=inputFactory(svg,{height:()=>ink.height,remaining:()=>ink.strokes.length>=2000?0:24000-count,begin:(source)=>{nativeStroke=source?.native===true;started=performance.now();clearTimeout(timer);},complete});
-    else {ink.strokes.forEach(prepareStroke);input=eraserInput(svg,{
+    else {ink.strokes.forEach(prepareStroke);const erase={
       begin(){eraseStart=null;eraseLines=[...svg.querySelectorAll('polyline')];clearTimeout(timer);},
       sweep(a,b,r){
         const area=eraserSweep(a,b,r),keptLines=[];
@@ -60,7 +60,18 @@ export function inkPad(host, initial, save, inputFactory=adaptiveInkInput, {quie
         ink={...ink,strokes:remaining};count=remaining.reduce((n,s)=>n+s.length,0);
       },
       end(){if(eraseStart){eraseStart=null;checkpoint();}}
-    });}
+    };
+    input=adaptiveInkInput(svg,{
+      height:()=>ink.height,remaining:()=>24000,
+      begin(){clearTimeout(timer);},
+      complete(points,element,meta){
+        if(!points.length)return true;
+        erase.begin();let last=points[0];
+        for(const point of points){erase.sweep(last,point,meta.radius);last=point;}
+        erase.end();return true;
+      }
+    },{tool:'eraser',browserFactory:()=>eraserInput(svg,erase)});
+    }
     message(mode==='eraser'?'Eraser · whole strokes · choose Pen in the note menu to write':'Pen');return true;
   }
   setTool('pen');

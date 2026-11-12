@@ -1,4 +1,16 @@
-# Story Sidecar Android Reader 0.1.22
+# Story Sidecar Android Reader 0.1.23
+
+## 0.1.23 — native BOOX eraser feedback test
+
+Use Reader 0.1.23 with **BOOX Test APK 0.1.1** for this native-only test. Install the new APK over the old one (same application ID and signing certificate); do not uninstall or clear app data. Upload the Reader site files, then use Configuration → Check for app update inside the APK.
+
+Select Eraser in the note menu. The pad should say **BOOX native eraser · lift pen to erase**. A temporary grey native pen trail replaces the web octagon during contact. Lift the pen to apply whole-stroke erasing within the usual 36 CSS-pixel-wide area along the path. The temporary trail is not stored or sent to GitHub. Undo restores the whole gesture. Choose Pen to return to native handwriting.
+
+This uses the proven native raw-pencil feedback channel for a gesture preview, not a hardware destructive eraser or a native moving octagon. It is a test of responsiveness; latency and trail clearing require physical BOOX validation. No hover cursor is promised. Finger input is explicitly disabled in the native pad.
+
+Normal browsers retain the working octagonal eraser unchanged. The old APK falls back to it and displays an upgrade hint. Capability negotiation prevents an old wrapper from drawing eraser gestures as permanent ink. The new APK continues to support older Readers for handwriting.
+
+Build and Android lint passed; mock-native tests cover native erasure, duplicate/stale messages, tool validation, grouped Undo, switching to Pen, and old-wrapper fallback. Browser annotation and clean-refresh regression checks passed. Signing certificate verified against BOOX Test 0.1.0.
 
 ## 0.1.22 — eraser responsiveness
 
