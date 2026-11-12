@@ -25,7 +25,7 @@ export function mountHighlights({reader,viewport,status,onWriting}){
 
   const tools=$('highlight-tools'), hint=$('highlight-hint');
 
-  let firstWord=null, pad=null, editingId=null;
+  let firstWord=null, pad=null, editingId=null, editStart=null;
 
   let annotationsVisible=localStorage.getItem('sidecar-annotations-visible')!=='false';
 
@@ -57,7 +57,7 @@ export function mountHighlights({reader,viewport,status,onWriting}){
 
     if(pad&&!pad.save())return false;
 
-    pad?.dispose();pad=null;editingId=null;reader.querySelectorAll(".ink-note.editing").forEach(n=>n.classList.remove("editing"));return true;
+    pad?.dispose();pad=null;editingId=null;editStart=null;reader.querySelectorAll(".ink-note.editing").forEach(n=>n.classList.remove("editing"));return true;
 
   }
 
@@ -126,7 +126,8 @@ export function mountHighlights({reader,viewport,status,onWriting}){
     if(rows[note.id]?.collapsed)persist({...rows,[note.id]:{...rows[note.id],collapsed:false}});
     repaint();reader.querySelector('.ink-note[data-note="'+note.id+'"]')?.remove();
     const box=document.createElement('aside');if(!insert(note,box)){open(note);return;}
-    box.classList.add('editing');corner(note,box);editingId=note.id;
+    box.classList.add('editing');corner(note,box);editingId=note.id;editStart=structuredClone(note);
+    const accept=document.createElement('button');accept.className='note-accept';accept.textContent='✓';accept.title='Accept edit';accept.setAttribute('aria-label','Accept edit');accept.onclick=e=>{e.stopPropagation();if(closePad())repaint();};box.append(accept);
     pad=inkPad(box,note.ink,(ink,finalize)=>{
       const old=rows[note.id];if(finalize){mergeInk();return;}
       const next={...old.note,ink,base:old.dirty?old.note.base:(old.base||old.main||old.remote||null)};
@@ -136,12 +137,9 @@ export function mountHighlights({reader,viewport,status,onWriting}){
     if(bounds.height>view.height||bounds.top<view.top)viewport.scrollTop+=bounds.top-view.top;
     else if(bounds.bottom>view.bottom)viewport.scrollTop+=bounds.bottom-view.bottom;
   }
-  // Ending handwriting is a tap outside, never a dot inside the writing area.
-  document.addEventListener('pointerdown',e=>{
-    if(pad&&!e.target.closest('.ink-note.editing,.annotation-menu')){
-      if(!closePad()){e.preventDefault();return;}
-      repaint();
-    }
+  // Palm contacts on surrounding prose must not finish or switch the active note.
+  for(const type of ['pointerdown','click','contextmenu'])reader.addEventListener(type,e=>{
+    if(pad&&!e.target.closest('.ink-note.editing')){e.preventDefault();e.stopImmediatePropagation();}
   },true);
 
   function stopPicking(){
@@ -489,6 +487,11 @@ export function mountHighlights({reader,viewport,status,onWriting}){
     const add=(label,action)=>{const b=document.createElement('button');b.textContent=label;b.type='button';b.onclick=()=>{menu.close();try{action();}catch(e){status(e.message,true);}};menu.append(b);};
     if(noteId){
       add('Undo',()=>undoNote(noteId));
+      if(editingId===noteId)add('Cancel changes',()=>{
+        const original=structuredClone(editStart);
+        if(!closePad())return;
+        save(original);repaint();
+      });
       add('Delete note',()=>{
         if(!confirm('Delete the handwriting and typed note? The prose and any highlight will stay.'))return;
         if(!closePad())return;

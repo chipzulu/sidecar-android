@@ -40,3 +40,5 @@ mark[data-color="sage"]{--ink:#91b47e88}mark[data-color="rose"]{--ink:#d3919c88}
 ::highlight(annotation-drag) { background:#d8b84e85; }
 mark[data-anchor-kind=point] { background:transparent!important; }
 .ink-actions[hidden] { display:none; }
+
+.ink-note .note-accept { position:absolute;right:42px;top:2px;min-width:36px;min-height:32px;padding:0 .35em;font-size:22px;color:#416953;background:#fffdf5;border:1px solid #416953;border-radius:5px; }

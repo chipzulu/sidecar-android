@@ -1,10 +1,16 @@
-# Story Sidecar Android Reader 0.1.19
+# Story Sidecar Android Reader 0.1.20
+
+## 0.1.20 — explicit handwriting finish and fresh-copy refresh
+
+Tap a note to edit; tap ✓ to accept. Palm contacts on surrounding prose no longer end or switch the edit. Hold the corner triangle for Undo, Cancel changes, or Delete note. Recovery saving continues while writing.
+
+GitHub → Refresh with fresh copy… asks for confirmation, downloads and verifies the complete book, then clears local drafts, annotations and reading position for that repository. Failed/cancelled downloads retain local work. The remote book and saved token are unchanged. Upload the site files and update inside the existing BOOX APK; no APK reinstall needed.
 
 ## Native ink correction and deletion in 0.1.19
 
 Update through Configuration inside the existing BOOX APK after publishing this reader. No APK replacement is required. Native BOOX strokes are no longer classified as menu holds, and browser context-menu events over the active native ink surface are ignored. Native ink remains ink regardless of stroke duration. This addresses a plausible source of the reported 0.1.18 interaction problem; physical-device confirmation is still needed.
 
-**On BOOX, hold the corner triangle** for the note menu (Undo, More space, Delete note, Edit typed note). A short tap on the triangle collapses/expands. Ordinary browser notes still support the existing hold/right-click menu. Tap outside to finish writing.
+**On BOOX, hold the corner triangle** for the note menu (Undo, More space, Delete note, Edit typed note). A short tap on the triangle collapses/expands. Ordinary browser notes still support the existing hold/right-click menu. Tap ✓ to finish writing (updated in 0.1.20).
 
 **Delete note** removes handwriting and typed content after confirmation. Prose and any highlight remain. The deletion state is retained in annotation metadata and can be sent using Send annotations. A later deliberate tap on the retained highlight can start a new note. PC 0.1.135 recognises this state and offers inline collapse and deletion without automatically opening a handwriting transcription card.
 
@@ -15,7 +21,7 @@ The existing **BOOX Test 0.1.0 APK** works with this release; update the reader 
 - Hold the pen on prose to open **Add note here**, **Highlight and annotate**, or **Highlight only**. A mouse right-click also opens the menu.
 - **Add note here** creates an inline note attached to nearby text without highlighting it. Its internal anchor is an adjacent character, so deleting that character can leave the note unattached for review. Empty/whitespace-only paragraphs are not position anchors yet.
 - For either highlighting action, drag across the passage. The paint follows the selection and settles on words. A tap without dragging cancels the mode. Selection stays within one scene; cross-page selection requires the target text to be reachable in the viewport (automatic edge scrolling is not included).
-- Tap an expanded handwritten note to edit. A stronger border indicates the active pad. Tap outside to save and finish; the note stays visible.
+- Tap an expanded handwritten note to edit. A stronger border indicates the active pad. Tap ✓ to save and finish; the note stays visible.
 - Press **▾** in the corner to collapse. **▸** expands it. Collapse state is remembered on this device for each book.
 - No permanent Done/Edit/Undo toolbar is shown in the note. In an ordinary browser, hold the pen still inside the active writing area and lift to open **Undo**, **More space**, and **Edit typed note**. On native BOOX, hold the corner triangle instead. Inactive notes also accept a right-click/normal context-menu gesture. Short pen taps remain ink dots.
 - **Undo** in the note menu removes the last stroke. The prose menu can undo the most recently created local highlight/note in this session. Undo is local; it does not revoke an annotation already sent to GitHub.

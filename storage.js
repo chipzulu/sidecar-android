@@ -31,6 +31,10 @@ export async function removeBook(book){
     };
     tx.oncomplete=resolve;tx.onerror=tx.onabort=()=>reject(Error('The offline book changed. Reopen it before removing it.'));
   });
+  clearBookWork(book);
+}
+export function clearBookWork(book){
+  const repository=book.repository.toLowerCase(),branch=book.branch;
   for(const key of Object.keys(localStorage)){
     if(key.startsWith('sidecar-draft:')){
       let parts;try{parts=JSON.parse(key.slice('sidecar-draft:'.length));}catch{continue;}
