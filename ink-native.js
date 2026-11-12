@@ -44,7 +44,7 @@ export function adaptiveInkInput(svg, callbacks) {
       clearTimeout(timeout);ready=true;badge.textContent='BOOX native pen';send('activate');return;
     }
     if(msg.type==='error'){useBrowser(msg.message||'native setup failed');return;}
-    if(msg.type==='begin'){busy=true;callbacks.begin();return;}
+    if(msg.type==='begin'){busy=true;callbacks.begin({native:true});return;}
     if(msg.type==='stroke'){
       const id=msg.id;
       if(!Number.isSafeInteger(id)||!Array.isArray(msg.points)||!Array.isArray(msg.rect))return;

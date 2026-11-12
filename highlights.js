@@ -98,6 +98,10 @@ export function mountHighlights({reader,viewport,status,onWriting}){
     const collapsed=Boolean(rows[note.id]?.collapsed);
     button.textContent=collapsed?'▸':'▾';button.title=collapsed?'Expand note':'Collapse note';button.setAttribute('aria-label',button.title);button.setAttribute('aria-expanded',String(!collapsed));
     button.onclick=e=>{e.stopPropagation();if(!closePad())return;persist({...rows,[note.id]:{...rows[note.id],collapsed:!collapsed}});repaint();};
+    let hold=0,held=false;
+    button.addEventListener('pointerdown',e=>{held=false;hold=setTimeout(()=>{held=true;showMenu(e.clientX,e.clientY,null,note.id);},800);});
+    for(const type of ['pointerup','pointercancel','pointerleave'])button.addEventListener(type,()=>clearTimeout(hold));
+    button.addEventListener('click',e=>{if(held){e.preventDefault();e.stopImmediatePropagation();held=false;}},true);
     box.append(button);
   }
   function repaint(){
@@ -105,7 +109,7 @@ export function mountHighlights({reader,viewport,status,onWriting}){
     for(const {note,discarded,collapsed} of Object.values(rows)){
       if(discarded||!note)continue;
       for(const mark of reader.querySelectorAll('mark[data-annotation="'+note.id+'"]'))mark.dataset.anchorKind=note.anchorKind||'highlight';
-      if(!note.ink)continue;
+      if(note.noteDeleted||!note.ink)continue;
       const box=document.createElement('aside');if(!insert(note,box))continue;
       corner(note,box);
       if(collapsed){box.classList.add('collapsed');const label=document.createElement('span');label.textContent='Handwritten note';box.append(label);}
@@ -117,7 +121,7 @@ export function mountHighlights({reader,viewport,status,onWriting}){
   }
   function openWriting(note){
     if(!closePad())return;
-    if(!note.ink){save({...note,ink:{version:1,width:800,height:300,strokes:[]}});note=rows[note.id].note;}
+    if(!note.ink){save({...note,noteDeleted:false,ink:{version:1,width:800,height:300,strokes:[]}});note=rows[note.id].note;}
     onWriting?.();annotationsVisible=true;setLayer();tip.hidden=true;
     if(rows[note.id]?.collapsed)persist({...rows,[note.id]:{...rows[note.id],collapsed:false}});
     repaint();reader.querySelector('.ink-note[data-note="'+note.id+'"]')?.remove();
@@ -258,7 +262,7 @@ export function mountHighlights({reader,viewport,status,onWriting}){
 
       if(row.inline && (incoming.color!==row.note.color||incoming.body!==row.note.body||JSON.stringify(incoming.ink)!==JSON.stringify(row.note.ink))){
 
-        row.note={...row.note,color:incoming.color,body:incoming.body,ink:incoming.ink};
+        row.note={...row.note,color:incoming.color,body:incoming.body,ink:incoming.ink,noteDeleted:incoming.noteDeleted};
 
         writeInline(row.note,false);
 
@@ -400,7 +404,7 @@ export function mountHighlights({reader,viewport,status,onWriting}){
 
     active=null;$('highlight-fields').hidden=true;const box=$('highlight-list');box.hidden=false;box.replaceChildren();
 
-    for(const {note} of Object.values(rows).filter(row=>!row.discarded)){const button=document.createElement('button');button.textContent=(note.unattached?'Unattached · ':'')+note.quote;button.onclick=()=>open(note);box.append(button);}
+    for(const {note} of Object.values(rows).filter(row=>!row.discarded&&!row.note?.noteDeleted)){const button=document.createElement('button');button.textContent=(note.unattached?'Unattached · ':'')+note.quote;button.onclick=()=>open(note);box.append(button);}
 
     $('highlight-message').textContent=box.childElementCount?'Choose a highlight':'Select words in one scene to highlight them.';
 
@@ -485,6 +489,11 @@ export function mountHighlights({reader,viewport,status,onWriting}){
     const add=(label,action)=>{const b=document.createElement('button');b.textContent=label;b.type='button';b.onclick=()=>{menu.close();try{action();}catch(e){status(e.message,true);}};menu.append(b);};
     if(noteId){
       add('Undo',()=>undoNote(noteId));
+      add('Delete note',()=>{
+        if(!confirm('Delete the handwriting and typed note? The prose and any highlight will stay.'))return;
+        if(!closePad())return;
+        save({...rows[noteId].note,ink:undefined,body:'',noteDeleted:true});repaint();
+      });
       add('More space',()=>{if(editingId!==noteId)openWriting(rows[noteId].note);pad?.more();});
       add('Edit typed note',()=>{if(closePad()){repaint();open(rows[noteId].note);}});
     }else if(at){
@@ -500,7 +509,7 @@ export function mountHighlights({reader,viewport,status,onWriting}){
   menu.addEventListener('click',e=>{if(e.detail>0&&!menuPress){e.preventDefault();e.stopImmediatePropagation();}menuPress=false;},true);
   menu.onclick=e=>{if(e.target===menu)menu.close();};
   reader.addEventListener('contextmenu',e=>{
-    const box=e.target.closest('.ink-note');if(!box)return;e.preventDefault();showMenu(e.clientX,e.clientY,null,box.dataset.note);
+    const box=e.target.closest('.ink-note');if(!box)return;e.preventDefault();if(window.SidecarNativePen&&box.classList.contains('editing')&&e.target.closest('svg'))return;showMenu(e.clientX,e.clientY,null,box.dataset.note);
   });
   $('highlight-toggle').onpointerdown=()=>{captured=capture();};
 

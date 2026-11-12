@@ -1,4 +1,12 @@
-# Story Sidecar Android Reader 0.1.18
+# Story Sidecar Android Reader 0.1.19
+
+## Native ink correction and deletion in 0.1.19
+
+Update through Configuration inside the existing BOOX APK after publishing this reader. No APK replacement is required. Native BOOX strokes are no longer classified as menu holds, and browser context-menu events over the active native ink surface are ignored. Native ink remains ink regardless of stroke duration. This addresses a plausible source of the reported 0.1.18 interaction problem; physical-device confirmation is still needed.
+
+**On BOOX, hold the corner triangle** for the note menu (Undo, More space, Delete note, Edit typed note). A short tap on the triangle collapses/expands. Ordinary browser notes still support the existing hold/right-click menu. Tap outside to finish writing.
+
+**Delete note** removes handwriting and typed content after confirmation. Prose and any highlight remain. The deletion state is retained in annotation metadata and can be sent using Send annotations. A later deliberate tap on the retained highlight can start a new note. PC 0.1.135 recognises this state and offers inline collapse and deletion without automatically opening a handwriting transcription card.
 
 ## Quiet annotations in 0.1.18
 
@@ -9,7 +17,7 @@ The existing **BOOX Test 0.1.0 APK** works with this release; update the reader 
 - For either highlighting action, drag across the passage. The paint follows the selection and settles on words. A tap without dragging cancels the mode. Selection stays within one scene; cross-page selection requires the target text to be reachable in the viewport (automatic edge scrolling is not included).
 - Tap an expanded handwritten note to edit. A stronger border indicates the active pad. Tap outside to save and finish; the note stays visible.
 - Press **▾** in the corner to collapse. **▸** expands it. Collapse state is remembered on this device for each book.
-- No permanent Done/Edit/Undo toolbar is shown in the note. Hold the pen still inside the active writing area and lift to open **Undo**, **More space**, and **Edit typed note**. Inactive notes also accept a right-click/normal context-menu gesture. Short pen taps remain ink dots.
+- No permanent Done/Edit/Undo toolbar is shown in the note. In an ordinary browser, hold the pen still inside the active writing area and lift to open **Undo**, **More space**, and **Edit typed note**. On native BOOX, hold the corner triangle instead. Inactive notes also accept a right-click/normal context-menu gesture. Short pen taps remain ink dots.
 - **Undo** in the note menu removes the last stroke. The prose menu can undo the most recently created local highlight/note in this session. Undo is local; it does not revoke an annotation already sent to GitHub.
 - Handwriting does not open the keyboard. **Edit typed note** is an explicit text-editing action and can use the normal Android keyboard.
 
@@ -34,7 +42,7 @@ Version 0.1.12 fixed repeated welcome-screen reloads when opening a book downloa
 1. On the PC, extract the Reader ZIP. Upload the **contents of `site/`** to the root of the **app repository** (`sidecar-android` for this installation). Keep the `shared/` folder. The root should contain `index.html`, `sw.js`, `update.html`, and `update-reader.js` alongside the other app files.
 2. Commit the upload and wait for GitHub Pages to finish publishing.
 3. On the tablet, open **Configuration → Check for app update**. If the installed version has no update button, open Chrome and visit the [Sidecar update page](https://chipzulu.github.io/sidecar-android/update.html). For another installation, open `update.html` under its own Pages address.
-4. Wait for **Reader 0.1.18 is ready**, then tap **Open reader**. Configuration shows the installed version.
+4. Wait for **Reader 0.1.19 is ready**, then tap **Open reader**. Configuration shows the installed version.
 
 Keep the reader’s site data when updating. Clearing it can delete local scene drafts, highlights, the offline book, and saved credentials. If the update page says “Try again,” check that Pages has finished deploying and that the tablet is online. A 404 for `update.html` usually means the file has not reached the published site or was uploaded inside an extra `site/` folder.
 

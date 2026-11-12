@@ -4,7 +4,7 @@ import {adaptiveInkInput} from './ink-native.js';
 // Input adapters provide completed strokes. Persistence never runs during pointer movement.
 export function inkPad(host, initial, save, inputFactory=adaptiveInkInput, {quiet=false,onHold}={}) {
   let ink=structuredClone(initial||{version:1,width:800,height:300,strokes:[]});
-  let count=ink.strokes.reduce((n,s)=>n+s.length,0),timer=0,pending=false,failed=false,started=0;
+  let count=ink.strokes.reduce((n,s)=>n+s.length,0),timer=0,pending=false,failed=false,started=0,nativeStroke=false;
   const svg=inkSvg(ink),toolbar=document.createElement('div'),status=document.createElement('small');
   svg.setAttribute('aria-label','Write your annotation with a pen');toolbar.className='ink-actions';toolbar.hidden=quiet;status.setAttribute('role','status');
   function message(text){if(status.textContent!==text)status.textContent=text;}
@@ -20,7 +20,7 @@ export function inkPad(host, initial, save, inputFactory=adaptiveInkInput, {quie
     clearTimeout(timer);timer=setTimeout(flush,800);
   }
   function complete(points,element){
-    if(onHold&&performance.now()-started>=600&&points.length&&points.every(p=>Math.hypot(p[0]-points[0][0],p[1]-points[0][1])<12)){
+    if(onHold&&!nativeStroke&&performance.now()-started>=600&&points.length&&points.every(p=>Math.hypot(p[0]-points[0][0],p[1]-points[0][1])<12)){
       // A stationary hold is a menu request, including through native BOOX capture.
       element?.remove();setTimeout(()=>onHold(),0);return true;
     }
@@ -33,7 +33,7 @@ export function inkPad(host, initial, save, inputFactory=adaptiveInkInput, {quie
     checkpoint();return true;
   }
   host.append(toolbar,svg,status);
-  const input=inputFactory(svg,{height:()=>ink.height,remaining:()=>ink.strokes.length>=2000?0:24000-count,begin:()=>{started=performance.now();clearTimeout(timer);},complete});
+  const input=inputFactory(svg,{height:()=>ink.height,remaining:()=>ink.strokes.length>=2000?0:24000-count,begin:(source)=>{nativeStroke=source?.native===true;started=performance.now();clearTimeout(timer);},complete});
   const actions={};
   function button(label,action){actions[label]=()=>{if(!input.active())action();};const b=document.createElement('button');b.type='button';b.textContent=label;b.onclick=()=>{if(!input.active())action();};toolbar.append(b);}
   button('Undo stroke',()=>{if(!ink.strokes.length)return;count-=ink.strokes.at(-1).length;ink={...ink,strokes:ink.strokes.slice(0,-1)};svg.lastElementChild?.remove();checkpoint();});
