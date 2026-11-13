@@ -1,4 +1,10 @@
-# Story Sidecar Android Reader 0.1.26
+# Story Sidecar Android Reader 0.1.27
+
+## 0.1.27 — simpler handwriting menu
+
+Removed **Edit typed note** from the handwriting menu. Existing typed content remains readable; pen, eraser, Undo, Cancel changes, More space, Delete note and ✓ are retained. The Pages eraser is unchanged.
+
+This Reader can be paired with BOOX APK 0.1.4 to test **Browser eraser · native pen**. Upload the site files and update the Reader inside the APK. Install the APK over the existing app. Select the combination in the APK toolbar, then choose Pen → Eraser in the note menu. Use Erase on lift · indicator to return to the confirmed native fallback.
 
 ## 0.1.26 — left-shift correction
 

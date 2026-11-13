@@ -499,7 +499,6 @@ export function mountHighlights({reader,viewport,status,onWriting}){
         save({...rows[noteId].note,ink:undefined,body:'',noteDeleted:true});repaint();
       });
       add('More space',()=>{if(editingId!==noteId)openWriting(rows[noteId].note);pad?.more();});
-      add('Edit typed note',()=>{if(closePad()){repaint();open(rows[noteId].note);}});
     }else if(at){
       add('Add note here',()=>{const anchor=selectionAnchor(at.path,roots(at.path),at.range);if(anchor)apply({...anchor,anchorKind:'point'});});
       add('Highlight and annotate',()=>{if(!closePad())return;stopPicking();gestures.setMode('note');status('Draw across the words to highlight and annotate. Tap without dragging to cancel.');});
