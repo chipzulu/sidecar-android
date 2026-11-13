@@ -1,4 +1,10 @@
-# Story Sidecar Android Reader 0.1.25
+# Story Sidecar Android Reader 0.1.26
+
+## 0.1.26 — left-shift correction
+
+Fixes a 0.1.25 positioning bug: the handwriting offset replaced the page’s `translateX(-50%)` centring transform, moving it right and potentially hiding ✓. The shift now uses a separate CSS variable composed with the existing centring transform. Repeated openings reset the offset before measuring available space, avoiding drift. Accept restores normal centring.
+
+No new APK needed. Upload the site files and update the Reader. The regression test now loads the real Reader stylesheet and checks leftward movement, visible accept controls, repeated opening, full-width bounds and vertical context. Annotation-flow checks also pass. The previous simplified fixture did not include the production centring transform.
 
 ## 0.1.25 — configurable handwriting position
 
