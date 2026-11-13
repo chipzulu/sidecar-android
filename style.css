@@ -42,3 +42,8 @@ mark[data-anchor-kind=point] { background:transparent!important; }
 .ink-actions[hidden] { display:none; }
 
 .ink-note .note-accept { position:absolute;right:42px;top:2px;min-width:36px;min-height:32px;padding:0 .35em;font-size:22px;color:#416953;background:#fffdf5;border:1px solid #416953;border-radius:5px; }
+
+#configuration .check-option { display:flex; align-items:center; gap:8px; }
+#configuration .check-option input { width:auto; flex:none; }
+.layout.writing-shifted .card-column { visibility:hidden; }
+#manuscript-scroll { overflow-anchor:none; }

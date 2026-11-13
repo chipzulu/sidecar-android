@@ -1,3 +1,4 @@
+import {positionWritingNote,finishWritingPosition,resetWritingPosition} from './writing-position.js';
 import {annotationGestures} from './annotation-gestures.js';
 import {inkSvg} from './shared/annotation-ink.js';
 
@@ -57,7 +58,7 @@ export function mountHighlights({reader,viewport,status,onWriting}){
 
     if(pad&&!pad.save())return false;
 
-    pad?.dispose();pad=null;editingId=null;editStart=null;reader.querySelectorAll(".ink-note.editing").forEach(n=>n.classList.remove("editing"));return true;
+    pad?.dispose();finishWritingPosition(viewport);pad=null;editingId=null;editStart=null;reader.querySelectorAll(".ink-note.editing").forEach(n=>n.classList.remove("editing"));return true;
 
   }
 
@@ -133,9 +134,7 @@ export function mountHighlights({reader,viewport,status,onWriting}){
       const next={...old.note,ink,base:old.dirty?old.note.base:(old.base||old.main||old.remote||null)};
       persist({...rows,[note.id]:{...old,note:next,inline:true,dirty:true,needsInline:true}});
     },undefined,{quiet:true,onHold:()=>{if(!box.isConnected||editingId!==note.id)return;const r=box.getBoundingClientRect();showMenu(r.right-20,r.top+20,null,note.id);}});
-    const bounds=box.getBoundingClientRect(),view=viewport.getBoundingClientRect();
-    if(bounds.height>view.height||bounds.top<view.top)viewport.scrollTop+=bounds.top-view.top;
-    else if(bounds.bottom>view.bottom)viewport.scrollTop+=bounds.bottom-view.bottom;
+    positionWritingNote(box,viewport,reader);
   }
   // Palm contacts on surrounding prose must not finish or switch the active note.
   for(const type of ['pointerdown','click','contextmenu'])reader.addEventListener(type,e=>{
@@ -592,7 +591,7 @@ export function mountHighlights({reader,viewport,status,onWriting}){
 
   },true);
 
-  return {load,sceneEdited,beforeRender:()=>{gestures.setMode(null);if(menu.open)menu.close();return closePad();},repaint,async send(inbox){
+  return {load,sceneEdited,beforeRender:()=>{gestures.setMode(null);if(menu.open)menu.close();if(!closePad())return false;resetWritingPosition(viewport);return true;},repaint,async send(inbox){
 
     if(!closePad())throw Error('Save the handwriting before sending.');
 

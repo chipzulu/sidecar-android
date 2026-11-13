@@ -1,4 +1,15 @@
-# Story Sidecar Android Reader 0.1.24
+# Story Sidecar Android Reader 0.1.25
+
+## 0.1.25 — configurable handwriting position
+
+Configuration → Handwriting position has two independent checkboxes, remembered on this device:
+
+- **Lift note when editing** (default on): scroll the active note upward once, leaving approximately three manuscript line-heights above it for context. Enough spare scroll space is added for the final note too. Near the beginning of a document there may be fewer context lines available.
+- **Move page left when editing** (default off): shift the manuscript and note left by up to 96 CSS pixels, limited by available space so the page stays on-screen. No page-width or pagination change. On an already full-width page there is little or no room to shift. Side cards are temporarily hidden while shifted and return afterward.
+
+Settings apply next time a handwritten note opens. Neither setting repositions after individual strokes. ✓ restores horizontal centring but keeps the vertical position; spare scrolling space is retained until navigation to avoid a jump. All pen/eraser modes remain unchanged. Keep the current APK and your preferred erase-on-lift mode; update only these Reader site files and run the Reader updater.
+
+Chrome checks passed for positioning, final-note lift, screen bounds, unchanged width, and accept position; annotation and simulated-native pen regression checks passed. Check physical writing comfort on the BOOX.
 
 ## 0.1.24 — live BOOX erasing
 
