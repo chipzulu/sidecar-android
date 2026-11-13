@@ -49,11 +49,11 @@ export function inkPad(host, initial, save, inputFactory=adaptiveInkInput, {quie
     if(input&&next===mode)return true;
     input?.dispose();mode=next;host.dataset.inkTool=mode;
     if(mode==='pen')input=inputFactory(svg,{height:()=>ink.height,remaining:()=>ink.strokes.length>=2000?0:24000-count,begin:(source)=>{nativeStroke=source?.native===true;started=performance.now();clearTimeout(timer);},complete});
-    else {ink.strokes.forEach(prepareStroke);const erase={
+    else {ink.strokes.forEach(prepareStroke);let erasingGesture=false,dirty=null;const erase={
       begin(){eraseStart=null;eraseLines=[...svg.querySelectorAll('polyline')];clearTimeout(timer);},
       sweep(a,b,r){
         const area=eraserSweep(a,b,r),keptLines=[];
-        const remaining=ink.strokes.filter((s,i)=>{if(!strokeTouchesSweep(s,area)){keptLines.push(eraseLines[i]);return true;}eraseLines[i]?.remove();return false;});
+        const remaining=ink.strokes.filter((s,i)=>{if(!strokeTouchesSweep(s,area)){keptLines.push(eraseLines[i]);return true;}const box=prepareStroke(s);if(!dirty)dirty=[...box];else {dirty[0]=Math.min(dirty[0],box[0]);dirty[1]=Math.min(dirty[1],box[1]);dirty[2]=Math.max(dirty[2],box[2]);dirty[3]=Math.max(dirty[3],box[3]);}eraseLines[i]?.remove();return false;});
         eraseLines=keptLines;
         if(remaining.length===ink.strokes.length)return;
         if(!eraseStart){eraseStart=ink;remember();}
@@ -63,12 +63,18 @@ export function inkPad(host, initial, save, inputFactory=adaptiveInkInput, {quie
     };
     input=adaptiveInkInput(svg,{
       height:()=>ink.height,remaining:()=>24000,
-      begin(){clearTimeout(timer);},
-      complete(points,element,meta){
-        if(!points.length)return true;
-        erase.begin();let last=points[0];
+      begin(){erase.begin();erasingGesture=true;},
+      progress(points,meta){
+        if(!erasingGesture){erase.begin();erasingGesture=true;}
+        dirty=null;let last=points[0];
         for(const point of points){erase.sweep(last,point,meta.radius);last=point;}
-        erase.end();return true;
+        return dirty;
+      },
+      complete(points,element,meta){
+        if(!erasingGesture)erase.begin();
+        let last=points[0];
+        for(const point of points){erase.sweep(last,point,meta.radius);last=point;}
+        erase.end();erasingGesture=false;return true;
       }
     },{tool:'eraser',browserFactory:()=>eraserInput(svg,erase)});
     }

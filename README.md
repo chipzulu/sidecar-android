@@ -1,4 +1,14 @@
-# Story Sidecar Android Reader 0.1.23
+# Story Sidecar Android Reader 0.1.24
+
+## 0.1.24 — live BOOX erasing
+
+Pair this Reader with **BOOX Test APK 0.1.3**. Upload the site contents, update the Reader inside the APK, and install the APK over the existing app without uninstalling. In the APK toolbar choose **Eraser: Live**; in the note menu select Eraser as usual.
+
+The native octagon retains its independent rendering path. Eraser points are sent in small batches while the pen is down (40 ms minimum scheduling interval, only one unacknowledged batch). Whole strokes disappear in the Reader immediately; their full bounds are acknowledged to the APK for a small-area E-Ink refresh. All samples remain available for the final pen-up catch-up. One Undo restores the complete drag, regardless of batch count. Local note persistence is checkpointed at the end of the gesture, not on every display batch.
+
+The APK toolbar retains **Erase on lift · indicator** and **Erase on lift · fast trail** as fallbacks. Pages/browser erasing is unchanged. Older APKs ignore the live request and continue pen-up erasing; older Readers do not request live batches. Stale/duplicate/out-of-gesture batch messages are ignored. Native input remains busy until the final gesture, so tools/accept cannot split Undo mid-drag.
+
+Build/lint, mock-native live deletion and grouped Undo tests, geometry tests, and browser annotation/refresh regression checks passed. Physical BOOX live refresh/ghosting and its interaction with the smooth octagon still need device testing. Test a long drag over multiple words, lift, Undo, then switch to Pen and write; compare with the pen-up fallback if needed.
 
 ## 0.1.23 — native BOOX eraser feedback test
 

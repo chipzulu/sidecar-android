@@ -6,7 +6,7 @@ export function adaptiveInkInput(svg, callbacks, {tool='pen',browserFactory=brow
   const bridge=window.SidecarNativePen;
   if(!bridge?.postMessage)return browserFactory(svg,callbacks);
   const session=crypto.randomUUID();
-  let fallback=null,ready=false,disposed=false,busy=false,frame=0,last='';
+  let fallback=null,ready=false,disposed=false,busy=false,frame=0,last='',gesture=null,lastBatch=0;
   const received=new Set();
   const badge=document.createElement('small');badge.textContent=erasing?'Connecting BOOX eraser…':'Connecting BOOX pen…';svg.before(badge);
   function send(type,extra={}){bridge.postMessage(JSON.stringify({version:1,type,session,...extra}));}
@@ -30,7 +30,7 @@ export function adaptiveInkInput(svg, callbacks, {tool='pen',browserFactory=brow
       const b=el.getBoundingClientRect();if(b.width&&b.height)exclude.push([b.left,b.top,b.right,b.bottom]);
     }
     const enabled=!document.hidden&&!document.querySelector('dialog[open]')&&(visualViewport?.scale||1)===1&&right>left&&bottom>top&&callbacks.remaining()>0;
-    const next={viewportWidth:innerWidth,rect:[r.left,r.top,r.right,r.bottom],limit:[left,top,right,bottom],exclude,width:2.5*r.width/800,color:'#31483b',tool,eraseRadius:18,enabled};
+    const next={viewportWidth:innerWidth,rect:[r.left,r.top,r.right,r.bottom],limit:[left,top,right,bottom],exclude,width:2.5*r.width/800,color:'#31483b',tool,eraseRadius:18,liveErase:erasing&&!!callbacks.progress,enabled};
     const encoded=JSON.stringify(next);
     if(encoded===last)return;
     // Native captures geometry per stroke, so scrolling cannot re-anchor an existing stroke.
@@ -38,25 +38,42 @@ export function adaptiveInkInput(svg, callbacks, {tool='pen',browserFactory=brow
     try{send(ready?'configure':'open',next);}catch{useBrowser('native bridge unavailable');}
   }
   function schedule(){if(!frame)frame=requestAnimationFrame(update);}
+  function mapPoints(msg){
+    if(!Array.isArray(msg.rect)||msg.rect.length!==4||!msg.rect.every(Number.isFinite)||!Array.isArray(msg.points)||msg.points.length>24000||!msg.points.every(p=>Array.isArray(p)&&p.length===2&&p.every(Number.isFinite)))return null;
+    const [x,y,right]=msg.rect,width=right-x;if(!(width>0))return null;
+    return {radius:18*800/width+1.25,points:msg.points.map(p=>[Math.round(Math.max(0,Math.min(800,(p[0]-x)*800/width))*10)/10,Math.round(Math.max(0,Math.min(callbacks.height(),(p[1]-y)*800/width))*10)/10])};
+  }
   function event(e){
     let msg;try{msg=JSON.parse(e.data);}catch{return;}
     if(msg.version!==1||msg.session!==session||disposed||fallback)return;
     if(msg.type==='ready'){
       clearTimeout(timeout);
       if(erasing&&msg.nativeEraser!==true){useBrowser('install BOOX Test 0.1.1 for native feedback');return;}
-      ready=true;badge.textContent=erasing?'BOOX native eraser · lift pen to erase':'BOOX native pen';send('activate');return;
+      ready=true;badge.textContent=erasing?'BOOX native eraser':'BOOX native pen';send('activate');return;
     }
     if(msg.type==='error'){useBrowser(msg.message||'native setup failed');return;}
-    if(msg.type==='begin'){busy=true;callbacks.begin({native:true});return;}
+    if(msg.type==='begin'){
+      busy=true;gesture=Number.isSafeInteger(msg.id)?msg.id:null;lastBatch=0;
+      callbacks.begin({native:true});return;
+    }
+    if(msg.type==='erase-progress'){
+      if(!erasing||!callbacks.progress||!busy||msg.id!==gesture||!Number.isSafeInteger(msg.batch)||msg.batch<1)return;
+      const ack=dirty=>send('erase-ack',{id:msg.id,batch:msg.batch,dirty});
+      if(msg.batch<=lastBatch){ack(null);return;}
+      const mapped=mapPoints(msg);if(!mapped){ack(null);return;}
+      const bounds=callbacks.progress(mapped.points,{radius:mapped.radius});lastBatch=msg.batch;
+      const [x,y,right]=msg.rect,scale=(right-x)/800;
+      ack(bounds?[x+(bounds[0]-3)*scale,y+(bounds[1]-3)*scale,x+(bounds[2]+3)*scale,y+(bounds[3]+3)*scale]:null);return;
+    }
     if(msg.type==='stroke'){
       const id=msg.id;
       if(!Number.isSafeInteger(id)||!Array.isArray(msg.points)||!Array.isArray(msg.rect))return;
       if(received.has(id)){send('ack',{id});return;}
       busy=false;
-      const [x,y,right]=msg.rect,width=right-x;
-      if(!(width>0)||!msg.rect.every(Number.isFinite)||msg.points.length>24000||!msg.points.every(p=>Array.isArray(p)&&p.length===2&&p.every(Number.isFinite))){send('ack',{id});return;}
-      const points=msg.points.map(p=>[Math.round(Math.max(0,Math.min(800,(p[0]-x)*800/width))*10)/10,Math.round(Math.max(0,Math.min(callbacks.height(),(p[1]-y)*800/width))*10)/10]);
-      if((msg.tool||'pen')===tool&&points.length<=callbacks.remaining())callbacks.complete(points,undefined,{radius:18*800/width+1.25});
+      const mapped=mapPoints(msg);
+      if(!mapped){send('ack',{id});return;}
+      if((msg.tool||'pen')===tool&&mapped.points.length<=callbacks.remaining())callbacks.complete(mapped.points,undefined,{radius:mapped.radius});
+      gesture=null;
       received.add(id);
       // DOM has permanent ink before native requests Android's visual-state callback.
       send('ack',{id});if(callbacks.remaining()===0)schedule();
