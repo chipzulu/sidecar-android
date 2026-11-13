@@ -12,7 +12,7 @@ import {decodeNote,encodeNote,isHighlightFile,noteFilename,selectionAnchor} from
 
 
 
-export function mountHighlights({reader,viewport,status,onWriting}){
+export function mountHighlights({reader,viewport,status,onWriting,onEditScene}){
 
   const $=id=>document.getElementById(id);
 
@@ -36,19 +36,19 @@ export function mountHighlights({reader,viewport,status,onWriting}){
 
     reader.classList.toggle('annotations-hidden',!annotationsVisible);
 
-    layer.setAttribute('aria-pressed',String(annotationsVisible));
+    layer.checked=annotationsVisible;
 
-    layer.textContent=annotationsVisible?'Annotations on':'Annotations off';
+
 
   }
 
   setLayer();
 
-  layer.onclick=()=>{
+  layer.onchange=()=>{
 
-    if(!closePad())return;
+    if(!closePad()){setLayer();return;}
 
-    annotationsVisible=!annotationsVisible;localStorage.setItem('sidecar-annotations-visible',String(annotationsVisible));
+    annotationsVisible=layer.checked;localStorage.setItem('sidecar-annotations-visible',String(annotationsVisible));
 
     stopPicking();tip.hidden=true;setLayer();repaint();
 
@@ -145,9 +145,9 @@ export function mountHighlights({reader,viewport,status,onWriting}){
 
     window.CSS?.highlights?.delete('pending-word');firstWord=null;captured=null;reattach=null;tools.hidden=true;
 
-    $('highlight-toggle').textContent='Highlight';
 
-    $('highlight-toggle').setAttribute('aria-pressed','false');
+
+
 
   }
 
@@ -155,9 +155,9 @@ export function mountHighlights({reader,viewport,status,onWriting}){
 
     firstWord=null;tools.hidden=false;
 
-    $('highlight-toggle').textContent='Apply highlight';
 
-    $('highlight-toggle').setAttribute('aria-pressed','true');
+
+
 
     hint.textContent='Tap the first word, then the last word.';
 
@@ -500,6 +500,7 @@ export function mountHighlights({reader,viewport,status,onWriting}){
       });
       add('More space',()=>{if(editingId!==noteId)openWriting(rows[noteId].note);pad?.more();});
     }else if(at){
+      add('Edit scene',()=>{if(closePad()){repaint();onEditScene?.(at);}});
       add('Add note here',()=>{const anchor=selectionAnchor(at.path,roots(at.path),at.range);if(anchor)apply({...anchor,anchorKind:'point'});});
       add('Highlight and annotate',()=>{if(!closePad())return;stopPicking();gestures.setMode('note');status('Draw across the words to highlight and annotate. Tap without dragging to cancel.');});
       add('Highlight only',()=>{if(!closePad())return;stopPicking();gestures.setMode('highlight');status('Draw across the words to highlight. Tap without dragging to cancel.');});
@@ -514,22 +515,6 @@ export function mountHighlights({reader,viewport,status,onWriting}){
   reader.addEventListener('contextmenu',e=>{
     const box=e.target.closest('.ink-note');if(!box)return;e.preventDefault();if(window.SidecarNativePen&&box.classList.contains('editing')&&e.target.closest('svg'))return;showMenu(e.clientX,e.clientY,null,box.dataset.note);
   });
-  $('highlight-toggle').onpointerdown=()=>{captured=capture();};
-
-  $('highlight-toggle').onclick=()=>{
-
-    if(!closePad())return;
-
-    annotationsVisible=true;setLayer();
-
-    const anchor=captured||capture();captured=null;
-
-    if(anchor){apply(anchor);return;}
-
-    startPicking();
-
-  };
-
   // Two taps work with a finger or a pen without relying on Android selection handles.
 
   viewport.addEventListener('click',event=>{

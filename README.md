@@ -1,4 +1,15 @@
-# Story Sidecar Android Reader 0.1.27
+# Story Sidecar Android Reader 0.1.28
+
+## 0.1.28 — compact toolbar and dismissible panels
+
+- Outline, Configuration and GitHub close when you tap outside their panels. Their own controls remain usable; Escape also dismisses open panels when no modal dialog is active.
+- **Show annotations** is now a Configuration checkbox, retaining the existing saved visibility preference.
+- **Text size** is in Configuration, with a manuscript-font sample that updates immediately.
+- The toolbar **Highlight** button is removed. Hold/right-click prose for Add note here, Highlight and annotate, or Highlight only.
+- **Edit scene** is in that same prose popup and opens the scene at the selected passage, not an unrelated visible scene.
+- Saved annotations remain accessible in Configuration. Open panels are excluded from native pen capture.
+
+No new APK: upload these site files and update the Reader in your existing app. Handwriting and eraser modes are unchanged. Chrome checks cover outside dismissal, inside controls, checkbox visibility, sample sizing, correct scene editing and annotation lifecycle; mock-native bridge checks pass. Configuration screenshot reviewed at tablet width.
 
 ## 0.1.27 — simpler handwriting menu
 

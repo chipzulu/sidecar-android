@@ -13,7 +13,7 @@ import {mountHighlights} from './highlights.js';
 const $=id=>document.getElementById(id);
 let snapshot=null,model=null,index=-1,coverUrl='',busy=false,credentialBusy=false,client=null,clientKey='',abort=null,disposeCards=()=>{},selectedScene=null,renderRevision=0,rendering=false, replacing=false;
 function message(text,error=false){$('status').textContent=text;$('status').classList.toggle('error',error);}
-const highlights=mountHighlights({reader:$('reader'),viewport:$('manuscript-scroll'),status:message,onWriting:()=>{if(dock)setOpen(dock,false);}});
+const highlights=mountHighlights({reader:$('reader'),viewport:$('manuscript-scroll'),status:message,onEditScene:at=>editScene(at),onWriting:()=>{if(dock)setOpen(dock,false);}});
 function preference(key,value){try{if(value===undefined)return localStorage.getItem('sidecar-reader:'+key);localStorage.setItem('sidecar-reader:'+key,value);}catch{/* Reading remains usable without preferences. */}}
 function locationKey(){return snapshot?`${snapshot.repository.toLowerCase()}:${snapshot.branch}`:'';}
 function remember(){if(snapshot&&!rendering&&!replacing)preference('position:'+locationKey(),JSON.stringify({scope:index===-2?'novel':selectedScene?'scene':index===-1?'cover':'chapter',chapter:model.chapters[index]?.key??null,scene:selectedScene,y:$('manuscript-scroll').scrollTop}));}
@@ -40,6 +40,16 @@ function setOpen(id,open){if(id==='outline'||id==='configuration'){dock=open?id:
 $('connection-toggle').onclick=()=>setOpen('connection',$('connection').hidden);
 $('outline-toggle').onclick=()=>setOpen('outline',$('outline').hidden);
 $('configuration-toggle').onclick=()=>setOpen('configuration',$('configuration').hidden);$('close-panel').onclick=()=>setOpen(dock,false);
+// Closing a panel never consumes the outside action or changes note-edit state.
+document.addEventListener('click',event=>{
+ const target=event.target;
+ if(dock&&!target.closest('#right-panel,#outline-toggle,#configuration-toggle,#width-handle,dialog'))setOpen(dock,false);
+ if(!$('connection').hidden&&!target.closest('#connection,#connection-toggle,dialog'))setOpen('connection',false);
+},true);
+document.addEventListener('keydown',event=>{
+ if(event.key==='Escape'&&!document.querySelector('dialog[open]')){if(dock)setOpen(dock,false);if(!$('connection').hidden)setOpen('connection',false);}
+});
+
 for(const [id,defaultOn] of [['writing-lift',true],['writing-left',false]]){
   $(id).checked=preference(id)==null?defaultOn:preference(id)==='true';
   $(id).onchange=()=>preference(id,String($(id).checked));
@@ -81,7 +91,7 @@ async function render(which,scenePath=null,scroll=true,preserve=false){
   if((which!==index||scenePath!==selectedScene)&&!document.getElementById("highlight-tools").hidden)document.getElementById("highlight-cancel").click();
   const revision=++renderRevision,scroller=$('manuscript-scroll'),fraction=scroller.scrollTop/Math.max(1,scroller.scrollHeight-scroller.clientHeight);
   index=which===-2?-2:Math.max(-1,Math.min(model.chapters.length-1,which));selectedScene=index>=0&&model.chapters[index].scenes.some(s=>s.path===scenePath)?scenePath:null;
-  $('highlight-toggle').hidden=index===-1;$('annotations-layer').hidden=index===-1;$('edit-scene').hidden=index===-1;const reader=$('reader');reader.replaceChildren();rendering=true;reader.setAttribute('aria-busy','true');
+  const reader=$('reader');reader.replaceChildren();rendering=true;reader.setAttribute('aria-busy','true');
   const name=index===-2?'Entire Novel':index===-1?model.title:selectedScene?model.chapters[index].scenes.find(s=>s.path===selectedScene).name:model.chapters[index].name;
   for(const [id,direction] of [['previous','Previous'],['next','Next']]){const label=`${direction} ${index===-2?'page':selectedScene?'scene':'chapter'}`;$(id).title=label;$(id).setAttribute('aria-label',label);}
   $('position').textContent=name;$('position').title=name;$('page-count').textContent=index===-1?'':'Estimating pages…';
@@ -109,13 +119,14 @@ async function render(which,scenePath=null,scroll=true,preserve=false){
 }
 let tappedBlock=null;
 $('reader').addEventListener('click',event=>{tappedBlock=event.target.closest('[data-block]');});
-$('edit-scene').onclick=()=>{
+function editScene(at){
   if(rendering||busy)return;
   const viewport=$('manuscript-scroll').getBoundingClientRect();
   const visible=node=>node.getBoundingClientRect().bottom>viewport.top&&node.getBoundingClientRect().top<viewport.bottom;
   const blocks=[...$('reader').querySelectorAll('[data-block]')];
-  const anchor=tappedBlock?.isConnected&&visible(tappedBlock)?tappedBlock:blocks.find(visible)||blocks[0];
-  const path=anchor?.dataset.scene||selectedScene;
+  const targeted=at?.range?.startContainer;
+  const anchor=(targeted?.nodeType===Node.TEXT_NODE?targeted.parentElement:targeted)?.closest('[data-block]')||(tappedBlock?.isConnected&&visible(tappedBlock)?tappedBlock:blocks.find(visible)||blocks[0]);
+  const path=at?.path||anchor?.dataset.scene||selectedScene;
   const scene=model.chapters.flatMap(chapter=>chapter.scenes).find(item=>item.path===path);
   if(!scene)return;
   writeScene(snapshot,scene,Number(anchor?.dataset.block)||0,async block=>{

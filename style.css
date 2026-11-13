@@ -47,3 +47,5 @@ mark[data-anchor-kind=point] { background:transparent!important; }
 #configuration .check-option input { width:auto; flex:none; }
 .layout.writing-shifted .card-column { visibility:hidden; }
 #manuscript-scroll { overflow-anchor:none; }
+
+#configuration #text-size-sample { font:var(--reading-size)/1.65 Georgia,serif; padding:12px; background:#f4eedc; border:1px solid #dcd1b8; }

@@ -26,7 +26,7 @@ export function adaptiveInkInput(svg, callbacks, {tool='pen',browserFactory=brow
       if(/auto|scroll|hidden|clip/.test(style.overflowY)){top=Math.max(top,b.top);bottom=Math.min(bottom,b.bottom);}
     }
     const exclude=[];
-    for(const el of document.querySelectorAll('button,input,textarea,select,a,[role="button"],dialog[open],header')){
+    for(const el of document.querySelectorAll('button,input,textarea,select,a,[role="button"],dialog[open],header,#right-panel:not([hidden]),#connection:not([hidden])')){
       const b=el.getBoundingClientRect();if(b.width&&b.height)exclude.push([b.left,b.top,b.right,b.bottom]);
     }
     const enabled=!document.hidden&&!document.querySelector('dialog[open]')&&(visualViewport?.scale||1)===1&&right>left&&bottom>top&&callbacks.remaining()>0;
