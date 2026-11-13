@@ -1,3 +1,4 @@
+import {notePalette} from './note-palette.js';
 import {positionWritingNote,finishWritingPosition,resetWritingPosition} from './writing-position.js';
 import {annotationGestures} from './annotation-gestures.js';
 import {inkSvg} from './shared/annotation-ink.js';
@@ -26,7 +27,7 @@ export function mountHighlights({reader,viewport,status,onWriting,onEditScene}){
 
   const tools=$('highlight-tools'), hint=$('highlight-hint');
 
-  let firstWord=null, pad=null, editingId=null, editStart=null;
+  let firstWord=null, pad=null, palette=null, editingId=null, editStart=null;
 
   let annotationsVisible=localStorage.getItem('sidecar-annotations-visible')!=='false';
 
@@ -58,7 +59,7 @@ export function mountHighlights({reader,viewport,status,onWriting,onEditScene}){
 
     if(pad&&!pad.save())return false;
 
-    pad?.dispose();finishWritingPosition(viewport);pad=null;editingId=null;editStart=null;reader.querySelectorAll(".ink-note.editing").forEach(n=>n.classList.remove("editing"));return true;
+    palette?.dispose();palette=null;pad?.dispose();finishWritingPosition(viewport);pad=null;editingId=null;editStart=null;reader.querySelectorAll(".ink-note.editing").forEach(n=>n.classList.remove("editing"));return true;
 
   }
 
@@ -128,13 +129,14 @@ export function mountHighlights({reader,viewport,status,onWriting,onEditScene}){
     repaint();reader.querySelector('.ink-note[data-note="'+note.id+'"]')?.remove();
     const box=document.createElement('aside');if(!insert(note,box)){open(note);return;}
     box.classList.add('editing');corner(note,box);editingId=note.id;editStart=structuredClone(note);
-    const accept=document.createElement('button');accept.className='note-accept';accept.textContent='✓';accept.title='Accept edit';accept.setAttribute('aria-label','Accept edit');accept.onclick=e=>{e.stopPropagation();if(closePad())repaint();};box.append(accept);
+
     pad=inkPad(box,note.ink,(ink,finalize)=>{
       const old=rows[note.id];if(finalize){mergeInk();return;}
       const next={...old.note,ink,base:old.dirty?old.note.base:(old.base||old.main||old.remote||null)};
       persist({...rows,[note.id]:{...old,note:next,inline:true,dirty:true,needsInline:true}});
     },undefined,{quiet:true,onHold:()=>{if(!box.isConnected||editingId!==note.id)return;const r=box.getBoundingClientRect();showMenu(r.right-20,r.top+20,null,note.id);}});
     positionWritingNote(box,viewport,reader);
+    palette=notePalette({anchor:box,tool:()=>pad?.tool(),setTool:value=>pad?.setTool(value),undo:()=>pad?.undo(),moreSpace:()=>pad?.more(),accept:()=>{if(closePad())repaint();},more:(x,y)=>showMenu(x,y,null,note.id,true),onError:status});
   }
   // Palm contacts on surrounding prose must not finish or switch the active note.
   for(const type of ['pointerdown','click','contextmenu'])reader.addEventListener(type,e=>{
@@ -481,13 +483,13 @@ export function mountHighlights({reader,viewport,status,onWriting,onEditScene}){
       unwrap(roots(note.path),note.id);persist({...rows,[note.id]:{...row,discarded:true,note:{...note,unattached:true}}});lastCreated=null;repaint();
     }
   }
-  function showMenu(x,y,at=null,noteId=null){
+  function showMenu(x,y,at=null,noteId=null,minimal=false){
     if(menu.open)menu.close();menuPress=false;menu.replaceChildren();
-    const add=(label,action)=>{const b=document.createElement('button');b.textContent=label;b.type='button';b.onclick=()=>{menu.close();try{action();}catch(e){status(e.message,true);}};menu.append(b);};
+    const add=(label,action)=>{const b=document.createElement('button');b.textContent=label;b.type='button';b.onclick=()=>{menu.close();try{action();palette?.refresh();}catch(e){status(e.message,true);}};menu.append(b);};
     if(noteId){
-      add('Pen',()=>{if(editingId!==noteId)openWriting(rows[noteId].note);pad?.setTool('pen');});
-      add('Eraser',()=>{if(editingId!==noteId)openWriting(rows[noteId].note);pad?.setTool('eraser');});
-      add('Undo',()=>undoNote(noteId));
+      if(!minimal)add('Pen',()=>{if(editingId!==noteId)openWriting(rows[noteId].note);pad?.setTool('pen');});
+      if(!minimal)add('Eraser',()=>{if(editingId!==noteId)openWriting(rows[noteId].note);pad?.setTool('eraser');});
+      if(!minimal)add('Undo',()=>undoNote(noteId));
       if(editingId===noteId)add('Cancel changes',()=>{
         const original=structuredClone(editStart);
         if(!closePad())return;
@@ -498,7 +500,7 @@ export function mountHighlights({reader,viewport,status,onWriting,onEditScene}){
         if(!closePad())return;
         save({...rows[noteId].note,ink:undefined,body:'',noteDeleted:true});repaint();
       });
-      add('More space',()=>{if(editingId!==noteId)openWriting(rows[noteId].note);pad?.more();});
+      if(!minimal)add('More space',()=>{if(editingId!==noteId)openWriting(rows[noteId].note);pad?.more();});
     }else if(at){
       add('Edit scene',()=>{if(closePad()){repaint();onEditScene?.(at);}});
       add('Add note here',()=>{const anchor=selectionAnchor(at.path,roots(at.path),at.range);if(anchor)apply({...anchor,anchorKind:'point'});});

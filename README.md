@@ -1,4 +1,14 @@
-# Story Sidecar Android Reader 0.1.28
+# Story Sidecar Android Reader 0.1.29
+
+## 0.1.29 — movable handwriting tool palette
+
+Tap a handwritten note to edit: its floating palette provides Pen, Eraser, Undo, **+** More space, **✓** Accept, and **⋯** Cancel changes / Delete note. Pen and Eraser show the active tool in dark green. Existing note-corner collapse and contextual menus remain available; the old separate accept button is replaced by the palette's ✓.
+
+Drag only the dotted handle. Near a left/right screen edge the palette becomes vertical; moving away makes it horizontal. Separate enter/leave thresholds prevent repeated flipping. Position and orientation are remembered per device, across notes/books, and clamped after screen resizing. Arrow keys on the focused handle also move it. The palette disappears when editing finishes. Small screens can scroll the palette if all tools do not fit.
+
+All controls have accessible labels and hover text. The complete palette rectangle is excluded from native pen capture. Pen/eraser storage, native mode selection and Undo semantics are unchanged. No APK update required: publish the site files and update Reader inside the current APK.
+
+Browser checks cover dragging, both orientations, edge hysteresis, no accidental tool switch, viewport bounds, remembered placement, tool selection, More actions and accept cleanup. Annotation lifecycle and mock-native bridge tests passed; the vertical tablet layout was visually inspected. Physical pen handling still warrants a BOOX check.
 
 ## 0.1.28 — compact toolbar and dismissible panels
 

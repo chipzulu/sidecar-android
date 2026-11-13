@@ -26,10 +26,10 @@ export function adaptiveInkInput(svg, callbacks, {tool='pen',browserFactory=brow
       if(/auto|scroll|hidden|clip/.test(style.overflowY)){top=Math.max(top,b.top);bottom=Math.min(bottom,b.bottom);}
     }
     const exclude=[];
-    for(const el of document.querySelectorAll('button,input,textarea,select,a,[role="button"],dialog[open],header,#right-panel:not([hidden]),#connection:not([hidden])')){
+    for(const el of document.querySelectorAll('button,input,textarea,select,a,[role="button"],dialog[open],header,.note-palette,#right-panel:not([hidden]),#connection:not([hidden])')){
       const b=el.getBoundingClientRect();if(b.width&&b.height)exclude.push([b.left,b.top,b.right,b.bottom]);
     }
-    const enabled=!document.hidden&&!document.querySelector('dialog[open]')&&(visualViewport?.scale||1)===1&&right>left&&bottom>top&&callbacks.remaining()>0;
+    const enabled=!document.hidden&&!document.querySelector('dialog[open],.note-palette.dragging')&&(visualViewport?.scale||1)===1&&right>left&&bottom>top&&callbacks.remaining()>0;
     const next={viewportWidth:innerWidth,rect:[r.left,r.top,r.right,r.bottom],limit:[left,top,right,bottom],exclude,width:2.5*r.width/800,color:'#31483b',tool,eraseRadius:18,liveErase:erasing&&!!callbacks.progress,enabled};
     const encoded=JSON.stringify(next);
     if(encoded===last)return;

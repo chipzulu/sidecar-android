@@ -49,3 +49,11 @@ mark[data-anchor-kind=point] { background:transparent!important; }
 #manuscript-scroll { overflow-anchor:none; }
 
 #configuration #text-size-sample { font:var(--reading-size)/1.65 Georgia,serif; padding:12px; background:#f4eedc; border:1px solid #dcd1b8; }
+
+.note-palette{position:fixed;z-index:30;display:flex;gap:3px;padding:4px;background:#faf7eb;border:1px solid #b8ac93;border-radius:9px;box-shadow:0 3px 12px #0002;max-width:calc(100vw - 16px);max-height:calc(100dvh - 80px);overflow:auto;}
+.note-palette.vertical{flex-direction:column;}
+.note-palette button{flex:none;width:42px;height:44px;min-height:44px;padding:6px;display:flex;align-items:center;justify-content:center;font-size:23px;background:transparent;border:0;border-radius:5px;}
+.note-palette button[aria-pressed=true]{background:#345346;color:#fff;}
+.note-palette svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;}
+.note-palette .palette-handle{cursor:grab;touch-action:none;color:#625e54;}
+.note-palette .palette-handle:active{cursor:grabbing;}
