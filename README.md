@@ -1,4 +1,10 @@
-# Story Sidecar Android Reader 0.1.33
+# Story Sidecar Android Reader 0.1.34
+
+## 0.1.34 — library storage foundation (intentional reset)
+
+First opening clears the old single-book download, drafts, annotations, card placements and reading positions. This reset was explicitly requested; old book content is not migrated. Saved GitHub tokens remain in the separate credentials database. The previous book’s repository/branch is rescued, plus other saved-token repository names (main is suggested where no branch was stored). GitHub settings are available in Saved GitHub connections; redownload your book. Device handwriting preferences are retained.
+
+Books now have independent local UUIDs, snapshots and work keys. Refreshing a repository/branch retains its UUID. Downloading a different book retains previous books. Removing a book clears only its work and snapshot, keeping GitHub credentials. Library metadata stores connection, title and last send/receive times; remote freshness remains not checked. The carousel and library-first launch arrive in step 2. Existing APK 0.1.8 is unchanged.
 
 ## 0.1.33 — diagnose missing native handwriting
 
@@ -232,3 +238,5 @@ Handwriting recognition is not included. Test pen responsiveness on your BOOX; t
 Reader sources are in `android-reader/`. Run `scripts/package-android-reader.py` to refresh shared modules and build the release ZIP. The same guide ships as `site/README.md` for the app repository and `START-HERE.md` for anyone opening the ZIP.
 
 0.1.31 validation: annotation browser flow (configuration, thick drawing, erase/Undo, collapse, cancel/delete) passed; mixed-width JSON roundtrip and legacy rendering passed; simulated native preview-width and bridge regressions passed. Physical BOOX width appearance needs confirmation.
+
+0.1.34 validation: library reset/credential rescue, two-book isolation, switching/removal/reload, annotation flow, fresh-copy failure/cancel preservation and full simulated native-message saving pass in Chrome. Saved tokens are never included in diagnostic output or library metadata.

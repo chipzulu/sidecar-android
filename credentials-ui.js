@@ -1,3 +1,4 @@
+import {rememberConnection} from './storage.js';
 import {repositoryName} from './api.js';
 import {readCredential,writeCredential} from './token-vault.js';
 
@@ -56,6 +57,7 @@ export function mountCredentials({activate,lock,message,onBusy}){
         await writeCredential(repository,next);record=next;
       }catch(e){lock();throw e;}
     }
+    await rememberConnection({repository,branch});
     session={repository,token};editing=false;$('token').value='';fields();
   }
   async function run(action){

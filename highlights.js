@@ -1,3 +1,4 @@
+import {workKey} from './storage.js';
 import {notePalette} from './note-palette.js';
 import {positionWritingNote,finishWritingPosition,resetWritingPosition} from './writing-position.js';
 import {annotationGestures} from './annotation-gestures.js';
@@ -201,7 +202,7 @@ export function mountHighlights({reader,viewport,status,onWriting,onEditScene}){
 
   });
 
-  function key(){return 'sidecar-highlights:'+JSON.stringify([book.repository.toLowerCase(),book.branch]);}
+  function key(){return workKey(book,'highlights');}
 
   function persist(next){
 

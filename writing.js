@@ -1,3 +1,4 @@
+import {workKey} from './storage.js';
 import {inlineFragment,sceneNotes,annotatedHtml,colourMarks} from './inline-notes.js';
 import {htmlForPlainTextPaste} from './shared/html-format.js';
 
@@ -10,7 +11,7 @@ let dirty = false;
 let lastBlock = 0;
 
 function draftKey(book, scene) {
-  return 'sidecar-draft:' + JSON.stringify([book.repository.toLowerCase(), book.branch, scene.path]);
+  return workKey(book,'draft',scene.path);
 }
 
 export function readDraft(book, scene) {

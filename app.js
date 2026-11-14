@@ -1,6 +1,6 @@
 import {readerClient,repositoryName} from './api.js';
 import {bookModel,chapterHeadingParts,sceneHeadingParts} from './model.js';
-import {readBook,saveBook,bookIdentity,readBookIdentity,removeBook,clearBookWork} from './storage.js';
+import {readBook,saveBook,bookIdentity,readBookIdentity,removeBook,clearBookWork,workKey,libraryReady,lastConnection,listConnections,findBook,markBookSent} from './storage.js';
 import {inlineFragment,sceneNotes,colourMarks} from './inline-notes.js';
 import {convertItalicMarkers} from './shared/italic-markers.js';
 import {keepMarker} from './shared/keep-together.js';
@@ -10,13 +10,13 @@ import {mountCards} from './cards.js';
 import {mountCredentials} from './credentials-ui.js';
 import {readDraft, writeScene} from './writing.js';
 import {mountHighlights} from './highlights.js';
+try{await libraryReady;}catch(error){document.getElementById("status").textContent=error.message;throw error;}
 const $=id=>document.getElementById(id);
 let snapshot=null,model=null,index=-1,coverUrl='',busy=false,credentialBusy=false,client=null,clientKey='',abort=null,disposeCards=()=>{},selectedScene=null,renderRevision=0,rendering=false, replacing=false;
 function message(text,error=false){$('status').textContent=text;$('status').classList.toggle('error',error);}
 const highlights=mountHighlights({reader:$('reader'),viewport:$('manuscript-scroll'),status:message,onEditScene:at=>editScene(at),onWriting:()=>{if(dock)setOpen(dock,false);}});
 function preference(key,value){try{if(value===undefined)return localStorage.getItem('sidecar-reader:'+key);localStorage.setItem('sidecar-reader:'+key,value);}catch{/* Reading remains usable without preferences. */}}
-function locationKey(){return snapshot?`${snapshot.repository.toLowerCase()}:${snapshot.branch}`:'';}
-function remember(){if(snapshot&&!rendering&&!replacing)preference('position:'+locationKey(),JSON.stringify({scope:index===-2?'novel':selectedScene?'scene':index===-1?'cover':'chapter',chapter:model.chapters[index]?.key??null,scene:selectedScene,y:$('manuscript-scroll').scrollTop}));}
+function remember(){if(snapshot&&!rendering&&!replacing)localStorage.setItem(workKey(snapshot,'position'),JSON.stringify({scope:index===-2?'novel':selectedScene?'scene':index===-1?'cover':'chapter',chapter:model.chapters[index]?.key??null,scene:selectedScene,y:$('manuscript-scroll').scrollTop}));}
 let pageWidth=Math.max(280,Number(preference('page-width'))||740),pageLines=Math.max(15,Math.min(60,Number(preference('page-lines'))||28)),cardMode=preference('card-layout')||'none',dock='';
 let layoutTimer,lastPageWidth=0;
 function repaginate(){if(!model||index===-1)return;return render(index,selectedScene,false,true);}
@@ -152,7 +152,7 @@ async function openBook(value,resume=true){
     if(draft)scene.html=draft.html;
   }
   highlights.load(value,model);
-  disposeCards();disposeCards=mountCards(value,{left:$('left-cards'),right:$('right-cards')},preference);
+  disposeCards();disposeCards=mountCards(value,{left:$('left-cards'),right:$('right-cards')},(key,value)=>{const k=workKey(snapshot,'card',key);if(value===undefined)return localStorage.getItem(k);localStorage.setItem(k,value);});
   if(model.cover){const type=/\.png$/i.test(model.cover.path)?'image/png':'image/jpeg';coverUrl=URL.createObjectURL(new Blob([model.cover.bytes],{type}));}
   document.title=model.title+' · Sidecar Reader';$('repository').value=value.repository;$('branch').value=value.branch;
   credentials.refresh();$('remove-book').hidden=false;$('fresh-copy').hidden=false;
@@ -161,7 +161,7 @@ async function openBook(value,resume=true){
   model.chapters.forEach((chapter,n)=>{const details=element('details'),summary=element('summary',chapter.name),children=element('div'),all=element('button','Read chapter');all.dataset.scope=`chapter:${chapter.key}`;all.onclick=()=>navigate(n);children.append(all);
     for(const scene of chapter.scenes){const button=element('button',scene.name);button.dataset.scope=scene.path;button.onclick=()=>navigate(n,scene.path);children.append(button);}details.append(summary,children);$('outline').append(details);});
   $('outline-toggle').disabled=false;setOpen('connection',false);
-  let saved=null;try{saved=JSON.parse(preference('position:'+locationKey())||'null');}catch{}
+  let saved=null;try{saved=JSON.parse(localStorage.getItem(workKey(value,'position'))||'null');}catch{}
   const chosen=resume&&saved?.scope==='novel'?-2:resume&&saved?.chapter!==null?model.chapters.findIndex(c=>c.key===saved?.chapter):-1;
   const expectedRevision=renderRevision+1;
   await render(chosen,saved?.scope==='scene'?saved.scene:null,false);
@@ -174,6 +174,8 @@ function textSize(value){const size=['18','21','24','28'].includes(value)?value:
 textSize(preference('size'));$('size').onchange=()=>{textSize($('size').value);repaginate();};
 function controls(){for(const id of ['repository','branch','token','download','send-highlights','remember-token','save-token','replace-token','cancel-token','forget-saved-token','remove-book','fresh-copy'])$(id).disabled=busy||credentialBusy;$('cancel').hidden=!busy||!abort;$('progress').hidden=!busy;}
 function lockGitHub(){client=null;clientKey='';$('token').value='';}
+const rescued=await lastConnection();if(rescued){$('repository').value=rescued.repository;$('branch').value=rescued.branch;}
+const profiles=await listConnections();const choices=$('saved-connections');for(const c of profiles)choices.add(new Option(c.repository+' · '+c.branch,c.key));choices.hidden=!profiles.length;choices.onchange=()=>{const c=profiles.find(c=>c.key===choices.value);if(c){$('repository').value=c.repository;$('branch').value=c.branch;credentials.refresh();}};
 const credentials=mountCredentials({activate:(repository,branch,token)=>{client=readerClient(repository,branch,token);clientKey=JSON.stringify([repository,branch]);},lock:lockGitHub,message,onBusy:value=>{credentialBusy=value;controls();}});
 $('send-highlights').onclick=async()=>{
   if(!snapshot){message('Download a book first.',true);return;}
@@ -182,7 +184,7 @@ $('send-highlights').onclick=async()=>{
   try{
     if(repositoryName($('repository').value)!==snapshot.repository||$('branch').value.trim()!==snapshot.branch)throw Error('Select the repository and branch for the open book before sending highlights.');
     await credentials.ensure();
-    const count=await highlights.send(client.inbox);message(count?'Sent '+count+' highlight note(s). On PC choose Get tablet highlights.':'No attached highlight notes waiting to send.');}
+    const count=await highlights.send(client.inbox);await markBookSent(snapshot);message(count?'Sent '+count+' highlight note(s). On PC choose Get tablet highlights.':'No attached highlight notes waiting to send.');}
   catch(e){message(e.message,true);}finally{busy=false;controls();}
 };
 $('remove-book').onclick=async()=>{
@@ -205,13 +207,13 @@ async function downloadBook(fresh){
     const repository=repositoryName($('repository').value),branch=$('branch').value.trim();
     if(fresh&&(!snapshot||repository.toLowerCase()!==snapshot.repository.toLowerCase()||branch!==snapshot.branch))throw Error('Select the repository and branch of the open book before refreshing its fresh copy.');
     await credentials.ensure();
-    if(snapshot&&(repository.toLowerCase()!==snapshot.repository.toLowerCase()||branch!==snapshot.branch)&&!confirm(`Open ${repository} (${branch}) in place of ${model.title} on this tablet?`)){message('Download cancelled.');return;}
+    if(snapshot&&(repository.toLowerCase()!==snapshot.repository.toLowerCase()||branch!==snapshot.branch)&&!confirm(`Open ${repository} (${branch}) and keep ${model.title} in the local library?`)){message('Download cancelled.');return;}
     message('Checking private repository and latest backup…');
     // Pass cancellation into the GET-only transport; token stays in its closure.
-    const next=await client.download(fresh?null:snapshot,p=>{if(abort.signal.aborted)throw Error('Download cancelled. Previous offline book retained.');$('progress').max=Math.max(1,p.total);$('progress').value=p.completed;message(`Downloading ${p.completed} of ${p.total} files · ${p.path}`);},abort.signal);
+    const next=await client.download(fresh?null:await findBook(repository,branch),p=>{if(abort.signal.aborted)throw Error('Download cancelled. Previous offline book retained.');$('progress').max=Math.max(1,p.total);$('progress').value=p.completed;message(`Downloading ${p.completed} of ${p.total} files · ${p.path}`);},abort.signal);
     if(abort.signal.aborted)throw Error('Download cancelled. Previous offline book retained.');
     const verified=bookModel(next);if(!verified.chapters.length)throw Error('No readable manuscript found.');
-    await saveBook(next);
+    next.title=verified.title;await saveBook(next);
     if(fresh){replacing=true;clearTimeout(scrollTimer);clearBookWork(next);bookUpdates.postMessage('saved');location.reload();return;}
     bookUpdates.postMessage('saved');remember();await openBook(next);message('Book verified and saved for offline reading. No GitHub files were changed.');
     navigator.storage?.persist?.().catch(()=>{});
