@@ -1,4 +1,10 @@
-# Story Sidecar Android Reader 0.1.30
+# Story Sidecar Android Reader 0.1.31
+
+## 0.1.31 — pen thickness and simple collapse control
+
+Configuration → Pen thickness offers Fine (original 2.5), Medium (4), and Thick (6) in note coordinates. Selection applies when opening a note for writing and is remembered on this device. Existing strokes keep their widths. New strokes save optional strokeWidths metadata, retained through erase and Undo. Older ink without metadata uses Fine. Native preview receives the same scaled width; existing APK 0.1.7 needs no update. Pressure sensitivity is not yet implemented.
+
+The triangle only collapses/expands the note, including on a long press; it no longer opens a menu. Tools are in the floating palette, with Cancel changes/Delete under ⋯. Shared desktop rendering source also understands widths; older installed desktop releases still display their original fixed width.
 
 ## 0.1.30 — Configuration → About
 
@@ -216,3 +222,5 @@ Handwriting recognition is not included. Test pen responsiveness on your BOOX; t
 ## Development
 
 Reader sources are in `android-reader/`. Run `scripts/package-android-reader.py` to refresh shared modules and build the release ZIP. The same guide ships as `site/README.md` for the app repository and `START-HERE.md` for anyone opening the ZIP.
+
+0.1.31 validation: annotation browser flow (configuration, thick drawing, erase/Undo, collapse, cancel/delete) passed; mixed-width JSON roundtrip and legacy rendering passed; simulated native preview-width and bridge regressions passed. Physical BOOX width appearance needs confirmation.

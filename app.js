@@ -54,6 +54,8 @@ for(const [id,defaultOn] of [['writing-lift',true],['writing-left',false]]){
   $(id).checked=preference(id)==null?defaultOn:preference(id)==='true';
   $(id).onchange=()=>preference(id,String($(id).checked));
 }
+$('pen-width').value=['2.5','4','6'].includes(preference('pen-width'))?preference('pen-width'):'2.5';
+$('pen-width').onchange=()=>preference('pen-width',$('pen-width').value);
 $('page-lines').value=pageLines;$('card-layout').value=cardMode;
 $('page-lines').onchange=()=>{pageLines=Math.max(15,Math.min(60,Number($('page-lines').value)||28));$('page-lines').value=pageLines;preference('page-lines',String(pageLines));repaginate();};
 function resizePage(value){pageWidth=Math.max(Math.min(280,document.querySelector('.layout').clientWidth-32),Math.min(value,document.querySelector('.layout').clientWidth-32));preference('page-width',String(pageWidth));layout();}

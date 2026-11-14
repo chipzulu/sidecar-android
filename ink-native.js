@@ -30,7 +30,7 @@ export function adaptiveInkInput(svg, callbacks, {tool='pen',browserFactory=brow
       const b=el.getBoundingClientRect();if(b.width&&b.height)exclude.push([b.left,b.top,b.right,b.bottom]);
     }
     const enabled=!document.hidden&&!document.querySelector('dialog[open],.note-palette.dragging')&&(visualViewport?.scale||1)===1&&right>left&&bottom>top&&callbacks.remaining()>0;
-    const next={viewportWidth:innerWidth,rect:[r.left,r.top,r.right,r.bottom],limit:[left,top,right,bottom],exclude,width:2.5*r.width/800,color:'#31483b',tool,eraseRadius:18,liveErase:erasing&&!!callbacks.progress,enabled};
+    const next={viewportWidth:innerWidth,rect:[r.left,r.top,r.right,r.bottom],limit:[left,top,right,bottom],exclude,width:(callbacks.width?.()??2.5)*r.width/800,color:'#31483b',tool,eraseRadius:18,liveErase:erasing&&!!callbacks.progress,enabled};
     const encoded=JSON.stringify(next);
     if(encoded===last)return;
     // Native captures geometry per stroke, so scrolling cannot re-anchor an existing stroke.

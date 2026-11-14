@@ -5,6 +5,8 @@ import {eraserInput,strokeTouchesSweep,eraserSweep,prepareStroke} from './ink-er
 // Input adapters provide completed strokes. Persistence never runs during pointer movement.
 export function inkPad(host, initial, save, inputFactory=adaptiveInkInput, {quiet=false,onHold}={}) {
   let ink=structuredClone(initial||{version:1,width:800,height:300,strokes:[]});
+  let penWidth=2.5;try{const value=Number(localStorage.getItem("sidecar-reader:pen-width"));if([2.5,4,6].includes(value))penWidth=value;}catch{}
+  const widths=()=>ink.strokeWidths||ink.strokes.map(()=>2.5);
   let count=ink.strokes.reduce((n,s)=>n+s.length,0),timer=0,pending=false,failed=false,started=0,nativeStroke=false;
   let input,mode='pen',eraseStart=null,eraseLines=[];const history=[];
   function remember(){history.push(ink);if(history.length>50)history.shift();}
@@ -32,14 +34,14 @@ export function inkPad(host, initial, save, inputFactory=adaptiveInkInput, {quie
       message('This note is full. Start another annotation.');return false;
     }
     remember();
-    if(!element)appendStroke(svg,points);
-    ink={...ink,strokes:[...ink.strokes,points]};count+=points.length;
+    if(!element)appendStroke(svg,points,penWidth);
+    ink={...ink,strokeWidths:[...widths(),penWidth],strokes:[...ink.strokes,points]};count+=points.length;
     checkpoint();return true;
   }
   host.append(toolbar,svg,status);
   function redraw(){
     svg.querySelectorAll('polyline').forEach(n=>n.remove());
-    for(const stroke of ink.strokes)appendStroke(svg,stroke);
+    ink.strokes.forEach((stroke,i)=>appendStroke(svg,stroke,widths()[i]));
     // Keep the eraser cursor above permanent ink.
     const cursor=svg.querySelector('polygon');if(cursor)svg.append(cursor);
     svg.setAttribute('viewBox','0 0 800 '+ink.height);count=ink.strokes.reduce((n,s)=>n+s.length,0);
@@ -48,16 +50,16 @@ export function inkPad(host, initial, save, inputFactory=adaptiveInkInput, {quie
     if(input?.active()||!['pen','eraser'].includes(next))return false;
     if(input&&next===mode)return true;
     input?.dispose();mode=next;host.dataset.inkTool=mode;
-    if(mode==='pen')input=inputFactory(svg,{height:()=>ink.height,remaining:()=>ink.strokes.length>=2000?0:24000-count,begin:(source)=>{nativeStroke=source?.native===true;started=performance.now();clearTimeout(timer);},complete});
+    if(mode==='pen')input=inputFactory(svg,{width:()=>penWidth,height:()=>ink.height,remaining:()=>ink.strokes.length>=2000?0:24000-count,begin:(source)=>{nativeStroke=source?.native===true;started=performance.now();clearTimeout(timer);},complete});
     else {ink.strokes.forEach(prepareStroke);let erasingGesture=false,dirty=null;const erase={
       begin(){eraseStart=null;eraseLines=[...svg.querySelectorAll('polyline')];clearTimeout(timer);},
       sweep(a,b,r){
-        const area=eraserSweep(a,b,r),keptLines=[];
-        const remaining=ink.strokes.filter((s,i)=>{if(!strokeTouchesSweep(s,area)){keptLines.push(eraseLines[i]);return true;}const box=prepareStroke(s);if(!dirty)dirty=[...box];else {dirty[0]=Math.min(dirty[0],box[0]);dirty[1]=Math.min(dirty[1],box[1]);dirty[2]=Math.max(dirty[2],box[2]);dirty[3]=Math.max(dirty[3],box[3]);}eraseLines[i]?.remove();return false;});
+        const area=eraserSweep(a,b,r+3),keptLines=[],keptWidths=[],oldWidths=widths();
+        const remaining=ink.strokes.filter((s,i)=>{if(!strokeTouchesSweep(s,area)){keptLines.push(eraseLines[i]);keptWidths.push(oldWidths[i]);return true;}const box=prepareStroke(s);if(!dirty)dirty=[...box];else {dirty[0]=Math.min(dirty[0],box[0]);dirty[1]=Math.min(dirty[1],box[1]);dirty[2]=Math.max(dirty[2],box[2]);dirty[3]=Math.max(dirty[3],box[3]);}eraseLines[i]?.remove();return false;});
         eraseLines=keptLines;
         if(remaining.length===ink.strokes.length)return;
         if(!eraseStart){eraseStart=ink;remember();}
-        ink={...ink,strokes:remaining};count=remaining.reduce((n,s)=>n+s.length,0);
+        ink={...ink,strokes:remaining,strokeWidths:keptWidths};count=remaining.reduce((n,s)=>n+s.length,0);
       },
       end(){if(eraseStart){eraseStart=null;checkpoint();}}
     };
@@ -83,7 +85,7 @@ export function inkPad(host, initial, save, inputFactory=adaptiveInkInput, {quie
   setTool('pen');
   const actions={};
   function button(label,action){actions[label]=()=>{if(!input.active())action();};const b=document.createElement('button');b.type='button';b.textContent=label;b.onclick=()=>{if(!input.active())action();};toolbar.append(b);}
-  button('Undo stroke',()=>{if(history.length)ink=history.pop();else if(ink.strokes.length)ink={...ink,strokes:ink.strokes.slice(0,-1)};else return;redraw();checkpoint();});
+  button('Undo stroke',()=>{if(history.length)ink=history.pop();else if(ink.strokes.length)ink={...ink,strokes:ink.strokes.slice(0,-1),strokeWidths:widths().slice(0,-1)};else return;redraw();checkpoint();});
   button('More space',()=>{remember();ink={...ink,height:Math.min(12000,ink.height+200)};svg.setAttribute('viewBox','0 0 800 '+ink.height);checkpoint();});
   button('Clear handwriting',()=>{if(!ink.strokes.length||!confirm('Clear the handwriting in this annotation?'))return;remember();ink={version:1,width:800,height:300,strokes:[]};redraw();checkpoint();});
   function finish(){if(input.finish()===false){message("Finish the pen stroke before closing this note.");return false;}return flush();}

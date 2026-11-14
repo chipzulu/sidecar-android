@@ -100,10 +100,6 @@ export function mountHighlights({reader,viewport,status,onWriting,onEditScene}){
     const collapsed=Boolean(rows[note.id]?.collapsed);
     button.textContent=collapsed?'▸':'▾';button.title=collapsed?'Expand note':'Collapse note';button.setAttribute('aria-label',button.title);button.setAttribute('aria-expanded',String(!collapsed));
     button.onclick=e=>{e.stopPropagation();if(!closePad())return;persist({...rows,[note.id]:{...rows[note.id],collapsed:!collapsed}});repaint();};
-    let hold=0,held=false;
-    button.addEventListener('pointerdown',e=>{held=false;hold=setTimeout(()=>{held=true;showMenu(e.clientX,e.clientY,null,note.id);},800);});
-    for(const type of ['pointerup','pointercancel','pointerleave'])button.addEventListener(type,()=>clearTimeout(hold));
-    button.addEventListener('click',e=>{if(held){e.preventDefault();e.stopImmediatePropagation();held=false;}},true);
     box.append(button);
   }
   function repaint(){
@@ -515,7 +511,7 @@ export function mountHighlights({reader,viewport,status,onWriting,onEditScene}){
   menu.addEventListener('click',e=>{if(e.detail>0&&!menuPress){e.preventDefault();e.stopImmediatePropagation();}menuPress=false;},true);
   menu.onclick=e=>{if(e.target===menu)menu.close();};
   reader.addEventListener('contextmenu',e=>{
-    const box=e.target.closest('.ink-note');if(!box)return;e.preventDefault();if(window.SidecarNativePen&&box.classList.contains('editing')&&e.target.closest('svg'))return;showMenu(e.clientX,e.clientY,null,box.dataset.note);
+    if(e.target.closest('.note-collapse')){e.preventDefault();return;}const box=e.target.closest('.ink-note');if(!box)return;e.preventDefault();if(window.SidecarNativePen&&box.classList.contains('editing')&&e.target.closest('svg'))return;showMenu(e.clientX,e.clientY,null,box.dataset.note);
   });
   // Two taps work with a finger or a pen without relying on Android selection handles.
 

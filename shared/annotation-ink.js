@@ -4,6 +4,7 @@ export function validInk(ink) {
   if (!ink || ink.version !== 1 || ink.width !== 800 ||
       !Number.isFinite(ink.height) || ink.height < 80 || ink.height > 12000 ||
       !Array.isArray(ink.strokes) || ink.strokes.length > 2000) return false;
+  if (ink.strokeWidths !== undefined && (!Array.isArray(ink.strokeWidths) || ink.strokeWidths.length !== ink.strokes.length || !ink.strokeWidths.every(w => Number.isFinite(w) && w >= 1 && w <= 12))) return false;
   let points = 0;
   return ink.strokes.every(stroke => Array.isArray(stroke) && stroke.length > 0 &&
     (points += stroke.length) <= 24000 && stroke.every(p => Array.isArray(p) && p.length === 2 &&
@@ -16,16 +17,16 @@ export function inkSvg(ink) {
   svg.setAttribute('aria-label', 'Handwritten annotation');
   svg.setAttribute('viewBox', '0 0 800 ' + (ink?.height || 260));
   if (!ink || !validInk(ink)) return svg;
-  for (const stroke of ink.strokes) appendStroke(svg, stroke);
+  ink.strokes.forEach((stroke,i) => appendStroke(svg, stroke, ink.strokeWidths?.[i] ?? 2.5));
   return svg;
 }
-export function appendStroke(svg, points) {
+export function appendStroke(svg, points, width=2.5) {
   const line = document.createElementNS(namespace, 'polyline');
   const drawn = points.length === 1 ? [points[0], [points[0][0] + .1, points[0][1]]] : points;
   line.setAttribute('points', drawn.map(p => p.join(',')).join(' '));
   line.setAttribute('fill', 'none');
   line.setAttribute('stroke', '#31483b');
-  line.setAttribute('stroke-width', '2.5');
+  line.setAttribute('stroke-width', String(width));
   line.setAttribute('stroke-linecap', 'round');
   line.setAttribute('stroke-linejoin', 'round');
   svg.append(line);

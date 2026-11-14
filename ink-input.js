@@ -1,7 +1,7 @@
 import {appendStroke} from './shared/annotation-ink.js';
 
 // Browser adapter only. Completed strokes use note coordinates, independent of DOM pixels.
-export function browserInkInput(svg, {height, remaining, begin, complete}) {
+export function browserInkInput(svg, {height, remaining, begin, complete, width=()=>2.5}) {
   let stroke=null, line, pointer, rect, frame=0;
   function paint(){frame=0;if(line&&stroke)line.setAttribute('points',stroke.length===1?`${stroke[0]} ${stroke[0][0]+.1},${stroke[0][1]}`:stroke.map(p=>p.join(',')).join(' '));}
   function point(e){const scale=800/rect.width;return [Math.round(Math.max(0,Math.min(800,(e.clientX-rect.left)*scale))*10)/10,Math.round(Math.max(0,Math.min(height(),(e.clientY-rect.top)*scale))*10)/10];}
@@ -9,7 +9,7 @@ export function browserInkInput(svg, {height, remaining, begin, complete}) {
   svg.onpointerdown=e=>{
     if(stroke||e.pointerType==='touch'||e.button!==0||remaining()<1)return;
     e.preventDefault();begin();rect=svg.getBoundingClientRect();pointer=e.pointerId;
-    svg.setPointerCapture(pointer);stroke=[point(e)];line=appendStroke(svg,stroke);
+    svg.setPointerCapture(pointer);stroke=[point(e)];line=appendStroke(svg,stroke,width());
   };
   svg.onpointermove=e=>{
     if(!stroke||e.pointerId!==pointer)return;e.preventDefault();
