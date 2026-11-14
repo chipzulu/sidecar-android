@@ -63,3 +63,10 @@ export async function removeBook(book){
 }
 export async function markBookSent(book){const d=await db(),tx=d.transaction('library','readwrite'),done=completed(tx),s=tx.objectStore('library'),r=s.get(book.id);r.onsuccess=()=>{if(r.result)s.put({...r.result,lastSentAt:new Date().toISOString()});};await done;}
 export async function listBooks(){const d=await db(),rows=await request(d.transaction('library').objectStore('library').getAll());return rows.map(row=>({...row,offline:true,hasLocalWork:Object.keys(localStorage).some(k=>k.startsWith('sidecar-book:'+row.id+':draft:')),remoteStatus:'not-checked'}));}
+
+export async function relinkBook(book,repository,branch){
+ const d=await db(),c=connection({repository,branch}),tx=d.transaction(['library','snapshots','connections'],'readwrite'),done=completed(tx);
+ const rows=tx.objectStore('library'),get=rows.get(book.id);
+ get.onsuccess=()=>{if(!get.result){tx.abort();return;}rows.put({...get.result,remote:c.key,connection:c,lastReceivedAt:null,lastSentAt:null});const r=tx.objectStore('snapshots').get(book.id);r.onsuccess=()=>{if(bookIdentity(r.result)!==bookIdentity(book)){tx.abort();return;}tx.objectStore('snapshots').put({...r.result,repository:c.repository,branch,revision:crypto.randomUUID()},book.id);};tx.objectStore('connections').put(c);};
+ await done;return readBook(book.id);
+}

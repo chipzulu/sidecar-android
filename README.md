@@ -1,4 +1,10 @@
-# Story Sidecar Android Reader 0.1.35
+# Story Sidecar Android Reader 0.1.36
+
+## 0.1.36 — book options and Updates
+
+The selected library book has a ⋯ menu: GitHub configuration, Refresh from remote, Remove from this device. Actions target that selected book, independent of the last manuscript opened. Connection changes preserve the local book ID/work and reject duplicate connections. Token controls remain in GitHub configuration. Add book still opens download setup.
+
+Inside a manuscript, Updates offers Send updates (annotations only; typed scene drafts remain local), Receive updates (keeps local work, blocks if a locally edited scene changed/disappeared remotely), and Refresh from remote (confirmed replacement of that book’s local work). Removal also confirms and keeps GitHub files/tokens. Existing books/notes and BOOX APK 0.1.8 remain unchanged.
 
 ## 0.1.35 — carousel library entrance
 
@@ -248,3 +254,5 @@ Reader sources are in `android-reader/`. Run `scripts/package-android-reader.py`
 0.1.34 validation: library reset/credential rescue, two-book isolation, switching/removal/reload, annotation flow, fresh-copy failure/cancel preservation and full simulated native-message saving pass in Chrome. Saved tokens are never included in diagnostic output or library metadata.
 
 0.1.35 validation: two-book carousel/cover/placeholder, stored scene resume, return/relaunch, Add book, narrow layout, About and zero GitHub requests passed. Annotation/fresh-copy and simulated-native stroke persistence regressions passed. Tablet and narrow-screen screenshots reviewed.
+
+0.1.36 validation: selected-book settings/removal and cancel, duplicate connection rejection, stable IDs/work after relink, remote/local scene conflict preservation, fresh copy/cancel/failure and simulated native handwriting persistence passed. Narrow book-options dialog visually reviewed. Physical tablet workflow check remains.

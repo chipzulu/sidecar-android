@@ -1,6 +1,6 @@
 import {listBooks,readBook,workKey} from './storage.js';
 
-export function mountLibrary({open,add,error}){
+export function mountLibrary({open,add,error,options}){
  const $=id=>document.getElementById(id);let books=[],index=0,revision=0,urls=[],opening=false;
  const tiles=()=>[...books,{id:'add',title:'Add a book'}];
  function revoke(){for(const url of urls)URL.revokeObjectURL(url);urls=[];}
@@ -9,7 +9,7 @@ export function mountLibrary({open,add,error}){
   const ticket=++revision;revoke();const all=tiles(),item=all[index];$('library-track').replaceChildren();
   $('library-previous').disabled=index===0;$('library-next').disabled=index===books.length;
   $('library-position').textContent=`${index+1} of ${all.length}`;
-  $('library-title').textContent=item.title;$('library-details').replaceChildren();
+  $('book-menu-open').hidden=item.id==='add';$('book-menu-open').onclick=()=>options(item);$('library-title').textContent=item.title;$('library-details').replaceChildren();
   for(const n of [index-1,index,index+1]){
    if(n<0||n>=all.length){const spacer=document.createElement('span');spacer.className='shelf-spacer';spacer.setAttribute('aria-hidden','true');$('library-track').append(spacer);continue;}
    const row=all[n],button=document.createElement('button');button.className='shelf-book'+(n===index?' selected':' neighbour');button.dataset.bookId=row.id;button.setAttribute('aria-label',row.id==='add'?'Add a book':n===index?'Open '+row.title:'Select '+row.title);

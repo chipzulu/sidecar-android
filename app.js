@@ -1,7 +1,7 @@
 import {mountLibrary} from './library-view.js';
 import {readerClient,repositoryName} from './api.js';
 import {bookModel,chapterHeadingParts,sceneHeadingParts} from './model.js';
-import {readBook,saveBook,bookIdentity,readBookIdentity,removeBook,clearBookWork,workKey,libraryReady,lastConnection,listConnections,findBook,markBookSent,selectBook} from './storage.js';
+import {readBook,saveBook,bookIdentity,readBookIdentity,removeBook,clearBookWork,workKey,libraryReady,lastConnection,listConnections,findBook,markBookSent,selectBook,relinkBook} from './storage.js';
 import {inlineFragment,sceneNotes,colourMarks} from './inline-notes.js';
 import {convertItalicMarkers} from './shared/italic-markers.js';
 import {keepMarker} from './shared/keep-together.js';
@@ -13,9 +13,9 @@ import {readDraft, writeScene} from './writing.js';
 import {mountHighlights} from './highlights.js';
 try{await libraryReady;}catch(error){document.getElementById("status").textContent=error.message;throw error;}
 const $=id=>document.getElementById(id);
-let libraryMode=true,libraryView;
+let libraryMode=true,libraryView,menuBook=null,configBook=null;
 let snapshot=null,model=null,index=-1,coverUrl='',busy=false,credentialBusy=false,client=null,clientKey='',abort=null,disposeCards=()=>{},selectedScene=null,renderRevision=0,rendering=false, replacing=false;
-function message(text,error=false){$('status').textContent=text;$('status').classList.toggle('error',error);}
+function message(text,error=false){$('updates-status').textContent=text;if(libraryMode){$('library-error').textContent=text;$('library-error').classList.toggle('error',error);}$('status').textContent=text;$('status').classList.toggle('error',error);}
 const highlights=mountHighlights({reader:$('reader'),viewport:$('manuscript-scroll'),status:message,onEditScene:at=>editScene(at),onWriting:()=>{if(dock)setOpen(dock,false);}});
 function preference(key,value){try{if(value===undefined)return localStorage.getItem('sidecar-reader:'+key);localStorage.setItem('sidecar-reader:'+key,value);}catch{/* Reading remains usable without preferences. */}}
 function remember(){if(snapshot&&!libraryMode&&!rendering&&!replacing)localStorage.setItem(workKey(snapshot,'position'),JSON.stringify({scope:index===-2?'novel':selectedScene?'scene':index===-1?'cover':'chapter',chapter:model.chapters[index]?.key??null,scene:selectedScene,y:$('manuscript-scroll').scrollTop}));}
@@ -24,7 +24,7 @@ let layoutTimer,lastPageWidth=0;
 function repaginate(){if(!model||index===-1)return;return render(index,selectedScene,false,true);}
 function layout(){
   const headerBottom=document.querySelector('header').getBoundingClientRect().bottom;
-  $('connection').style.top=(headerBottom+8)+'px';
+  $('connection').style.top=(headerBottom+8)+'px';$('updates-panel').style.top=(headerBottom+8)+'px';
   $('connection').style.maxHeight=Math.max(80,innerHeight-headerBottom-20)+'px';
   if(libraryMode)return;
   const available=document.querySelector('.layout').clientWidth;const fit=fitLayout(available,pageWidth,cardMode,Boolean(dock));
@@ -39,18 +39,19 @@ function layout(){
   $('layout-note').textContent=(cardMode!=='none'&&!fit.left?'Cards hidden: there is no usable space beside this page. ':cardMode==='both'&&!fit.right?'Right cards hidden at this width. ':'')+(fit.overlay?'The right panel overlays the page at this width.':'');
   if(lastPageWidth!==fit.page){lastPageWidth=fit.page;clearTimeout(layoutTimer);layoutTimer=setTimeout(repaginate,100);}
 }
-function setOpen(id,open){if(id==='outline'||id==='configuration'){dock=open?id:'';for(const name of ['outline','configuration']){$(name).hidden=dock!==name;$(name+'-toggle').setAttribute('aria-expanded',String(dock===name));}layout();return;}$(id).hidden=!open;$(id+'-toggle').setAttribute('aria-expanded',String(open));layout();}
-$('connection-toggle').onclick=()=>setOpen('connection',$('connection').hidden);
+function setOpen(id,open){if(id==='outline'||id==='configuration'){dock=open?id:'';for(const name of ['outline','configuration']){$(name).hidden=dock!==name;$(name+'-toggle').setAttribute('aria-expanded',String(dock===name));}layout();return;}$(id).hidden=!open;if(id!=='connection')$(id+'-toggle').setAttribute('aria-expanded',String(open));layout();}
+$('connection-toggle').onclick=()=>{if(busy||credentialBusy)return;const panel=$('updates-panel');panel.hidden=!panel.hidden;$('connection-toggle').setAttribute('aria-expanded',String(!panel.hidden));};
 $('outline-toggle').onclick=()=>setOpen('outline',$('outline').hidden);
 $('configuration-toggle').onclick=()=>setOpen('configuration',$('configuration').hidden);$('close-panel').onclick=()=>setOpen(dock,false);
 // Closing a panel never consumes the outside action or changes note-edit state.
 document.addEventListener('click',event=>{
  const target=event.target;
+ if(!target.closest('#updates-panel,#connection-toggle,dialog')){$('updates-panel').hidden=true;$('connection-toggle').setAttribute('aria-expanded','false');}
  if(dock&&!target.closest('#right-panel,#outline-toggle,#configuration-toggle,#width-handle,dialog'))setOpen(dock,false);
  if(!$('connection').hidden&&!target.closest('#connection,#connection-toggle,dialog'))setOpen('connection',false);
 },true);
 document.addEventListener('keydown',event=>{
- if(event.key==='Escape'&&!document.querySelector('dialog[open]')){if(dock)setOpen(dock,false);if(!$('connection').hidden)setOpen('connection',false);}
+ if(event.key==='Escape'&&!document.querySelector('dialog[open]')){$('updates-panel').hidden=true;$('connection-toggle').setAttribute('aria-expanded','false');if(dock)setOpen(dock,false);if(!$('connection').hidden)setOpen('connection',false);}
 });
 
 for(const [id,defaultOn] of [['writing-lift',true],['writing-left',false]]){
@@ -158,7 +159,7 @@ async function openBook(value,resume=true){
   disposeCards();disposeCards=mountCards(value,{left:$('left-cards'),right:$('right-cards')},(key,value)=>{const k=workKey(snapshot,'card',key);if(value===undefined)return localStorage.getItem(k);localStorage.setItem(k,value);});
   if(model.cover){const type=/\.png$/i.test(model.cover.path)?'image/png':'image/jpeg';coverUrl=URL.createObjectURL(new Blob([model.cover.bytes],{type}));}
   document.title=model.title+' · Sidecar Reader';$('repository').value=value.repository;$('branch').value=value.branch;
-  credentials.refresh();$('remove-book').hidden=false;$('fresh-copy').hidden=false;
+  credentials.refresh();$('fresh-copy').hidden=false;
   $('book-status').textContent=`${model.title} · ${value.repository} (${value.branch}) · Offline copy downloaded ${new Date(value.downloadedAt).toLocaleString()} · ${value.commit.slice(0,8)} · ${value.files.length} files`;
   $('outline').replaceChildren();const cover=element('button','Cover');cover.dataset.scope='cover';cover.onclick=()=>navigate(-1);const entire=element('button','Entire Novel');entire.dataset.scope='novel';entire.onclick=()=>navigate(-2);$('outline').append(cover,entire);
   model.chapters.forEach((chapter,n)=>{const details=element('details'),summary=element('summary',chapter.name),children=element('div'),all=element('button','Read chapter');all.dataset.scope=`chapter:${chapter.key}`;all.onclick=()=>navigate(n);children.append(all);
@@ -175,7 +176,7 @@ $('previous').onclick=()=>step(-1);$('next').onclick=()=>step(1);
 let scrollTimer;$('manuscript-scroll').addEventListener('scroll',()=>{clearTimeout(scrollTimer);scrollTimer=setTimeout(()=>{remember();pageStatus();},100);},{passive:true});addEventListener('pagehide',remember);
 function textSize(value){const size=['18','21','24','28'].includes(value)?value:'21';document.documentElement.style.setProperty('--reading-size',size+'px');$('size').value=size;preference('size',size);}
 textSize(preference('size'));$('size').onchange=()=>{textSize($('size').value);repaginate();};
-function controls(){for(const id of ['repository','branch','token','download','send-highlights','remember-token','save-token','replace-token','cancel-token','forget-saved-token','remove-book','fresh-copy'])$(id).disabled=busy||credentialBusy;$('cancel').hidden=!busy||!abort;$('progress').hidden=!busy;}
+function controls(){for(const id of ['repository','branch','token','download','send-highlights','remember-token','save-token','replace-token','cancel-token','forget-saved-token','remove-book','fresh-copy','receive-updates','book-settings','book-refresh','save-connection','library-toggle','library-add','book-menu-open','saved-connections'])$(id).disabled=busy||credentialBusy;$('cancel').hidden=!busy||!abort;$('progress').hidden=!busy;$('updates-cancel').hidden=!busy||!abort;}
 function lockGitHub(){client=null;clientKey='';$('token').value='';}
 const rescued=await lastConnection();if(rescued){$('repository').value=rescued.repository;$('branch').value=rescued.branch;}
 const profiles=await listConnections();const choices=$('saved-connections');for(const c of profiles)choices.add(new Option(c.repository+' · '+c.branch,c.key));choices.hidden=!profiles.length;choices.onchange=()=>{const c=profiles.find(c=>c.key===choices.value);if(c){$('repository').value=c.repository;$('branch').value=c.branch;credentials.refresh();}};
@@ -185,42 +186,69 @@ $('send-highlights').onclick=async()=>{
   if(busy||credentialBusy)return;
   busy=true;controls();
   try{
-    if(repositoryName($('repository').value)!==snapshot.repository||$('branch').value.trim()!==snapshot.branch)throw Error('Select the repository and branch for the open book before sending highlights.');
+    await targetCredentials(snapshot);
     await credentials.ensure();
     const count=await highlights.send(client.inbox);await markBookSent(snapshot);message(count?'Sent '+count+' highlight note(s). On PC choose Get tablet highlights.':'No attached highlight notes waiting to send.');}
   catch(e){message(e.message,true);}finally{busy=false;controls();}
 };
+async function targetCredentials(book){
+ const different=$('repository').value.trim().toLowerCase()!==book.repository.toLowerCase();
+ $('repository').value=book.repository;$('branch').value=book.branch;
+ if(different)await credentials.refresh();
+}
+async function configureFor(book){
+ if(book){$('repository').value=book.repository;$('branch').value=book.branch;}
+ await credentials.refresh();
+}
+async function openSettings(book=null){
+ if(busy||credentialBusy)return;configBook=book;
+ $('connection-title').textContent=book?'GitHub · '+(book.title||book.repository):'Add a book from GitHub';
+ $('download').hidden=!!book;$('save-connection').hidden=!book;choices.hidden=!!book||!profiles.length;
+ if(book)await configureFor(book);setOpen('connection',true);
+}
+$('save-connection').onclick=async()=>{
+ if(!configBook||busy||credentialBusy)return;
+ const book=configBook;
+ try{const repository=repositoryName($('repository').value),branch=$('branch').value.trim();if(!branch)throw Error('Enter a branch.');
+ if(repository!==book.repository||branch!==book.branch){if(!confirm('Change the GitHub connection for '+book.title+'? The local book and notes stay on this device. Nothing is sent.'))return;configBook=await relinkBook(book,repository,branch);}
+ await libraryView.refresh(book.id);message('Connection saved. Token controls above manage its access token.');
+ }catch(e){message('Could not save connection. It may already belong to another library book. '+e.message,true);}
+};
+$('book-menu-close').onclick=()=>$('book-menu').close();
+$('book-menu').addEventListener('click',e=>{if(e.target===$('book-menu')){const r=e.target.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)e.target.close();}});
+$('book-settings').onclick=async()=>{const book=menuBook;$('book-menu').close();await openSettings(await readBook(book.id));};
+$('book-refresh').onclick=async()=>{const book=menuBook;$('book-menu').close();await downloadBook(true,await readBook(book.id));};
 $('remove-book').onclick=async()=>{
-  if(!snapshot||busy||credentialBusy||document.querySelector('dialog[open]'))return;
-  if(!confirm('Remove '+model.title+' from this device? This deletes its downloaded copy, local scene drafts and annotations on this device. GitHub files and the saved token are kept.'))return;
-  busy=true;controls();
-  try{
-    await removeBook(snapshot);snapshot=null;bookUpdates.postMessage('removed');location.reload();
-  }catch(e){message(e.message,true);busy=false;controls();}
+ const row=menuBook;if(!row||busy||credentialBusy)return;$('book-menu').close();
+ if(!confirm('Remove '+row.title+' from this device? Its local drafts and annotations, including unsent work, will be deleted. GitHub and saved tokens are kept.'))return;
+ busy=true;controls();try{const book=await readBook(row.id);if(!book)throw Error('Book is no longer available.');await removeBook(book);if(snapshot?.id===book.id)snapshot=null;bookUpdates.postMessage('removed');await libraryView.refresh();message('Removed from this device.');}catch(e){message(e.message,true);}finally{busy=false;controls();}
 };
 $('cancel').onclick=()=>abort?.abort();
 $('download').onclick=()=>downloadBook(false);
-$('fresh-copy').onclick=()=>downloadBook(true);
-async function downloadBook(fresh){
+$('fresh-copy').onclick=()=>downloadBook(true,snapshot);
+$('receive-updates').onclick=()=>downloadBook(false,snapshot);
+$('updates-cancel').onclick=()=>abort?.abort();
+async function downloadBook(fresh,target=null){
   if(busy||credentialBusy)return;
-  if(fresh&&!confirm('Replace this book with a fresh copy from GitHub? All local scene edits, annotations and reading position for this repository will be discarded, including unsent work. GitHub files and your token are kept.'))return;
+  if(fresh&&!confirm('Replace '+(target?.title||target?.repository||'this book')+' with a fresh copy from GitHub? All local scene edits, annotations and reading position for this repository will be discarded, including unsent work. GitHub files and your token are kept.'))return;
   if(!highlights.beforeRender())return;
   busy=true;controls();abort=new AbortController();$('progress').removeAttribute('value');
   try{
+    if(target)await targetCredentials(target);
     const repository=repositoryName($('repository').value),branch=$('branch').value.trim();
-    if(fresh&&(!snapshot||repository.toLowerCase()!==snapshot.repository.toLowerCase()||branch!==snapshot.branch))throw Error('Select the repository and branch of the open book before refreshing its fresh copy.');
     await credentials.ensure();
-    if(snapshot&&(repository.toLowerCase()!==snapshot.repository.toLowerCase()||branch!==snapshot.branch)&&!confirm(`Open ${repository} (${branch}) and keep ${model.title} in the local library?`)){message('Download cancelled.');return;}
+    if(!target&&snapshot&&(repository.toLowerCase()!==snapshot.repository.toLowerCase()||branch!==snapshot.branch)&&!confirm(`Open ${repository} (${branch}) and keep ${model.title} in the local library?`)){message('Download cancelled.');return;}
     message('Checking private repository and latest backup…');
     // Pass cancellation into the GET-only transport; token stays in its closure.
     const next=await client.download(fresh?null:await findBook(repository,branch),p=>{if(abort.signal.aborted)throw Error('Download cancelled. Previous offline book retained.');$('progress').max=Math.max(1,p.total);$('progress').value=p.completed;message(`Downloading ${p.completed} of ${p.total} files · ${p.path}`);},abort.signal);
     if(abort.signal.aborted)throw Error('Download cancelled. Previous offline book retained.');
     const verified=bookModel(next);if(!verified.chapters.length)throw Error('No readable manuscript found.');
+    if(!fresh){const previous=target||await findBook(repository,branch);if(previous){const incoming=new Map(next.files.map(f=>[f.path,f.sha]));const conflicts=bookModel(previous).chapters.flatMap(c=>c.scenes).filter(scene=>{const draft=readDraft(previous,scene);return draft&&draft.base!==incoming.get(scene.path);});if(conflicts.length)throw Error('Receive stopped: '+conflicts.length+' locally edited scene(s) also changed or were removed remotely. Local work is kept. Resolve these changes before receiving, or deliberately use Refresh from remote.');}}
     next.title=verified.title;await saveBook(next);
-    if(fresh){replacing=true;clearTimeout(scrollTimer);clearBookWork(next);bookUpdates.postMessage('saved');location.reload();return;}
+    if(fresh){clearTimeout(scrollTimer);clearBookWork(next);bookUpdates.postMessage('saved');if(libraryMode){if(snapshot?.id===next.id)snapshot=null;await libraryView.refresh(next.id);}else{replacing=true;await openBook(next,false);replacing=false;}message('Fresh copy received. Local work for this book was replaced.');return;}
     bookUpdates.postMessage('saved');remember();await openBook(next);message('Book verified and saved for offline reading. No GitHub files were changed.');
     navigator.storage?.persist?.().catch(()=>{});
-  }catch(error){message(error.message,true);setOpen('connection',true);}finally{busy=false;controls();abort=null;void reconcileBook();}
+  }catch(error){message(error.message,true);if(!target)setOpen('connection',true);}finally{busy=false;controls();abort=null;void reconcileBook();}
 };
 // The installed reader and Chrome can share the database while keeping separate pages in memory.
 const bookUpdates=new BroadcastChannel('sidecar-reader-book');
@@ -245,10 +273,10 @@ async function reconcileBook(){
   }catch(error){message(error.message,true);}
   finally{checking=false;if(checkAgain){checkAgain=false;void reconcileBook();}}
 }
-libraryView=mountLibrary({open:async id=>{if(!highlights.beforeRender())return;remember();await openBook(await selectBook(id));},add:()=>{setOpen('connection',true);$('repository').focus();},error:text=>{$('library-error').textContent=text;}});
+libraryView=mountLibrary({open:async id=>{if(busy||credentialBusy||!highlights.beforeRender())return;remember();await openBook(await selectBook(id));},add:()=>{void openSettings();},options:row=>{if(busy||credentialBusy)return;menuBook=row;$('book-menu-title').textContent=row.title;$('book-menu').showModal();},error:text=>{$('library-error').textContent=text;}});
 async function showLibrary(){
  if(busy||credentialBusy||!highlights.beforeRender())return;
- remember();clearTimeout(scrollTimer);libraryMode=true;document.body.classList.add('library-mode');$('library').hidden=false;$('library-toggle').hidden=true;
+ remember();clearTimeout(scrollTimer);$('updates-panel').hidden=true;libraryMode=true;document.body.classList.add('library-mode');$('library').hidden=false;$('library-toggle').hidden=true;
  if(dock)setOpen(dock,false);setOpen('connection',false);document.title='Your library · Story Sidecar';
  await libraryView.refresh(snapshot?.id);$('library-add').focus({preventScroll:true});
 }
