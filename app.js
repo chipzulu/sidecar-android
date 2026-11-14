@@ -1,6 +1,7 @@
+import {mountLibrary} from './library-view.js';
 import {readerClient,repositoryName} from './api.js';
 import {bookModel,chapterHeadingParts,sceneHeadingParts} from './model.js';
-import {readBook,saveBook,bookIdentity,readBookIdentity,removeBook,clearBookWork,workKey,libraryReady,lastConnection,listConnections,findBook,markBookSent} from './storage.js';
+import {readBook,saveBook,bookIdentity,readBookIdentity,removeBook,clearBookWork,workKey,libraryReady,lastConnection,listConnections,findBook,markBookSent,selectBook} from './storage.js';
 import {inlineFragment,sceneNotes,colourMarks} from './inline-notes.js';
 import {convertItalicMarkers} from './shared/italic-markers.js';
 import {keepMarker} from './shared/keep-together.js';
@@ -12,11 +13,12 @@ import {readDraft, writeScene} from './writing.js';
 import {mountHighlights} from './highlights.js';
 try{await libraryReady;}catch(error){document.getElementById("status").textContent=error.message;throw error;}
 const $=id=>document.getElementById(id);
+let libraryMode=true,libraryView;
 let snapshot=null,model=null,index=-1,coverUrl='',busy=false,credentialBusy=false,client=null,clientKey='',abort=null,disposeCards=()=>{},selectedScene=null,renderRevision=0,rendering=false, replacing=false;
 function message(text,error=false){$('status').textContent=text;$('status').classList.toggle('error',error);}
 const highlights=mountHighlights({reader:$('reader'),viewport:$('manuscript-scroll'),status:message,onEditScene:at=>editScene(at),onWriting:()=>{if(dock)setOpen(dock,false);}});
 function preference(key,value){try{if(value===undefined)return localStorage.getItem('sidecar-reader:'+key);localStorage.setItem('sidecar-reader:'+key,value);}catch{/* Reading remains usable without preferences. */}}
-function remember(){if(snapshot&&!rendering&&!replacing)localStorage.setItem(workKey(snapshot,'position'),JSON.stringify({scope:index===-2?'novel':selectedScene?'scene':index===-1?'cover':'chapter',chapter:model.chapters[index]?.key??null,scene:selectedScene,y:$('manuscript-scroll').scrollTop}));}
+function remember(){if(snapshot&&!libraryMode&&!rendering&&!replacing)localStorage.setItem(workKey(snapshot,'position'),JSON.stringify({scope:index===-2?'novel':selectedScene?'scene':index===-1?'cover':'chapter',chapter:model.chapters[index]?.key??null,scene:selectedScene,y:$('manuscript-scroll').scrollTop}));}
 let pageWidth=Math.max(280,Number(preference('page-width'))||740),pageLines=Math.max(15,Math.min(60,Number(preference('page-lines'))||28)),cardMode=preference('card-layout')||'none',dock='';
 let layoutTimer,lastPageWidth=0;
 function repaginate(){if(!model||index===-1)return;return render(index,selectedScene,false,true);}
@@ -24,6 +26,7 @@ function layout(){
   const headerBottom=document.querySelector('header').getBoundingClientRect().bottom;
   $('connection').style.top=(headerBottom+8)+'px';
   $('connection').style.maxHeight=Math.max(80,innerHeight-headerBottom-20)+'px';
+  if(libraryMode)return;
   const available=document.querySelector('.layout').clientWidth;const fit=fitLayout(available,pageWidth,cardMode,Boolean(dock));
   document.documentElement.style.setProperty('--page-width',fit.page+'px');
   for(const [id,width] of [['left-cards',fit.left],['right-cards',fit.right]]){$(id).hidden=!width;$(id).style.width=width+'px';}
@@ -146,7 +149,7 @@ function step(direction){
 async function openBook(value,resume=true){
   if(!highlights.beforeRender())throw Error('Save the handwriting before switching books.');
   if(client && clientKey!==JSON.stringify([value.repository,value.branch]))lockGitHub();
-  if(coverUrl)URL.revokeObjectURL(coverUrl);coverUrl='';snapshot=value;model=bookModel(value);
+  if(coverUrl)URL.revokeObjectURL(coverUrl);coverUrl='';snapshot=value;model=bookModel(value);libraryMode=false;document.body.classList.remove('library-mode');$('library').hidden=true;$('library-toggle').hidden=false;layout();
   for(const chapter of model.chapters)for(const scene of chapter.scenes){
     const draft=readDraft(value,scene);
     if(draft)scene.html=draft.html;
@@ -222,7 +225,7 @@ async function downloadBook(fresh){
 // The installed reader and Chrome can share the database while keeping separate pages in memory.
 const bookUpdates=new BroadcastChannel('sidecar-reader-book');
 let checking=false, checkAgain=false;
-function canSwitchBook(){return !replacing&&!busy&&!credentialBusy&&!document.querySelector('dialog[open]');}
+function canSwitchBook(){return !libraryMode&&!replacing&&!busy&&!credentialBusy&&!document.querySelector('dialog[open]');}
 async function reconcileBook(){
   if(!canSwitchBook())return;
   if(checking){checkAgain=true;return;}
@@ -242,8 +245,17 @@ async function reconcileBook(){
   }catch(error){message(error.message,true);}
   finally{checking=false;if(checkAgain){checkAgain=false;void reconcileBook();}}
 }
-try{const saved=await readBook();if(saved)await openBook(saved);}catch(error){message(error.message,true);}
-bookUpdates.onmessage=reconcileBook;
+libraryView=mountLibrary({open:async id=>{if(!highlights.beforeRender())return;remember();await openBook(await selectBook(id));},add:()=>{setOpen('connection',true);$('repository').focus();},error:text=>{$('library-error').textContent=text;}});
+async function showLibrary(){
+ if(busy||credentialBusy||!highlights.beforeRender())return;
+ remember();clearTimeout(scrollTimer);libraryMode=true;document.body.classList.add('library-mode');$('library').hidden=false;$('library-toggle').hidden=true;
+ if(dock)setOpen(dock,false);setOpen('connection',false);document.title='Your library · Story Sidecar';
+ await libraryView.refresh(snapshot?.id);$('library-add').focus({preventScroll:true});
+}
+$('library-toggle').onclick=()=>{void showLibrary();};$('library-about').onclick=()=>$('about-open').click();
+try{await libraryView.refresh((await readBook())?.id);}catch(error){$('library-error').textContent=error.message;}
+
+bookUpdates.onmessage=()=>{if(libraryMode)void libraryView.refresh();else void reconcileBook();};
 window.addEventListener('pageshow',reconcileBook);
 window.addEventListener('focus',reconcileBook);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)reconcileBook();});

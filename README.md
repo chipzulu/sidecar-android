@@ -1,4 +1,10 @@
-# Story Sidecar Android Reader 0.1.34
+# Story Sidecar Android Reader 0.1.35
+
+## 0.1.35 — carousel library entrance
+
+Every fresh launch shows Your library. Covers use Cover.png, Cover.jpeg, then Cover.jpg; a title cover is used when absent. Navigate using arrows, left/right keyboard keys or a horizontal swipe; tap a side book to select it, then the selected cover to open at its remembered position. The + tile / Add book opens the existing GitHub download panel. Library returns from a manuscript after saving its active note. About remains accessible from the library.
+
+Each selected book shows offline availability, locally stored edits, annotations waiting to send, its GitHub connection and recorded receive/annotation-send dates. Remote freshness is explicitly not checked; merely browsing the library makes no GitHub request. GitHub setup remains in its existing panel until step 3. This release preserves 0.1.34 books/work and changes no handwriting code. Keep BOOX APK 0.1.8.
 
 ## 0.1.34 — library storage foundation (intentional reset)
 
@@ -240,3 +246,5 @@ Reader sources are in `android-reader/`. Run `scripts/package-android-reader.py`
 0.1.31 validation: annotation browser flow (configuration, thick drawing, erase/Undo, collapse, cancel/delete) passed; mixed-width JSON roundtrip and legacy rendering passed; simulated native preview-width and bridge regressions passed. Physical BOOX width appearance needs confirmation.
 
 0.1.34 validation: library reset/credential rescue, two-book isolation, switching/removal/reload, annotation flow, fresh-copy failure/cancel preservation and full simulated native-message saving pass in Chrome. Saved tokens are never included in diagnostic output or library metadata.
+
+0.1.35 validation: two-book carousel/cover/placeholder, stored scene resume, return/relaunch, Add book, narrow layout, About and zero GitHub requests passed. Annotation/fresh-copy and simulated-native stroke persistence regressions passed. Tablet and narrow-screen screenshots reviewed.
