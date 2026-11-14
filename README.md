@@ -1,4 +1,8 @@
-# Story Sidecar Android Reader 0.1.31
+# Story Sidecar Android Reader 0.1.32
+
+## 0.1.32 — disappearing stroke fix
+
+Fixes incoming single-stroke validation accidentally carrying the whole note’s width list. Valid strokes could be rejected after adding thickness metadata. Closed-note Undo now removes the matching width entry too. Regression covers 24 consecutive strokes at each thickness, save/reopen and Undo followed by writing. Reader-only update; keep APK 0.1.7.
 
 ## 0.1.31 — pen thickness and simple collapse control
 

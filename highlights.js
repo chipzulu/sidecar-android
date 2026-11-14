@@ -471,7 +471,7 @@ export function mountHighlights({reader,viewport,status,onWriting,onEditScene}){
   function undoNote(id){
     if(id===editingId&&pad){pad.undo();return;}
     const n=rows[id]?.note;
-    if(n?.ink?.strokes.length){save({...n,ink:{...n.ink,strokes:n.ink.strokes.slice(0,-1)}});repaint();return;}
+    if(n?.ink?.strokes.length){save({...n,ink:{...n.ink,strokes:n.ink.strokes.slice(0,-1),...(n.ink.strokeWidths?{strokeWidths:n.ink.strokeWidths.slice(0,-1)}:{})}});repaint();return;}
     if(lastCreated){
       const row=rows[lastCreated],note=row?.note,scene=note&&scenes.get(note.path);if(!scene)return;
       const root=document.createElement('div');root.append(inlineFragment(scene.html));unwrap([root],note.id);

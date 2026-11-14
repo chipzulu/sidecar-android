@@ -30,7 +30,7 @@ export function inkPad(host, initial, save, inputFactory=adaptiveInkInput, {quie
       element?.remove();setTimeout(()=>onHold(),0);return true;
     }
     // Validate only the incoming stroke; existing strokes were validated on entry.
-    if(ink.strokes.length>=2000||count+points.length>24000||!validInk({...ink,strokes:[points]})){
+    if(ink.strokes.length>=2000||count+points.length>24000||!validInk({version:1,width:800,height:ink.height,strokes:[points],strokeWidths:[penWidth]})){
       message('This note is full. Start another annotation.');return false;
     }
     remember();
