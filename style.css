@@ -57,3 +57,5 @@ mark[data-anchor-kind=point] { background:transparent!important; }
 .note-palette svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;}
 .note-palette .palette-handle{cursor:grab;touch-action:none;color:#625e54;}
 .note-palette .palette-handle:active{cursor:grabbing;}
+
+.about-button{font-size:.85rem;padding:5px 12px}#about-dialog{max-width:min(420px,calc(100vw - 40px))}#about-dialog::backdrop{background:#0005}

@@ -1,4 +1,12 @@
-# Story Sidecar Android Reader 0.1.29
+# Story Sidecar Android Reader 0.1.30
+
+## 0.1.30 — Configuration → About
+
+About holds Reader version, Check for app update and Reload Reader. With BOOX APK 0.1.5 it also shows the native connection status, APK version and existing eraser-mode selector. The native toolbar is removed. Browser users see only applicable controls. Reload asks for confirmation; finish edits first.
+
+Upload the site contents and update the Reader first, then install APK 0.1.5 over the existing APK without uninstalling or clearing data. The APK signing certificate and application ID are unchanged; saved books and eraser preferences are retained. Older APKs retain their toolbar until updated.
+
+Browser annotation regression and About tests pass (native messages simulated), APK build/lint and signing verification pass. Confirm on BOOX: About opens, eraser choices work, reload/update work, handwriting and erasing remain correct. This becomes the baseline after that device check; book carousel is next.
 
 ## 0.1.29 — movable handwriting tool palette
 
