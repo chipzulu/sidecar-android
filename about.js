@@ -9,7 +9,11 @@ if(bridge){
   $('about-eraser').hidden=false;$('about-eraser').textContent=info.eraser;
  }catch{/* Keep About usable if an older wrapper sends an unknown message. */}};
 }
-$('about-open').onclick=()=>{dialog.showModal();bridge?.postMessage('status');};
+$('about-open').onclick=()=>{
+ const d=window.sidecarInkDiagnostic;
+ $('about-ink-diagnostic').textContent=d?`Last ${d.tool} session: ${d.begun} started, ${d.received} received, ${d.accepted} accepted, ${d.rejected} rejected. ${d.last}. Saved note: ${window.sidecarInkSavedCount??'not confirmed'} strokes.`:'No native handwriting session in this Reader window yet.';
+ dialog.showModal();bridge?.postMessage('status');
+};
 $('about-close').onclick=()=>dialog.close();
 dialog.addEventListener('click',e=>{if(e.target===dialog){const r=dialog.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)dialog.close();}});
 $('about-eraser').onclick=()=>bridge?.postMessage('eraser');

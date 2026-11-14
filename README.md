@@ -1,4 +1,8 @@
-# Story Sidecar Android Reader 0.1.32
+# Story Sidecar Android Reader 0.1.33
+
+## 0.1.33 — diagnose missing native handwriting
+
+This is a diagnostic build, not a confirmed fix for the BOOX disappearance. Keep APK 0.1.8. After writing a short word in a fresh note, accept with ✓, then open Configuration → About before reloading. Report the last pen session’s started/received/accepted/rejected counts, last result and saved-note count. No prose, token or stroke coordinates are included in these diagnostics; counts live only in this Reader window. Note save confirmation also shows its stroke count. Full native-message integration test covers 24 strokes, accept and book reload; device-specific failure remains under investigation.
 
 ## 0.1.32 — disappearing stroke fix
 

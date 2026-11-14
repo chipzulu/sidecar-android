@@ -15,7 +15,7 @@ export function inkPad(host, initial, save, inputFactory=adaptiveInkInput, {quie
   function message(text){if(mode==='eraser'&&!text.startsWith('Eraser'))text='Eraser · '+text;if(status.textContent!==text)status.textContent=text;}
   function flush(){
     clearTimeout(timer);
-    try{if(failed){save(ink,false);failed=false;}if(pending){save(ink,true);pending=false;}message('Saved on this device');return true;}
+    try{if(failed){save(ink,false);failed=false;}if(pending){save(ink,true);pending=false;}message('Saved on this device · '+ink.strokes.length+' strokes');window.sidecarInkSavedCount=ink.strokes.length;return true;}
     catch(e){message('Could not save handwriting: '+e.message);return false;}
   }
   function checkpoint(){
@@ -30,9 +30,9 @@ export function inkPad(host, initial, save, inputFactory=adaptiveInkInput, {quie
       element?.remove();setTimeout(()=>onHold(),0);return true;
     }
     // Validate only the incoming stroke; existing strokes were validated on entry.
-    if(ink.strokes.length>=2000||count+points.length>24000||!validInk({version:1,width:800,height:ink.height,strokes:[points],strokeWidths:[penWidth]})){
-      message('This note is full. Start another annotation.');return false;
-    }
+    if(ink.strokes.length>=2000||count+points.length>24000){message('This note is full. Start another annotation.');return false;}
+    if(!validInk({version:1,width:800,height:ink.height,strokes:[points],strokeWidths:[penWidth]})){message('Stroke could not be saved: invalid ink coordinates or width.');return false;}
+
     remember();
     if(!element)appendStroke(svg,points,penWidth);
     ink={...ink,strokeWidths:[...widths(),penWidth],strokes:[...ink.strokes,points]};count+=points.length;

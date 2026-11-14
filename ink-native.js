@@ -6,6 +6,10 @@ export function adaptiveInkInput(svg, callbacks, {tool='pen',browserFactory=brow
   const bridge=window.SidecarNativePen;
   if(!bridge?.postMessage)return browserFactory(svg,callbacks);
   const session=crypto.randomUUID();
+  const diagnostic={tool,begun:0,received:0,accepted:0,rejected:0,last:'Waiting for a stroke'};
+  window.sidecarInkDiagnostic=diagnostic;
+  function reject(reason){diagnostic.rejected++;diagnostic.last=reason;badge.textContent='Handwriting not accepted: '+reason;}
+
   let fallback=null,ready=false,disposed=false,busy=false,frame=0,last='',gesture=null,lastBatch=0;
   const received=new Set();
   const badge=document.createElement('small');badge.textContent=erasing?'Connecting BOOX eraser…':'Connecting BOOX pen…';svg.before(badge);
@@ -53,7 +57,7 @@ export function adaptiveInkInput(svg, callbacks, {tool='pen',browserFactory=brow
     }
     if(msg.type==='error'){useBrowser(msg.message||'native setup failed');return;}
     if(msg.type==='begin'){
-      busy=true;gesture=Number.isSafeInteger(msg.id)?msg.id:null;lastBatch=0;
+      diagnostic.begun++;diagnostic.last='Pen stroke started';busy=true;gesture=Number.isSafeInteger(msg.id)?msg.id:null;lastBatch=0;
       callbacks.begin({native:true});return;
     }
     if(msg.type==='erase-progress'){
@@ -67,12 +71,18 @@ export function adaptiveInkInput(svg, callbacks, {tool='pen',browserFactory=brow
     }
     if(msg.type==='stroke'){
       const id=msg.id;
-      if(!Number.isSafeInteger(id)||!Array.isArray(msg.points)||!Array.isArray(msg.rect))return;
+      diagnostic.received++;
+      if(!Number.isSafeInteger(id)||!Array.isArray(msg.points)||!Array.isArray(msg.rect)){reject('Malformed native stroke message');return;}
       if(received.has(id)){send('ack',{id});return;}
       busy=false;
       const mapped=mapPoints(msg);
-      if(!mapped){send('ack',{id});return;}
-      if((msg.tool||'pen')===tool&&mapped.points.length<=callbacks.remaining())callbacks.complete(mapped.points,undefined,{radius:mapped.radius});
+      if(!mapped){reject('Native coordinates could not be converted');send('ack',{id});return;}
+      try{
+        if((msg.tool||'pen')!==tool)reject('Stroke arrived for a different tool');
+        else if(mapped.points.length>callbacks.remaining())reject('Note point limit reached');
+        else if(callbacks.complete(mapped.points,undefined,{radius:mapped.radius})===false)reject('Note rejected stroke; check the message below the note');
+        else {diagnostic.accepted++;diagnostic.last='Accepted '+mapped.points.length+' points';}
+      }catch(error){reject(error.message||'Stroke handling failed');}
       gesture=null;
       received.add(id);
       // DOM has permanent ink before native requests Android's visual-state callback.
