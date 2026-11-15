@@ -65,5 +65,6 @@ export function readerClient(repository,branch,token,{fetcher=fetch,signal}={}) 
     progress({completed,total:entries.length,path:'Saving verified offline copy…'});
     return {repository:name,branch,commit:ref.object.sha,downloadedAt:new Date().toISOString(),files};
   }
-  return {download,inbox:annotationInbox(name,branch,token,fetcher)};
+  async function check(){activeSignal=signal;const repo=await get('');if(!repo.private)throw Error('Use a private book repository.');const ref=await get('/git/ref/heads/'+encodeURIComponent(branch));return ref.object.sha;}
+  return {download,check,inbox:annotationInbox(name,branch,token,fetcher)};
 }

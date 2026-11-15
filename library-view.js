@@ -33,7 +33,7 @@ export function mountLibrary({open,add,error,options}){
   line('GitHub · '+item.connection.repository+' · '+item.connection.branch);
   const date=value=>value?new Date(value).toLocaleString(): 'Not yet';
   line('Last received: '+date(item.lastReceivedAt));line('Last annotation send: '+date(item.lastSentAt));
-  line('Remote changes: not checked');
+  line(item.remoteStatus==='not-checked'?'Remote changes: not checked':(item.remoteStatus==='up-to-date'?'Backup matches GitHub':'Different backup on GitHub')+' · checked '+date(item.remoteCheckedAt));
  }
  $('library-previous').onclick=()=>select(index-1);$('library-next').onclick=()=>select(index+1);
  $('library-add').onclick=()=>{select(books.length);add();};

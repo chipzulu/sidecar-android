@@ -1,3 +1,4 @@
+import {resolveAnnotationConflict} from './annotation-conflict.js';
 import {workKey} from './storage.js';
 import {notePalette} from './note-palette.js';
 import {positionWritingNote,finishWritingPosition,resetWritingPosition} from './writing-position.js';
@@ -129,7 +130,7 @@ export function mountHighlights({reader,viewport,status,onWriting,onEditScene}){
 
     pad=inkPad(box,note.ink,(ink,finalize)=>{
       const old=rows[note.id];if(finalize){mergeInk();return;}
-      const next={...old.note,ink,base:old.dirty?old.note.base:(old.base||old.main||old.remote||null)};
+      const next={...old.note,ink,base:old.dirty?old.note.base:(old.base||old.remote||old.note?.base||old.main||null)};
       persist({...rows,[note.id]:{...old,note:next,inline:true,dirty:true,needsInline:true}});
     },undefined,{quiet:true,onHold:()=>{if(!box.isConnected||editingId!==note.id)return;const r=box.getBoundingClientRect();showMenu(r.right-20,r.top+20,null,note.id);}});
     positionWritingNote(box,viewport,reader);
@@ -324,7 +325,7 @@ export function mountHighlights({reader,viewport,status,onWriting,onEditScene}){
 
     const old=rows[note.id]||{};
 
-    const next={...note,base:old.dirty?old.note.base:(old.base||old.main||old.remote||null)};
+    const next={...note,base:old.dirty?old.note.base:(old.base||old.remote||old.note?.base||old.main||null)};
 
     if(scenes.has(next.path)||place)writeInline(next,place);
 
@@ -584,7 +585,22 @@ export function mountHighlights({reader,viewport,status,onWriting,onEditScene}){
 
     try{for(const row of Object.values(rows).filter(r=>r.dirty&&!r.note.unattached)){
 
-      const note=row.note,sha=await inbox.send(noteFilename(note.id),encodeNote(note),row.remote);
+      const note=row.note;let sha;
+      try{sha=await inbox.send(noteFilename(note.id),encodeNote(note),row.remote||row.note.base||row.base);}
+      catch(error){
+        if(error.code!=='ANNOTATION_CONFLICT'||!error.remote)throw error;
+        const choice=await resolveAnnotationConflict(note,error.remote.note);
+        if(owner!==book)throw Error('Book changed. Retry from the original book.');
+        if(choice==='cancel')throw Error('Send cancelled. Tablet and GitHub copies are unchanged for this annotation.');
+        // Preserve both candidates locally before the explicitly selected replacement.
+        localStorage.setItem(workKey(book,'annotation-recovery',note.id+':'+crypto.randomUUID()),JSON.stringify({tablet:note,remote:error.remote.note,remoteSha:error.remote.sha,date:new Date().toISOString()}));
+        if(choice==='remote'){
+          const accepted=structuredClone(error.remote.note);writeInline(accepted,true);
+          persist({...rows,[note.id]:{...rows[note.id],note:accepted,remote:error.remote.sha,base:error.remote.sha,dirty:false,needsInline:false}});repaint();continue;
+        }
+        // Compare-and-swap against the version just previewed; never force overwrite.
+        sha=await inbox.send(noteFilename(note.id),encodeNote(note),error.remote.sha);
+      }
 
       if(owner!==book)throw Error('Book changed. Retry from the original book.');
 

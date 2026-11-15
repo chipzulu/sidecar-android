@@ -1,7 +1,7 @@
 import {mountLibrary} from './library-view.js';
 import {readerClient,repositoryName} from './api.js';
 import {bookModel,chapterHeadingParts,sceneHeadingParts} from './model.js';
-import {readBook,saveBook,bookIdentity,readBookIdentity,removeBook,clearBookWork,workKey,libraryReady,lastConnection,listConnections,findBook,markBookSent,selectBook,relinkBook} from './storage.js';
+import {readBook,saveBook,bookIdentity,readBookIdentity,removeBook,clearBookWork,workKey,libraryReady,lastConnection,listConnections,findBook,markBookSent,selectBook,relinkBook,recordRemoteCheck} from './storage.js';
 import {inlineFragment,sceneNotes,colourMarks} from './inline-notes.js';
 import {convertItalicMarkers} from './shared/italic-markers.js';
 import {keepMarker} from './shared/keep-together.js';
@@ -176,7 +176,7 @@ $('previous').onclick=()=>step(-1);$('next').onclick=()=>step(1);
 let scrollTimer;$('manuscript-scroll').addEventListener('scroll',()=>{clearTimeout(scrollTimer);scrollTimer=setTimeout(()=>{remember();pageStatus();},100);},{passive:true});addEventListener('pagehide',remember);
 function textSize(value){const size=['18','21','24','28'].includes(value)?value:'21';document.documentElement.style.setProperty('--reading-size',size+'px');$('size').value=size;preference('size',size);}
 textSize(preference('size'));$('size').onchange=()=>{textSize($('size').value);repaginate();};
-function controls(){for(const id of ['repository','branch','token','download','send-highlights','remember-token','save-token','replace-token','cancel-token','forget-saved-token','remove-book','fresh-copy','receive-updates','book-settings','book-refresh','save-connection','library-toggle','library-add','book-menu-open','saved-connections'])$(id).disabled=busy||credentialBusy;$('cancel').hidden=!busy||!abort;$('progress').hidden=!busy;$('updates-cancel').hidden=!busy||!abort;}
+function controls(){for(const id of ['repository','branch','token','download','send-highlights','remember-token','save-token','replace-token','cancel-token','forget-saved-token','remove-book','fresh-copy','receive-updates','book-settings','book-refresh','book-check','save-connection','library-toggle','library-add','book-menu-open','saved-connections'])$(id).disabled=busy||credentialBusy;$('cancel').hidden=!busy||!abort;$('progress').hidden=!busy;$('updates-cancel').hidden=!busy||!abort;}
 function lockGitHub(){client=null;clientKey='';$('token').value='';}
 const rescued=await lastConnection();if(rescued){$('repository').value=rescued.repository;$('branch').value=rescued.branch;}
 const profiles=await listConnections();const choices=$('saved-connections');for(const c of profiles)choices.add(new Option(c.repository+' · '+c.branch,c.key));choices.hidden=!profiles.length;choices.onchange=()=>{const c=profiles.find(c=>c.key===choices.value);if(c){$('repository').value=c.repository;$('branch').value=c.branch;credentials.refresh();}};
@@ -188,7 +188,7 @@ $('send-highlights').onclick=async()=>{
   try{
     await targetCredentials(snapshot);
     await credentials.ensure();
-    const count=await highlights.send(client.inbox);await markBookSent(snapshot);message(count?'Sent '+count+' highlight note(s). On PC choose Get tablet highlights.':'No attached highlight notes waiting to send.');}
+    const count=await highlights.send(client.inbox);if(count)await markBookSent(snapshot);message(count?'Sent '+count+' highlight note(s). On PC choose Get tablet highlights.':'No attached highlight notes waiting to send.');}
   catch(e){message(e.message,true);}finally{busy=false;controls();}
 };
 async function targetCredentials(book){
@@ -217,6 +217,11 @@ $('save-connection').onclick=async()=>{
 $('book-menu-close').onclick=()=>$('book-menu').close();
 $('book-menu').addEventListener('click',e=>{if(e.target===$('book-menu')){const r=e.target.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)e.target.close();}});
 $('book-settings').onclick=async()=>{const book=menuBook;$('book-menu').close();await openSettings(await readBook(book.id));};
+$('book-check').onclick=async()=>{
+ const selected=menuBook;if(!selected||busy||credentialBusy)return;$('book-menu').close();busy=true;controls();
+ try{const book=await readBook(selected.id);if(!book)throw Error('Book is no longer available.');await targetCredentials(book);await credentials.ensure();message('Checking the GitHub backup…');const commit=await client.check();await recordRemoteCheck(book,commit);await libraryView.refresh(book.id);message(commit===book.commit?'The downloaded backup matches GitHub.':'GitHub has a different backup. Open the book and choose Receive updates when ready.');}
+ catch(error){message(error.message,true);}finally{busy=false;controls();}
+};
 $('book-refresh').onclick=async()=>{const book=menuBook;$('book-menu').close();await downloadBook(true,await readBook(book.id));};
 $('remove-book').onclick=async()=>{
  const row=menuBook;if(!row||busy||credentialBusy)return;$('book-menu').close();

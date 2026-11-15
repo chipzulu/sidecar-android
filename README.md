@@ -1,4 +1,12 @@
-# Story Sidecar Android Reader 0.1.36
+# Story Sidecar Android Reader 0.1.37
+
+## 0.1.37 — annotation conflict recovery and remote status
+
+Send updates now recovers a missing upload receipt automatically when authored content matches GitHub (ignoring only base bookkeeping). If different, a dialog previews Tablet and GitHub handwriting/text and offers Keep tablet version, Keep GitHub version, or Cancel. Keep tablet uses the previewed GitHub SHA as a compare-and-swap guard; a concurrent remote edit still blocks it. Both candidates are archived locally before a chosen replacement. Cancel preserves the conflicting copies; notes sent earlier in the batch remain sent. Imported base receipts are retained where available.
+
+For the existing “Hej med dig” note: update the Reader without refreshing the book, Send updates, then choose Keep tablet version if its preview is the handwriting you want to send. PC Get tablet highlights retrieves it.
+
+Library ⋯ → Check remote status checks only the repository’s backup commit, without downloading book files or changing local work. Its timestamped result is separate from annotation-inbox status. Existing books/work/tokens are preserved. Keep APK 0.1.8.
 
 ## 0.1.36 — book options and Updates
 
@@ -256,3 +264,5 @@ Reader sources are in `android-reader/`. Run `scripts/package-android-reader.py`
 0.1.35 validation: two-book carousel/cover/placeholder, stored scene resume, return/relaunch, Add book, narrow layout, About and zero GitHub requests passed. Annotation/fresh-copy and simulated-native stroke persistence regressions passed. Tablet and narrow-screen screenshots reviewed.
 
 0.1.36 validation: selected-book settings/removal and cancel, duplicate connection rejection, stable IDs/work after relink, remote/local scene conflict preservation, fresh copy/cancel/failure and simulated native handwriting persistence passed. Narrow book-options dialog visually reviewed. Physical tablet workflow check remains.
+
+0.1.37 validation: receipt unit tests and full browser conflict tests passed (preview/cancel/tablet/remote, second edit/send and reload). Concurrent changes reject stale approvals. Library matching/different backup checks use only GET metadata and preserve downloaded commit. Annotation regression passes. Dialog screenshot visually reviewed. Tablet/PC live exchange still needs confirmation.

@@ -10,7 +10,7 @@ export function annotationInbox(repository,branch,token,fetcher=fetch) {
       ...(body?{body:JSON.stringify(body)}:{})});
     if(missing&&response.status===404)return null;
     if(!response.ok)throw Error(response.status===403?'GitHub denied access. Sending highlights requires Contents read and write.':
-      response.status===409||response.status===422?'GitHub changed during transfer. Refresh and try again.':'Highlight transfer failed (GitHub '+response.status+').');
+      response.status===409||response.status===422?'GitHub changed during transfer. Your tablet copy is kept. Send again to review the current version.':'Highlight transfer failed (GitHub '+response.status+').');
     return response.json();
   }
   async function head(ref){return request('/git/ref/heads/'+encodeURIComponent(ref),'GET',null,true);}
@@ -47,7 +47,15 @@ export function annotationInbox(repository,branch,token,fetcher=fetch) {
     let binary='';for(const b of bytes)binary+=String.fromCharCode(b);
     const content=btoa(binary);
     if(existing?.content?.replace(/\s/g,'')===content)return existing.sha;
-    if(existing && existing.sha!==expected)throw Error('Another device changed this highlight. Your tablet copy is still saved.');
+    if(existing){
+      let remote;try{remote=decodeNote(new TextDecoder('utf-8',{fatal:true}).decode(Uint8Array.from(atob(existing.content.replace(/\s/g,'')),c=>c.charCodeAt(0))));}catch{}
+      if(!remote||'Highlight '+remote.id+'.md'!==name)throw Error('GitHub annotation could not be verified. Your tablet copy is still saved.');
+      // Base is transport bookkeeping, not authored content. Equal content recovers a lost receipt.
+      const stable=value=>Array.isArray(value)?value.map(stable):value&&typeof value==='object'?Object.fromEntries(Object.keys(value).sort().map(k=>[k,stable(value[k])])):value;
+      const authored=note=>{const {base,...content}=note;return JSON.stringify(stable(content));};
+      if(authored(remote)===authored(decodeNote(text)))return existing.sha;
+      if(existing.sha!==expected){const error=Error('The GitHub annotation differs from the tablet copy. Its saved upload receipt is missing or out of date.');error.code='ANNOTATION_CONFLICT';error.remote={note:remote,sha:existing.sha};throw error;}
+    }
     const saved=await request(path,'PUT',{branch:inbox,message:'Update '+name,content,...(existing?{sha:existing.sha}:{})});
     return saved.content.sha;
   }
