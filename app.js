@@ -1,3 +1,4 @@
+import {pressureSensitivity} from './pressure.js';
 import {mountLibrary} from './library-view.js';
 import {readerClient,repositoryName} from './api.js';
 import {bookModel,chapterHeadingParts,sceneHeadingParts} from './model.js';
@@ -58,6 +59,9 @@ for(const [id,defaultOn] of [['pen-pressure',false],['writing-lift',true],['writ
   $(id).checked=preference(id)==null?defaultOn:preference(id)==='true';
   $(id).onchange=()=>preference(id,String($(id).checked));
 }
+const sensitivityControl=$('pressure-sensitivity');sensitivityControl.value=pressureSensitivity(preference('pressure-sensitivity'));
+function sensitivityLabel(){const value=Number(sensitivityControl.value);$('pressure-sensitivity-value').textContent=value.toFixed(1)+'×';sensitivityControl.setAttribute('aria-valuetext',value.toFixed(1)+' times sensitivity');}
+sensitivityLabel();sensitivityControl.oninput=()=>{preference('pressure-sensitivity',sensitivityControl.value);sensitivityLabel();};
 $('pen-width').value=['2.5','4','6'].includes(preference('pen-width'))?preference('pen-width'):'2.5';
 $('pen-width').onchange=()=>preference('pen-width',$('pen-width').value);
 $('page-lines').value=pageLines;$('card-layout').value=cardMode;

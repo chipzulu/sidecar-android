@@ -1,3 +1,4 @@
+import {pressureSensitivity,DEFAULT_SENSITIVITY} from './pressure.js';
 import {inkSvg,appendStroke,validInk} from './shared/annotation-ink.js';
 import {adaptiveInkInput} from './ink-native.js';
 import {eraserInput,strokeTouchesSweep,eraserSweep,prepareStroke} from './ink-eraser.js';
@@ -7,6 +8,7 @@ export function inkPad(host, initial, save, inputFactory=adaptiveInkInput, {quie
   let ink=structuredClone(initial||{version:1,width:800,height:300,strokes:[]});
   let penWidth=2.5;try{const value=Number(localStorage.getItem("sidecar-reader:pen-width"));if([2.5,4,6].includes(value))penWidth=value;}catch{}
   let pressure=false;try{pressure=localStorage.getItem('sidecar-reader:pen-pressure')==='true';}catch{}
+  let sensitivity=DEFAULT_SENSITIVITY;try{sensitivity=pressureSensitivity(localStorage.getItem('sidecar-reader:pressure-sensitivity'));}catch{}
   const widths=()=>ink.strokeWidths||ink.strokes.map(()=>2.5);
   let count=ink.strokes.reduce((n,s)=>n+s.length,0),timer=0,pending=false,failed=false,started=0,nativeStroke=false;
   let input,mode='pen',eraseStart=null,eraseLines=[];const history=[];
@@ -51,7 +53,7 @@ export function inkPad(host, initial, save, inputFactory=adaptiveInkInput, {quie
     if(input?.active()||!['pen','eraser'].includes(next))return false;
     if(input&&next===mode)return true;
     input?.dispose();mode=next;host.dataset.inkTool=mode;
-    if(mode==='pen')input=inputFactory(svg,{width:()=>penWidth,pressure:()=>pressure,height:()=>ink.height,remaining:()=>ink.strokes.length>=2000?0:24000-count,begin:(source)=>{nativeStroke=source?.native===true;started=performance.now();clearTimeout(timer);},complete});
+    if(mode==='pen')input=inputFactory(svg,{width:()=>penWidth,pressure:()=>pressure,sensitivity:()=>sensitivity,height:()=>ink.height,remaining:()=>ink.strokes.length>=2000?0:24000-count,begin:(source)=>{nativeStroke=source?.native===true;started=performance.now();clearTimeout(timer);},complete});
     else {ink.strokes.forEach(prepareStroke);let erasingGesture=false,dirty=null;const erase={
       begin(){eraseStart=null;eraseLines=[...svg.querySelectorAll('.ink-stroke')];clearTimeout(timer);},
       sweep(a,b,r){

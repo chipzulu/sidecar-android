@@ -1,4 +1,10 @@
-# Story Sidecar Android Reader 0.1.38
+# Story Sidecar Android Reader 0.1.39
+
+## 0.1.39 — sensitivity and compact Configuration
+
+Pressure sensitivity slider ranges from 0.5× to 3.0×, with a more responsive 1.4× default. 1.0× reproduces the original saved pressure response. Higher values reach the same bounded width variation with lighter pressure. Applies to new strokes after reopening a note; previous ink is unchanged. This changes saved strokes and browser live ink. BOOX native fountain preview still uses its SDK curve; no undocumented hardware settings are applied. Keep APK 0.1.9 and PC 0.1.136.
+
+Configuration labels and controls now share a row, with shorter spacing and compact card choices. Longer explanations are under Help. Pressure controls remain usable by touch/pen/keyboard, and About remains at the bottom of the shorter panel.
 
 ## 0.1.38 — optional pressure handwriting
 
@@ -274,3 +280,5 @@ Reader sources are in `android-reader/`. Run `scripts/package-android-reader.py`
 0.1.37 validation: receipt unit tests and full browser conflict tests passed (preview/cancel/tablet/remote, second edit/send and reload). Concurrent changes reject stale approvals. Library matching/different backup checks use only GET metadata and preserve downloaded commit. Annotation regression passes. Dialog screenshot visually reviewed. Tablet/PC live exchange still needs confirmation.
 
 0.1.38 verification: pressure validation, normalized native samples, browser live input, bounded widths, erase/Undo and saved SVG roundtrip passed. Pressure notes also pass conflict resolution, repeated upload and reload. Existing fixed-width native and annotation regression checks pass. Hardware is mocked in browser tests; BOOX curve and latency need physical confirmation.
+
+0.1.39 validation: slider value/persistence, more responsive default and capped gain, pressure capture/eraser/Undo, transfer/reopen and annotation regressions passed. Configuration screenshot at 800×1100 shows all controls through About without scrolling; shorter screens remain scrollable.

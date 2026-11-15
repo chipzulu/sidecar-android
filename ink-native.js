@@ -1,3 +1,4 @@
+import {adjustedPressure} from './pressure.js';
 import {browserInkInput} from './ink-input.js';
 
 // Protocol 1 uses CSS viewport pixels; the native host converts to physical view pixels.
@@ -45,7 +46,7 @@ export function adaptiveInkInput(svg, callbacks, {tool='pen',browserFactory=brow
   function mapPoints(msg){
     if(!Array.isArray(msg.rect)||msg.rect.length!==4||!msg.rect.every(Number.isFinite)||!Array.isArray(msg.points)||msg.points.length>24000||!msg.points.every(p=>Array.isArray(p)&&(p.length===2||(p.length===3&&p[2]>=0&&p[2]<=1))&&p.every(Number.isFinite)))return null;
     const [x,y,right]=msg.rect,width=right-x;if(!(width>0))return null;
-    return {radius:18*800/width+1.25,points:msg.points.map(p=>[Math.round(Math.max(0,Math.min(800,(p[0]-x)*800/width))*10)/10,Math.round(Math.max(0,Math.min(callbacks.height(),(p[1]-y)*800/width))*10)/10,...(!erasing&&callbacks.pressure?.()&&p.length===3?[p[2]]:[])])};
+    return {radius:18*800/width+1.25,points:msg.points.map(p=>[Math.round(Math.max(0,Math.min(800,(p[0]-x)*800/width))*10)/10,Math.round(Math.max(0,Math.min(callbacks.height(),(p[1]-y)*800/width))*10)/10,...(!erasing&&callbacks.pressure?.()&&p.length===3?[adjustedPressure(p[2],callbacks.sensitivity?.()??1)]:[])])};
   }
   function event(e){
     let msg;try{msg=JSON.parse(e.data);}catch{return;}
