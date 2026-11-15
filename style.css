@@ -94,3 +94,4 @@ body.library-mode #connection-toggle{display:none}
 /* Keep the layout stable while exposing the prose during width adjustment. */
 body.resizing-page #right-panel{visibility:hidden;pointer-events:none}
 #width-feedback{position:fixed;top:90px;left:50%;transform:translateX(-50%);z-index:20;background:#345346;color:#fff;padding:7px 12px;border-radius:6px;font:13px system-ui;pointer-events:none}
+body.library-mode #width-handle,body.library-mode #width-feedback{display:none!important}

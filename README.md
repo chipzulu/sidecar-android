@@ -1,4 +1,4 @@
-# Story Sidecar Android Reader 0.1.40
+# Story Sidecar Android Reader 0.1.41
 
 ## 0.1.39 — sensitivity and compact Configuration
 
@@ -285,3 +285,6 @@ Reader sources are in `android-reader/`. Run `scripts/package-android-reader.py`
 
 ## Reader 0.1.40 — page-width drag
 The resize handle is now on the left edge. Drag left to widen, right to narrow. Configuration temporarily hides while dragging, keeping the centred page visible with a small current-width indicator. Release or cancel restores Configuration; width is saved. No APK update needed.
+
+## Reader 0.1.41 — resize handle position
+Moved the fixed resize controls outside the transformed manuscript scroll container, so viewport coordinates are accurate. The handle sits entirely left of the page with a small gap, rather than overlapping the paper. No APK update needed.

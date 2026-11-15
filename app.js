@@ -37,7 +37,7 @@ function layout(){
   $('page-width').max=Math.floor(Math.max(1,available-32));$('page-width').value=Math.round(fit.page);$('page-width').min=Math.min(280,fit.page);
   $('width-feedback').textContent='Page width: '+Math.round(fit.page)+' px';
   $('width-handle').hidden=dock!=='configuration';
-  requestAnimationFrame(()=>{$('width-handle').style.left=(Math.max(4,$('reader').getBoundingClientRect().left-6))+'px';});
+  requestAnimationFrame(()=>{$('width-handle').style.left=(Math.max(0,$('reader').getBoundingClientRect().left-16))+'px';});
   $('layout-note').textContent=(cardMode!=='none'&&!fit.left?'Cards hidden: there is no usable space beside this page. ':cardMode==='both'&&!fit.right?'Right cards hidden at this width. ':'')+(fit.overlay?'The right panel overlays the page at this width.':'');
   if(lastPageWidth!==fit.page){lastPageWidth=fit.page;clearTimeout(layoutTimer);layoutTimer=setTimeout(repaginate,100);}
 }
