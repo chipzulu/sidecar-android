@@ -1,4 +1,4 @@
-# Story Sidecar Android Reader 0.1.39
+# Story Sidecar Android Reader 0.1.40
 
 ## 0.1.39 — sensitivity and compact Configuration
 
@@ -282,3 +282,6 @@ Reader sources are in `android-reader/`. Run `scripts/package-android-reader.py`
 0.1.38 verification: pressure validation, normalized native samples, browser live input, bounded widths, erase/Undo and saved SVG roundtrip passed. Pressure notes also pass conflict resolution, repeated upload and reload. Existing fixed-width native and annotation regression checks pass. Hardware is mocked in browser tests; BOOX curve and latency need physical confirmation.
 
 0.1.39 validation: slider value/persistence, more responsive default and capped gain, pressure capture/eraser/Undo, transfer/reopen and annotation regressions passed. Configuration screenshot at 800×1100 shows all controls through About without scrolling; shorter screens remain scrollable.
+
+## Reader 0.1.40 — page-width drag
+The resize handle is now on the left edge. Drag left to widen, right to narrow. Configuration temporarily hides while dragging, keeping the centred page visible with a small current-width indicator. Release or cancel restores Configuration; width is saved. No APK update needed.
