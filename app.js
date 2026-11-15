@@ -54,7 +54,7 @@ document.addEventListener('keydown',event=>{
  if(event.key==='Escape'&&!document.querySelector('dialog[open]')){$('updates-panel').hidden=true;$('connection-toggle').setAttribute('aria-expanded','false');if(dock)setOpen(dock,false);if(!$('connection').hidden)setOpen('connection',false);}
 });
 
-for(const [id,defaultOn] of [['writing-lift',true],['writing-left',false]]){
+for(const [id,defaultOn] of [['pen-pressure',false],['writing-lift',true],['writing-left',false]]){
   $(id).checked=preference(id)==null?defaultOn:preference(id)==='true';
   $(id).onchange=()=>preference(id,String($(id).checked));
 }

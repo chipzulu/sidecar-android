@@ -1,4 +1,10 @@
-# Story Sidecar Android Reader 0.1.37
+# Story Sidecar Android Reader 0.1.38
+
+## 0.1.38 — optional pressure handwriting
+
+Configuration → Pressure sensitivity is off by default. Enable it and reopen a note to use pressure for new strokes. Fine/Medium/Thick remains the base; saved ink varies from 80% to 120% of that width. Existing ink is unchanged. Browser pen devices use PointerEvent pressure; BOOX requires APK 0.1.9, using native fountain preview and normalized device pressure. SDK preview curvature can differ from the subtle saved rendering; verify on the physical tablet. Fixed-width off mode retains native pencil and the established timing.
+
+Install PC extension 0.1.136 before importing pressure notes. It displays saved widths and pressure with the same renderer as this Reader. Older PC releases cannot interpret the new pressure points. Reader 0.1.38 accepts old notes and older APK fixed-width points.
 
 ## 0.1.37 — annotation conflict recovery and remote status
 
@@ -266,3 +272,5 @@ Reader sources are in `android-reader/`. Run `scripts/package-android-reader.py`
 0.1.36 validation: selected-book settings/removal and cancel, duplicate connection rejection, stable IDs/work after relink, remote/local scene conflict preservation, fresh copy/cancel/failure and simulated native handwriting persistence passed. Narrow book-options dialog visually reviewed. Physical tablet workflow check remains.
 
 0.1.37 validation: receipt unit tests and full browser conflict tests passed (preview/cancel/tablet/remote, second edit/send and reload). Concurrent changes reject stale approvals. Library matching/different backup checks use only GET metadata and preserve downloaded commit. Annotation regression passes. Dialog screenshot visually reviewed. Tablet/PC live exchange still needs confirmation.
+
+0.1.38 verification: pressure validation, normalized native samples, browser live input, bounded widths, erase/Undo and saved SVG roundtrip passed. Pressure notes also pass conflict resolution, repeated upload and reload. Existing fixed-width native and annotation regression checks pass. Hardware is mocked in browser tests; BOOX curve and latency need physical confirmation.

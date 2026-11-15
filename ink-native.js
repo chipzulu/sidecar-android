@@ -34,7 +34,7 @@ export function adaptiveInkInput(svg, callbacks, {tool='pen',browserFactory=brow
       const b=el.getBoundingClientRect();if(b.width&&b.height)exclude.push([b.left,b.top,b.right,b.bottom]);
     }
     const enabled=!document.hidden&&!document.querySelector('dialog[open],.note-palette.dragging')&&(visualViewport?.scale||1)===1&&right>left&&bottom>top&&callbacks.remaining()>0;
-    const next={viewportWidth:innerWidth,rect:[r.left,r.top,r.right,r.bottom],limit:[left,top,right,bottom],exclude,width:(callbacks.width?.()??2.5)*r.width/800,color:'#31483b',tool,eraseRadius:18,liveErase:erasing&&!!callbacks.progress,enabled};
+    const next={viewportWidth:innerWidth,rect:[r.left,r.top,r.right,r.bottom],limit:[left,top,right,bottom],exclude,pressurePoints:!erasing&&!!callbacks.pressure?.(),width:(callbacks.width?.()??2.5)*r.width/800,color:'#31483b',tool,eraseRadius:18,liveErase:erasing&&!!callbacks.progress,enabled};
     const encoded=JSON.stringify(next);
     if(encoded===last)return;
     // Native captures geometry per stroke, so scrolling cannot re-anchor an existing stroke.
@@ -43,9 +43,9 @@ export function adaptiveInkInput(svg, callbacks, {tool='pen',browserFactory=brow
   }
   function schedule(){if(!frame)frame=requestAnimationFrame(update);}
   function mapPoints(msg){
-    if(!Array.isArray(msg.rect)||msg.rect.length!==4||!msg.rect.every(Number.isFinite)||!Array.isArray(msg.points)||msg.points.length>24000||!msg.points.every(p=>Array.isArray(p)&&p.length===2&&p.every(Number.isFinite)))return null;
+    if(!Array.isArray(msg.rect)||msg.rect.length!==4||!msg.rect.every(Number.isFinite)||!Array.isArray(msg.points)||msg.points.length>24000||!msg.points.every(p=>Array.isArray(p)&&(p.length===2||(p.length===3&&p[2]>=0&&p[2]<=1))&&p.every(Number.isFinite)))return null;
     const [x,y,right]=msg.rect,width=right-x;if(!(width>0))return null;
-    return {radius:18*800/width+1.25,points:msg.points.map(p=>[Math.round(Math.max(0,Math.min(800,(p[0]-x)*800/width))*10)/10,Math.round(Math.max(0,Math.min(callbacks.height(),(p[1]-y)*800/width))*10)/10])};
+    return {radius:18*800/width+1.25,points:msg.points.map(p=>[Math.round(Math.max(0,Math.min(800,(p[0]-x)*800/width))*10)/10,Math.round(Math.max(0,Math.min(callbacks.height(),(p[1]-y)*800/width))*10)/10,...(!erasing&&callbacks.pressure?.()&&p.length===3?[p[2]]:[])])};
   }
   function event(e){
     let msg;try{msg=JSON.parse(e.data);}catch{return;}

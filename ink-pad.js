@@ -6,6 +6,7 @@ import {eraserInput,strokeTouchesSweep,eraserSweep,prepareStroke} from './ink-er
 export function inkPad(host, initial, save, inputFactory=adaptiveInkInput, {quiet=false,onHold}={}) {
   let ink=structuredClone(initial||{version:1,width:800,height:300,strokes:[]});
   let penWidth=2.5;try{const value=Number(localStorage.getItem("sidecar-reader:pen-width"));if([2.5,4,6].includes(value))penWidth=value;}catch{}
+  let pressure=false;try{pressure=localStorage.getItem('sidecar-reader:pen-pressure')==='true';}catch{}
   const widths=()=>ink.strokeWidths||ink.strokes.map(()=>2.5);
   let count=ink.strokes.reduce((n,s)=>n+s.length,0),timer=0,pending=false,failed=false,started=0,nativeStroke=false;
   let input,mode='pen',eraseStart=null,eraseLines=[];const history=[];
@@ -40,7 +41,7 @@ export function inkPad(host, initial, save, inputFactory=adaptiveInkInput, {quie
   }
   host.append(toolbar,svg,status);
   function redraw(){
-    svg.querySelectorAll('polyline').forEach(n=>n.remove());
+    svg.querySelectorAll('.ink-stroke').forEach(n=>n.remove());
     ink.strokes.forEach((stroke,i)=>appendStroke(svg,stroke,widths()[i]));
     // Keep the eraser cursor above permanent ink.
     const cursor=svg.querySelector('polygon');if(cursor)svg.append(cursor);
@@ -50,9 +51,9 @@ export function inkPad(host, initial, save, inputFactory=adaptiveInkInput, {quie
     if(input?.active()||!['pen','eraser'].includes(next))return false;
     if(input&&next===mode)return true;
     input?.dispose();mode=next;host.dataset.inkTool=mode;
-    if(mode==='pen')input=inputFactory(svg,{width:()=>penWidth,height:()=>ink.height,remaining:()=>ink.strokes.length>=2000?0:24000-count,begin:(source)=>{nativeStroke=source?.native===true;started=performance.now();clearTimeout(timer);},complete});
+    if(mode==='pen')input=inputFactory(svg,{width:()=>penWidth,pressure:()=>pressure,height:()=>ink.height,remaining:()=>ink.strokes.length>=2000?0:24000-count,begin:(source)=>{nativeStroke=source?.native===true;started=performance.now();clearTimeout(timer);},complete});
     else {ink.strokes.forEach(prepareStroke);let erasingGesture=false,dirty=null;const erase={
-      begin(){eraseStart=null;eraseLines=[...svg.querySelectorAll('polyline')];clearTimeout(timer);},
+      begin(){eraseStart=null;eraseLines=[...svg.querySelectorAll('.ink-stroke')];clearTimeout(timer);},
       sweep(a,b,r){
         const area=eraserSweep(a,b,r+3),keptLines=[],keptWidths=[],oldWidths=widths();
         const remaining=ink.strokes.filter((s,i)=>{if(!strokeTouchesSweep(s,area)){keptLines.push(eraseLines[i]);keptWidths.push(oldWidths[i]);return true;}const box=prepareStroke(s);if(!dirty)dirty=[...box];else {dirty[0]=Math.min(dirty[0],box[0]);dirty[1]=Math.min(dirty[1],box[1]);dirty[2]=Math.max(dirty[2],box[2]);dirty[3]=Math.max(dirty[3],box[3]);}eraseLines[i]?.remove();return false;});

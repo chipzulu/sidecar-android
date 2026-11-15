@@ -1,10 +1,10 @@
-import {appendStroke} from './shared/annotation-ink.js';
+import {appendStroke,paintStroke} from './shared/annotation-ink.js';
 
 // Browser adapter only. Completed strokes use note coordinates, independent of DOM pixels.
-export function browserInkInput(svg, {height, remaining, begin, complete, width=()=>2.5}) {
+export function browserInkInput(svg, {height, remaining, begin, complete, width=()=>2.5,pressure=()=>false}) {
   let stroke=null, line, pointer, rect, frame=0;
-  function paint(){frame=0;if(line&&stroke)line.setAttribute('points',stroke.length===1?`${stroke[0]} ${stroke[0][0]+.1},${stroke[0][1]}`:stroke.map(p=>p.join(',')).join(' '));}
-  function point(e){const scale=800/rect.width;return [Math.round(Math.max(0,Math.min(800,(e.clientX-rect.left)*scale))*10)/10,Math.round(Math.max(0,Math.min(height(),(e.clientY-rect.top)*scale))*10)/10];}
+  function paint(){frame=0;if(line&&stroke)paintStroke(line,stroke,width());}
+  function point(e){const scale=800/rect.width;const p=[Math.round(Math.max(0,Math.min(800,(e.clientX-rect.left)*scale))*10)/10,Math.round(Math.max(0,Math.min(height(),(e.clientY-rect.top)*scale))*10)/10];if(pressure()&&e.pointerType==='pen')p.push(Math.round(Math.max(0,Math.min(1,(e.type==='pointerup'&&e.pressure===0?(stroke?.at(-1)?.[2]??.5):e.pressure)))*1000)/1000);return p;}
   function add(e){if(stroke.length>=remaining())return;const p=point(e),last=stroke.at(-1);if(Math.hypot(p[0]-last[0],p[1]-last[1])>=.8)stroke.push(p);}
   svg.onpointerdown=e=>{
     if(stroke||e.pointerType==='touch'||e.button!==0||remaining()<1)return;
