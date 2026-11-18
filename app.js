@@ -1,4 +1,4 @@
-import {publishPeerChanges,reconcilePublished} from './peer-send.js';
+import {publishPeerChanges,reconcilePublished,receivePeerBook} from './peer-send.js';
 import {pressureSensitivity} from './pressure.js';
 import {mountLibrary} from './library-view.js';
 import {readerClient,repositoryName} from './api.js';
@@ -209,7 +209,7 @@ $('send-highlights').onclick=async()=>{
     await navigator.locks.request('sidecar-peer-send:'+owner.id,async()=>{
       const result=await publishPeerChanges(owner,client.peer,p=>message('Sending changes: '+p.completed+' / '+p.total));
       remember();await openBook(result.book);bookUpdates.postMessage('saved');
-      message(result.uploaded?'Sent scene text and annotations to GitHub. Receiving scene changes on PC is not available in this release yet.':'GitHub already matches your saved changes.');
+      message(result.uploaded?'Sent scene text and annotations to GitHub. Choose Receive changes on your other device.':'GitHub already matches your saved changes.');
     });}
 
   catch(e){message(e.message,true);}finally{$('reader').inert=false;busy=false;controls();}
@@ -242,7 +242,7 @@ $('book-menu').addEventListener('click',e=>{if(e.target===$('book-menu')){const 
 $('book-settings').onclick=async()=>{const book=menuBook;$('book-menu').close();await openSettings(await readBook(book.id));};
 $('book-check').onclick=async()=>{
  const selected=menuBook;if(!selected||busy||credentialBusy)return;$('book-menu').close();busy=true;controls();
- try{const book=await readBook(selected.id);if(!book)throw Error('Book is no longer available.');await targetCredentials(book);await credentials.ensure();message('Checking the GitHub backup…');const commit=await client.check();await recordRemoteCheck(book,commit);await libraryView.refresh(book.id);message(commit===book.commit?'The downloaded backup matches GitHub.':'GitHub has a different backup. Open the book and choose Receive updates when ready.');}
+ try{const book=await readBook(selected.id);if(!book)throw Error('Book is no longer available.');await targetCredentials(book);await credentials.ensure();message('Checking the GitHub backup…');const commit=await client.check();await recordRemoteCheck(book,commit);await libraryView.refresh(book.id);message(commit===book.commit?'The downloaded backup matches GitHub.':'GitHub has a different backup. Open the book and choose Receive changes when ready.');}
  catch(error){message(error.message,true);}finally{busy=false;controls();}
 };
 $('book-refresh').onclick=async()=>{const book=menuBook;$('book-menu').close();await downloadBook(true,await readBook(book.id));};
@@ -260,6 +260,7 @@ async function downloadBook(fresh,target=null){
   if(busy||credentialBusy)return;
   if(fresh&&!confirm('Replace '+(target?.title||target?.repository||'this book')+' with a fresh copy from GitHub? All local scene edits, annotations and reading position for this repository will be discarded, including unsent work. GitHub files and your token are kept.'))return;
   if(!highlights.beforeRender())return;
+  try{highlights.prepareSend();}catch(error){message(error.message,true);return;}$('reader').inert=true;
   busy=true;controls();abort=new AbortController();$('progress').removeAttribute('value');
   try{
     if(target)await targetCredentials(target);
@@ -271,12 +272,14 @@ async function downloadBook(fresh,target=null){
     const next=await client.download(fresh?null:await findBook(repository,branch),p=>{if(abort.signal.aborted)throw Error('Download cancelled. Previous offline book retained.');$('progress').max=Math.max(1,p.total);$('progress').value=p.completed;message(`Downloading ${p.completed} of ${p.total} files · ${p.path}`);},abort.signal);
     if(abort.signal.aborted)throw Error('Download cancelled. Previous offline book retained.');
     const verified=bookModel(next);if(!verified.chapters.length)throw Error('No readable manuscript found.');
-    if(!fresh){const previous=target||await findBook(repository,branch);if(previous){const incoming=new Map(next.files.map(f=>[f.path,f.sha]));const conflicts=bookModel(previous).chapters.flatMap(c=>c.scenes).filter(scene=>{const draft=readDraft(previous,scene);return draft&&draft.base!==incoming.get(scene.path);});if(conflicts.length)throw Error('Receive stopped: '+conflicts.length+' locally edited scene(s) also changed or were removed remotely. Local work is kept. Resolve these changes before receiving, or deliberately use Refresh from remote.');}}
-    next.title=verified.title;await saveBook(next);
+    next.title=verified.title;
+    const previous=!fresh?(target||await findBook(repository,branch)):null;
+    const received=previous?await receivePeerBook(previous,next):null;
+    if(!previous)await saveBook(next);
     if(fresh){clearTimeout(scrollTimer);clearBookWork(next);bookUpdates.postMessage('saved');if(libraryMode){if(snapshot?.id===next.id)snapshot=null;await libraryView.refresh(next.id);}else{replacing=true;await openBook(next,false);replacing=false;}message('Fresh copy received. Local work for this book was replaced.');return;}
-    bookUpdates.postMessage('saved');remember();await openBook(next);message('Book verified and saved for offline reading. No GitHub files were changed.');
+    bookUpdates.postMessage('saved');remember();await openBook(next);message(received?`Received ${received.applied} changed file(s); ${received.kept} locally changed file(s) kept.`:'Book verified and saved for offline reading. No GitHub files were changed.');
     navigator.storage?.persist?.().catch(()=>{});
-  }catch(error){message(error.message,true);if(!target)setOpen('connection',true);}finally{busy=false;controls();abort=null;void reconcileBook();}
+  }catch(error){message(error.message,true);if(!target)setOpen('connection',true);}finally{$('reader').inert=false;busy=false;controls();abort=null;void reconcileBook();}
 };
 // The installed reader and Chrome can share the database while keeping separate pages in memory.
 const bookUpdates=new BroadcastChannel('sidecar-reader-book');

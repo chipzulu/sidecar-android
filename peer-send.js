@@ -1,5 +1,5 @@
 import {gitBlobSha,checkBackupInventory} from './shared/github-backup.js';
-import {peerIdentity,editOrigin,jsonOrigin,fileKind} from './shared/peer-state.js';
+import {peerIdentity,editOrigin,jsonOrigin,fileKind,receivePlan} from './shared/peer-state.js';
 import {encodeNote,noteFilename} from './shared/annotation-brush.js';
 import {workKey,readBookIdentity,bookIdentity,saveBook} from './storage.js';
 export async function preparePeerSend(book){
@@ -44,4 +44,15 @@ export function reconcilePublished(next){
   if(JSON.stringify(row.note)===JSON.stringify(note))rows[id]={...row,dirty:false,main:file.sha,base:file.sha,needsInline:false};
  }
  localStorage.setItem(key,JSON.stringify(rows));
+}
+
+export async function receivePeerBook(previous,incoming){
+ if(await readBookIdentity(previous.id)!==bookIdentity(previous))throw Error('The local book changed while downloading. Retry receive.');
+ reconcilePublished(previous);
+ const local=await preparePeerSend(previous),plan=receivePlan(previous.syncBase,previous.repository,previous.branch,local.files,incoming.files);
+ if(plan.conflicts.length)throw Error('Receive stopped. Both copies changed these files: '+plan.conflicts.join('; ')+'. No local files or drafts were changed. Comparison is not available yet.');
+ const remote=new Map(incoming.files.map(f=>[f.path,f.sha])),current=new Map(local.files.map(f=>[f.path,f.sha]));
+ incoming.peerReceipt={drafts:[...local.drafts].filter(([path])=>current.get(path)===remote.get(path)),notes:[...local.notes].filter(([id])=>{const path='Book/Notes/'+noteFilename(id);return current.get(path)===remote.get(path);})};
+ await saveBook(incoming);reconcilePublished(incoming);
+ return {applied:plan.apply.length,kept:plan.keep.length};
 }

@@ -30,3 +30,18 @@ export function editOrigin(book,path,previous){
 }
 // localStorage uses JSON, unlike IndexedDB: retain original bytes as ordinary arrays.
 export function jsonOrigin(origin){if(!origin.known||origin.contentBase64)return origin;let binary='';for(const b of origin.bytes)binary+=String.fromCharCode(b);const {bytes,...rest}=origin;return {...rest,contentBase64:btoa(binary)};}
+
+export function receivePlan(base,repository,branch,local,remote){
+ const l=new Map(local.map(f=>[f.path,f])),r=new Map(remote.map(f=>[f.path,f]));
+ const known=base?.version===1&&base.identity===peerIdentity(repository,branch);
+ const conflicts=[],apply=[],keep=[];
+ for(const path of new Set([...Object.keys(known?base.entries:{}),...l.keys(),...r.keys()])){
+  const left=l.get(path),right=r.get(path),before=known?base.entries[path]?.sha:undefined;
+  if(left?.sha===right?.sha)continue;
+  if(!known){conflicts.push(path);continue;}
+  if(left?.sha===before)apply.push({path,before:left||null,after:right||null});
+  else if(right?.sha===before)keep.push(path);
+  else conflicts.push(path);
+ }
+ return {known:!!known,conflicts:conflicts.sort(),apply,keep};
+}

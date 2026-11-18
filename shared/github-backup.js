@@ -91,6 +91,27 @@ export function githubBackupClient(config, token, {fetcher=fetch, signal}={}) {
     if(tree.truncated)throw new Error('Remote tree is too large to verify safely.');
     return {head:ref.object.sha,tree:commit.tree.sha,entries:tree.tree};
   }
+  async function download(progress=()=>{},cached=[]) {
+    const remote=await inspect();
+    const entries=remote.entries.filter(e=>e.path.startsWith('Book/')&&e.type!=='tree');
+    const names=new Set();
+    for(const e of entries){
+      const parts=e.path.split('/');
+      if(e.type!=='blob'||e.mode!=='100644'||parts.some(p=>!p||p==='.'||p==='..'||p.toLowerCase()==='.git'||/[\\:*?"<>|\x00-\x1f]/.test(p)||/[. ]$/.test(p))||names.has(e.path.toLowerCase()))throw Error('Unsupported or ambiguous remote Book path: '+e.path);
+      names.add(e.path.toLowerCase());
+    }
+    checkBackupInventory(entries.map(e=>({...e,size:e.size||0})));
+    const files=new Array(entries.length),cache=new Map(cached.map(f=>[f.sha,f.bytes]));let total=0,cursor=0,completed=0;
+    async function worker(){while(cursor<entries.length){const index=cursor++,entry=entries[index];let bytes=cache.get(entry.sha);
+      if(!bytes){const blob=await api('/git/blobs/'+entry.sha);if(blob.encoding!=='base64')throw Error('Unsupported remote blob encoding.');bytes=Uint8Array.from(atob(blob.content.replace(/\s/g,'')),c=>c.charCodeAt(0));}
+      total+=bytes.length;if(bytes.length>25*1024*1024||total>100*1024*1024)throw Error('Remote book exceeds the transfer size limit.');
+      if(await gitBlobSha(bytes)!==entry.sha)throw Error('Remote file verification failed: '+entry.path);
+      files[index]={path:entry.path,sha:entry.sha,bytes,size:bytes.length};completed++;progress({completed,total:entries.length,path:entry.path});
+    }}
+    await Promise.all(Array.from({length:Math.min(4,entries.length)},worker));
+    if(!files.some(f=>/^Book\/Chapters\/.+\.html?$/i.test(f.path)))throw Error('No manuscript scenes found in the remote book.');
+    return {...remote,files};
+  }
   function plan(remote,files,previous) {
     const entries=remote.entries.filter(e=>e.path==='Book'||e.path.startsWith('Book/'));
     if(entries.some(e=>e.type!=='tree' && (e.type!=='blob'||e.mode!=='100644')))throw new Error('Remote Book contains unsupported links or file modes. Use a dedicated book repository.');
@@ -130,5 +151,5 @@ export function githubBackupClient(config, token, {fetcher=fetch, signal}={}) {
     await api(`/git/refs/heads/${encodeURIComponent(safe.branch)}`,'PATCH',{sha:commit.sha,force:false});
     return {head:commit.sha,uploaded:true};
   }
-  return {inspect,plan,upload,inbox:annotationInbox(safe.repository,safe.branch,token,fetcher)};
+  return {inspect,download,plan,upload,inbox:annotationInbox(safe.repository,safe.branch,token,fetcher)};
 }

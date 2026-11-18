@@ -1,4 +1,4 @@
-# Story Sidecar Android Reader 0.1.46
+# Story Sidecar Android Reader 0.1.47
 
 ## 0.1.39 — sensitivity and compact Configuration
 
@@ -307,3 +307,6 @@ Transfers are unchanged: Send updates still sends annotations only. Prose drafts
 Send changes now publishes saved prose and inline annotations together, plus annotation records, to the configured book branch. It uses a normal non-force commit and requires Contents read/write permission. Remote changes stop the send; local work stays on the device. Failed or interrupted sends preserve work and support safe retries. Successful sends update the shared base and clear only the captured edits. No APK update (keep 0.1.11).
 
 PC scene receiving comes in Step 3 and is not in this release. Test with a test-book repository: change a short sentence, add a note, send, and inspect the scene HTML and Book/Notes on GitHub. Do not expect the old PC annotation-inbox button to fetch these new scene changes.
+
+## 0.1.47 — Receive changes
+Normal receiving now compares shared-base/local/remote files. Independent changes are preserved; identical edits settle. Any conflicting file stops the whole receive and lists paths; the existing book and drafts remain. No merge UI yet. Use PC 0.1.139 for Receive changes on the desktop. Keep APK 0.1.11. Refresh from remote still deliberately discards local work and is not conflict resolution.
