@@ -1,4 +1,4 @@
-# Story Sidecar Android Reader 0.1.42
+# Story Sidecar Android Reader 0.1.43
 
 ## 0.1.39 — sensitivity and compact Configuration
 
@@ -291,3 +291,6 @@ Moved the fixed resize controls outside the transformed manuscript scroll contai
 
 ## Native save activity strip
 Reader 0.1.42 + APK 0.1.10: the left edge of the writing area pulses on completed native strokes. Pending local-save confirmations grow the amber strip (full at 12); after 10 seconds it turns red. Confirmations shrink it. Render acknowledgement and local-storage confirmation are separate. This is not a GitHub sync indicator or recovery system. A frozen native process can freeze the indicator too. Install APK over the existing app; do not clear data.
+
+## Pen-input regression investigation
+Reader 0.1.43 / APK 0.1.11 removes the separate native SaveStrip overlay and its E-Ink update calls. The APK still owns pending-save counts and sends save-state events; the Reader draws the strip within the note SVG. This restores the prior native view arrangement. Device testing is required to confirm the reported connected-but-no-strokes regression is resolved.

@@ -1,4 +1,4 @@
-const CACHE='sidecar-reader-0.1.42';
+const CACHE='sidecar-reader-0.1.43';
 const FILES=['./','./index.html','./style.css','./app.js','./library-view.js','./about.js','./writing.js','./writing-position.js','./inline-notes.js','./highlights.js','./annotation-conflict.js','./note-palette.js','./annotation-gestures.js','./ink-pad.js','./pressure.js','./ink-eraser.js','./ink-input.js','./ink-native.js','./shared/annotation-ink.js','./shared/annotation-brush.js','./shared/annotation-inbox.js','./shared/annotation-brush.css','./api.js','./model.js','./storage.js','./pages.js','./layout.js','./cards.js','./token-vault.js','./credentials-ui.js','./manifest.webmanifest','./icon.svg','./icon-192.png','./icon-512.png','./shared/structure.js','./shared/clock-names.js','./shared/html-format.js','./shared/keep-together.js','./shared/manuscript-format.js','./shared/italic-markers.js','./shared/file-text.js'];
 self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(FILES.map(file=>new Request(new URL(file,self.registration.scope),{cache:'reload'}))))));
 self.addEventListener('activate',event=>event.waitUntil(self.clients.claim()));

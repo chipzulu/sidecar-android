@@ -13,6 +13,18 @@ export function adaptiveInkInput(svg, callbacks, {tool='pen',browserFactory=brow
 
   let fallback=null,ready=false,disposed=false,busy=false,frame=0,last='',gesture=null,lastBatch=0;
   const received=new Set(),awaitingSave=new Set();
+  const strip=document.createElementNS('http://www.w3.org/2000/svg','rect');
+  strip.setAttribute('x','0');strip.setAttribute('y','0');strip.setAttribute('width','5');strip.setAttribute('height','0');strip.style.pointerEvents='none';svg.append(strip);
+  let saveTimer=0,savePending=0,saveSince=0,pulseUntil=0;
+  function paintSaveState(){
+    clearTimeout(saveTimer);if(disposed)return;
+    const now=performance.now(),fraction=savePending?Math.min(1,savePending/12):now<pulseUntil?.08:0;
+    strip.setAttribute('height',String(fraction?Math.max(8,callbacks.height()*fraction):0));
+    strip.setAttribute('fill',savePending?(now-saveSince>=10000?'#9b2d28':'#aa7323'):'#345346');
+    // Keep feedback above ink without changing capture or native screen-update modes.
+    if(svg.lastChild!==strip)svg.append(strip);
+    if(savePending||now<pulseUntil)saveTimer=setTimeout(paintSaveState,450);
+  }
   function confirmSaved(){if(callbacks.isSaved?.()!==true)return;for(const id of awaitingSave)send("saved",{id});awaitingSave.clear();}
   const badge=document.createElement('small');badge.textContent=erasing?'Connecting BOOX eraser…':'Connecting BOOX pen…';svg.before(badge);
   function send(type,extra={}){bridge.postMessage(JSON.stringify({version:1,type,session,...extra}));}
@@ -52,6 +64,10 @@ export function adaptiveInkInput(svg, callbacks, {tool='pen',browserFactory=brow
   function event(e){
     let msg;try{msg=JSON.parse(e.data);}catch{return;}
     if(msg.version!==1||msg.session!==session||disposed||fallback)return;
+    if(msg.type==='save-state'){
+      if(!Number.isSafeInteger(msg.pending)||msg.pending<0||!Number.isFinite(msg.age)||msg.age<0)return;
+      savePending=msg.pending;saveSince=performance.now()-msg.age;if(msg.pulse)pulseUntil=performance.now()+400;paintSaveState();return;
+    }
     if(msg.type==='ready'){
       clearTimeout(timeout);
       if(erasing&&msg.nativeEraser!==true){useBrowser('install BOOX Test 0.1.1 for native feedback');return;}
@@ -104,6 +120,6 @@ export function adaptiveInkInput(svg, callbacks, {tool='pen',browserFactory=brow
     confirmSaved,
     active:()=>fallback?fallback.active():busy,
     finish(){if(fallback)return fallback.finish();return !busy;},
-    dispose(){if(disposed)return;disposed=true;clearTimeout(timeout);cancelAnimationFrame(frame);resize.disconnect();changes.disconnect();window.removeEventListener('resize',schedule);window.removeEventListener('scroll',schedule,true);document.removeEventListener('visibilitychange',schedule);visualViewport?.removeEventListener('resize',schedule);fallback?.dispose();try{send('close');}catch{}if(bridge.onmessage===event)bridge.onmessage=null;badge.remove();}
+    dispose(){if(disposed)return;disposed=true;clearTimeout(saveTimer);strip.remove();clearTimeout(timeout);cancelAnimationFrame(frame);resize.disconnect();changes.disconnect();window.removeEventListener('resize',schedule);window.removeEventListener('scroll',schedule,true);document.removeEventListener('visibilitychange',schedule);visualViewport?.removeEventListener('resize',schedule);fallback?.dispose();try{send('close');}catch{}if(bridge.onmessage===event)bridge.onmessage=null;badge.remove();}
   };
 }
