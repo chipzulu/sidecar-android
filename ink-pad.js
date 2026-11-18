@@ -18,7 +18,7 @@ export function inkPad(host, initial, save, inputFactory=adaptiveInkInput, {quie
   function message(text){if(mode==='eraser'&&!text.startsWith('Eraser'))text='Eraser · '+text;if(status.textContent!==text)status.textContent=text;}
   function flush(){
     clearTimeout(timer);
-    try{if(failed){save(ink,false);failed=false;}if(pending){save(ink,true);pending=false;}message('Saved on this device · '+ink.strokes.length+' strokes');window.sidecarInkSavedCount=ink.strokes.length;return true;}
+    try{if(failed){save(ink,false);failed=false;}if(pending){save(ink,true);pending=false;}input?.confirmSaved?.();message('Saved on this device · '+ink.strokes.length+' strokes');window.sidecarInkSavedCount=ink.strokes.length;return true;}
     catch(e){message('Could not save handwriting: '+e.message);return false;}
   }
   function checkpoint(){
@@ -53,7 +53,7 @@ export function inkPad(host, initial, save, inputFactory=adaptiveInkInput, {quie
     if(input?.active()||!['pen','eraser'].includes(next))return false;
     if(input&&next===mode)return true;
     input?.dispose();mode=next;host.dataset.inkTool=mode;
-    if(mode==='pen')input=inputFactory(svg,{width:()=>penWidth,pressure:()=>pressure,sensitivity:()=>sensitivity,height:()=>ink.height,remaining:()=>ink.strokes.length>=2000?0:24000-count,begin:(source)=>{nativeStroke=source?.native===true;started=performance.now();clearTimeout(timer);},complete});
+    if(mode==='pen')input=inputFactory(svg,{width:()=>penWidth,pressure:()=>pressure,sensitivity:()=>sensitivity,isSaved:()=>!failed,height:()=>ink.height,remaining:()=>ink.strokes.length>=2000?0:24000-count,begin:(source)=>{nativeStroke=source?.native===true;started=performance.now();clearTimeout(timer);},complete});
     else {ink.strokes.forEach(prepareStroke);let erasingGesture=false,dirty=null;const erase={
       begin(){eraseStart=null;eraseLines=[...svg.querySelectorAll('.ink-stroke')];clearTimeout(timer);},
       sweep(a,b,r){
@@ -67,7 +67,7 @@ export function inkPad(host, initial, save, inputFactory=adaptiveInkInput, {quie
       end(){if(eraseStart){eraseStart=null;checkpoint();}}
     };
     input=adaptiveInkInput(svg,{
-      height:()=>ink.height,remaining:()=>24000,
+      isSaved:()=>!failed,height:()=>ink.height,remaining:()=>24000,
       begin(){erase.begin();erasingGesture=true;},
       progress(points,meta){
         if(!erasingGesture){erase.begin();erasingGesture=true;}

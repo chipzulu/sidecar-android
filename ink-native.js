@@ -12,7 +12,8 @@ export function adaptiveInkInput(svg, callbacks, {tool='pen',browserFactory=brow
   function reject(reason){diagnostic.rejected++;diagnostic.last=reason;badge.textContent='Handwriting not accepted: '+reason;}
 
   let fallback=null,ready=false,disposed=false,busy=false,frame=0,last='',gesture=null,lastBatch=0;
-  const received=new Set();
+  const received=new Set(),awaitingSave=new Set();
+  function confirmSaved(){if(callbacks.isSaved?.()!==true)return;for(const id of awaitingSave)send("saved",{id});awaitingSave.clear();}
   const badge=document.createElement('small');badge.textContent=erasing?'Connecting BOOX eraser…':'Connecting BOOX pen…';svg.before(badge);
   function send(type,extra={}){bridge.postMessage(JSON.stringify({version:1,type,session,...extra}));}
   function useBrowser(reason){
@@ -35,7 +36,7 @@ export function adaptiveInkInput(svg, callbacks, {tool='pen',browserFactory=brow
       const b=el.getBoundingClientRect();if(b.width&&b.height)exclude.push([b.left,b.top,b.right,b.bottom]);
     }
     const enabled=!document.hidden&&!document.querySelector('dialog[open],.note-palette.dragging')&&(visualViewport?.scale||1)===1&&right>left&&bottom>top&&callbacks.remaining()>0;
-    const next={viewportWidth:innerWidth,rect:[r.left,r.top,r.right,r.bottom],limit:[left,top,right,bottom],exclude,pressurePoints:!erasing&&!!callbacks.pressure?.(),width:(callbacks.width?.()??2.5)*r.width/800,color:'#31483b',tool,eraseRadius:18,liveErase:erasing&&!!callbacks.progress,enabled};
+    const next={saveReceipts:!!callbacks.isSaved,viewportWidth:innerWidth,rect:[r.left,r.top,r.right,r.bottom],limit:[left,top,right,bottom],exclude,pressurePoints:!erasing&&!!callbacks.pressure?.(),width:(callbacks.width?.()??2.5)*r.width/800,color:'#31483b',tool,eraseRadius:18,liveErase:erasing&&!!callbacks.progress,enabled};
     const encoded=JSON.stringify(next);
     if(encoded===last)return;
     // Native captures geometry per stroke, so scrolling cannot re-anchor an existing stroke.
@@ -82,7 +83,7 @@ export function adaptiveInkInput(svg, callbacks, {tool='pen',browserFactory=brow
         if((msg.tool||'pen')!==tool)reject('Stroke arrived for a different tool');
         else if(mapped.points.length>callbacks.remaining())reject('Note point limit reached');
         else if(callbacks.complete(mapped.points,undefined,{radius:mapped.radius})===false)reject('Note rejected stroke; check the message below the note');
-        else {diagnostic.accepted++;diagnostic.last='Accepted '+mapped.points.length+' points';}
+        else {awaitingSave.add(id);confirmSaved();diagnostic.accepted++;diagnostic.last='Accepted '+mapped.points.length+' points';}
       }catch(error){reject(error.message||'Stroke handling failed');}
       gesture=null;
       received.add(id);
@@ -100,6 +101,7 @@ export function adaptiveInkInput(svg, callbacks, {tool='pen',browserFactory=brow
   document.addEventListener('visibilitychange',schedule);visualViewport?.addEventListener('resize',schedule);
   schedule();
   return {
+    confirmSaved,
     active:()=>fallback?fallback.active():busy,
     finish(){if(fallback)return fallback.finish();return !busy;},
     dispose(){if(disposed)return;disposed=true;clearTimeout(timeout);cancelAnimationFrame(frame);resize.disconnect();changes.disconnect();window.removeEventListener('resize',schedule);window.removeEventListener('scroll',schedule,true);document.removeEventListener('visibilitychange',schedule);visualViewport?.removeEventListener('resize',schedule);fallback?.dispose();try{send('close');}catch{}if(bridge.onmessage===event)bridge.onmessage=null;badge.remove();}

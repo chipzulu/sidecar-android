@@ -1,4 +1,4 @@
-# Story Sidecar Android Reader 0.1.41
+# Story Sidecar Android Reader 0.1.42
 
 ## 0.1.39 — sensitivity and compact Configuration
 
@@ -288,3 +288,6 @@ The resize handle is now on the left edge. Drag left to widen, right to narrow. 
 
 ## Reader 0.1.41 — resize handle position
 Moved the fixed resize controls outside the transformed manuscript scroll container, so viewport coordinates are accurate. The handle sits entirely left of the page with a small gap, rather than overlapping the paper. No APK update needed.
+
+## Native save activity strip
+Reader 0.1.42 + APK 0.1.10: the left edge of the writing area pulses on completed native strokes. Pending local-save confirmations grow the amber strip (full at 12); after 10 seconds it turns red. Confirmations shrink it. Render acknowledgement and local-storage confirmation are separate. This is not a GitHub sync indicator or recovery system. A frozen native process can freeze the indicator too. Install APK over the existing app; do not clear data.
