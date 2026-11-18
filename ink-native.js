@@ -15,15 +15,16 @@ export function adaptiveInkInput(svg, callbacks, {tool='pen',browserFactory=brow
   const received=new Set(),awaitingSave=new Set();
   const strip=document.createElementNS('http://www.w3.org/2000/svg','rect');
   strip.setAttribute('x','0');strip.setAttribute('y','0');strip.setAttribute('width','5');strip.setAttribute('height','0');strip.style.pointerEvents='none';svg.append(strip);
-  let saveTimer=0,savePending=0,saveSince=0,pulseUntil=0;
+  let saveTimer=0,savePending=0,saveSince=0,savedMark=0;
   function paintSaveState(){
     clearTimeout(saveTimer);if(disposed)return;
-    const now=performance.now(),fraction=savePending?Math.min(1,savePending/12):now<pulseUntil?.08:0;
+    const now=performance.now(),fraction=savePending?Math.min(1,savePending/12):savedMark?(savedMark%2?.08:.14):0;
     strip.setAttribute('height',String(fraction?Math.max(8,callbacks.height()*fraction):0));
     strip.setAttribute('fill',savePending?(now-saveSince>=10000?'#9b2d28':'#aa7323'):'#345346');
     // Keep feedback above ink without changing capture or native screen-update modes.
     if(svg.lastChild!==strip)svg.append(strip);
-    if(savePending||now<pulseUntil)saveTimer=setTimeout(paintSaveState,450);
+    // Only schedule the transition to red; successful saves have no fade timer.
+    if(savePending&&now-saveSince<10000)saveTimer=setTimeout(paintSaveState,Math.max(1,10000-(now-saveSince)));
   }
   function confirmSaved(){if(callbacks.isSaved?.()!==true)return;for(const id of awaitingSave)send("saved",{id});awaitingSave.clear();}
   const badge=document.createElement('small');badge.textContent=erasing?'Connecting BOOX eraser…':'Connecting BOOX pen…';svg.before(badge);
@@ -66,7 +67,8 @@ export function adaptiveInkInput(svg, callbacks, {tool='pen',browserFactory=brow
     if(msg.version!==1||msg.session!==session||disposed||fallback)return;
     if(msg.type==='save-state'){
       if(!Number.isSafeInteger(msg.pending)||msg.pending<0||!Number.isFinite(msg.age)||msg.age<0)return;
-      savePending=msg.pending;saveSince=performance.now()-msg.age;if(msg.pulse)pulseUntil=performance.now()+400;paintSaveState();return;
+      if(msg.pending<savePending)savedMark+=savePending-msg.pending;
+      savePending=msg.pending;saveSince=performance.now()-msg.age;paintSaveState();return;
     }
     if(msg.type==='ready'){
       clearTimeout(timeout);

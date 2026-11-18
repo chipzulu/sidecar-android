@@ -1,4 +1,4 @@
-# Story Sidecar Android Reader 0.1.43
+# Story Sidecar Android Reader 0.1.44
 
 ## 0.1.39 — sensitivity and compact Configuration
 
@@ -294,3 +294,6 @@ Reader 0.1.42 + APK 0.1.10: the left edge of the writing area pulses on complete
 
 ## Pen-input regression investigation
 Reader 0.1.43 / APK 0.1.11 removes the separate native SaveStrip overlay and its E-Ink update calls. The APK still owns pending-save counts and sends save-state events; the Reader draws the strip within the note SVG. This restores the prior native view arrangement. Device testing is required to confirm the reported connected-but-no-strokes regression is resolved.
+
+## Reader 0.1.44 — persistent save mark
+With BOOX APK 0.1.11, confirmed local saves leave a green mark on the note’s left edge. It alternates between short and longer lengths on confirmation rather than flashing or fading. Pending strokes grow an amber strip; after ten seconds without confirmation it turns red. A new editing session starts without a green mark until a save is confirmed. No new APK is needed. This does not change native ink handoff refresh or resolve device freezes.
