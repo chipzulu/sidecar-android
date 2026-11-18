@@ -1,3 +1,4 @@
+import {sharedBase} from './shared/peer-state.js';
 import {listCredentialRepositories} from './token-vault.js';
 const request=r=>new Promise((resolve,reject)=>{r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});
 const completed=tx=>new Promise((resolve,reject)=>{tx.oncomplete=resolve;tx.onerror=tx.onabort=()=>reject(tx.error||Error('Library transaction cancelled.'));});
@@ -40,7 +41,7 @@ async function db(){await libraryReady;return database;}
 export async function listConnections(){const d=await db();return request(d.transaction('connections').objectStore('connections').getAll());}
 export async function rememberConnection(book){const d=await db(),c=connection(book),tx=d.transaction(['connections','meta'],'readwrite'),done=completed(tx);tx.objectStore('connections').put(c);tx.objectStore('meta').put(c.key,'lastConnection');await done;return c;}
 export async function lastConnection(){const d=await db(),key=await request(d.transaction('meta').objectStore('meta').get('lastConnection'));return key?request(d.transaction('connections').objectStore('connections').get(key)):null;}
-export async function readBook(id){const d=await db();id ||= await request(d.transaction('meta').objectStore('meta').get('active'));return id?request(d.transaction('snapshots').objectStore('snapshots').get(id)):undefined;}
+export async function readBook(id){const d=await db();id ||= await request(d.transaction('meta').objectStore('meta').get('active'));const book=id?await request(d.transaction('snapshots').objectStore('snapshots').get(id)):undefined;if(book&&!book.syncBase&&!book.syncDetached&&book.commit)book.syncBase=sharedBase(book.repository,book.branch,book.commit,book.files);return book;}
 export async function readBookIdentity(id){return bookIdentity(await readBook(id));}
 export async function findBook(repository,branch){const d=await db(),row=await request(d.transaction('library').objectStore('library').index('remote').get(connection({repository,branch}).key));return row?readBook(row.id):undefined;}
 export async function selectBook(id){const d=await db(),tx=d.transaction(['library','meta'],'readwrite'),done=completed(tx);const r=tx.objectStore('library').get(id);r.onsuccess=()=>{if(!r.result){tx.abort();return;}tx.objectStore('meta').put(id,'active');};await done;return readBook(id);}
@@ -49,11 +50,11 @@ export async function saveBook(book){
  const get=store.index('remote').get(c.key);
  get.onsuccess=()=>{
   const previous=get.result,id=previous?.id||crypto.randomUUID(),now=new Date().toISOString();
-  saved={...book,id,revision:crypto.randomUUID()};
+  saved={...book,id,revision:crypto.randomUUID(),syncDetached:false,syncBase:sharedBase(book.repository,book.branch,book.commit,book.files)};
   store.put({id,remote:c.key,connection:c,title:book.title||previous?.title||book.repository,createdAt:previous?.createdAt||now,lastReceivedAt:now,lastSentAt:previous?.lastSentAt||null});
   tx.objectStore('snapshots').put(saved,id);tx.objectStore('meta').put(id,'active');tx.objectStore('connections').put(c);tx.objectStore('meta').put(c.key,'lastConnection');
  };
- await done;Object.assign(book,{id:saved.id,revision:saved.revision});return saved;
+ await done;Object.assign(book,{id:saved.id,revision:saved.revision,syncBase:saved.syncBase,syncDetached:false});return saved;
 }
 export async function removeBook(book){
  const d=await db(),tx=d.transaction(['library','snapshots','meta'],'readwrite'),done=completed(tx);
@@ -67,7 +68,7 @@ export async function listBooks(){const d=await db(),rows=await request(d.transa
 export async function relinkBook(book,repository,branch){
  const d=await db(),c=connection({repository,branch}),tx=d.transaction(['library','snapshots','connections'],'readwrite'),done=completed(tx);
  const rows=tx.objectStore('library'),get=rows.get(book.id);
- get.onsuccess=()=>{if(!get.result){tx.abort();return;}rows.put({...get.result,remote:c.key,connection:c,lastReceivedAt:null,lastSentAt:null,remoteCheckedAt:null,checkedCommit:null});const r=tx.objectStore('snapshots').get(book.id);r.onsuccess=()=>{if(bookIdentity(r.result)!==bookIdentity(book)){tx.abort();return;}tx.objectStore('snapshots').put({...r.result,repository:c.repository,branch,revision:crypto.randomUUID()},book.id);};tx.objectStore('connections').put(c);};
+ get.onsuccess=()=>{if(!get.result){tx.abort();return;}rows.put({...get.result,remote:c.key,connection:c,lastReceivedAt:null,lastSentAt:null,remoteCheckedAt:null,checkedCommit:null});const r=tx.objectStore('snapshots').get(book.id);r.onsuccess=()=>{if(bookIdentity(r.result)!==bookIdentity(book)){tx.abort();return;}tx.objectStore('snapshots').put({...r.result,repository:c.repository,branch,syncBase:null,syncDetached:true,revision:crypto.randomUUID()},book.id);};tx.objectStore('connections').put(c);};
  await done;return readBook(book.id);
 }
 

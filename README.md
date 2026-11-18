@@ -1,4 +1,4 @@
-# Story Sidecar Android Reader 0.1.44
+# Story Sidecar Android Reader 0.1.45
 
 ## 0.1.39 — sensitivity and compact Configuration
 
@@ -297,3 +297,8 @@ Reader 0.1.43 / APK 0.1.11 removes the separate native SaveStrip overlay and its
 
 ## Reader 0.1.44 — persistent save mark
 With BOOX APK 0.1.11, confirmed local saves leave a green mark on the note’s left edge. It alternates between short and longer lengths on confirmation rather than flashing or fading. Pending strokes grow an amber strip; after ten seconds without confirmation it turns red. A new editing session starts without a green mark until a save is confirmed. No new APK is needed. This does not change native ink handoff refresh or resolve device freezes.
+
+## 0.1.45 — peer-sync Step 1
+Verified downloaded snapshots now supply a shared base commit and file hashes. New local scene drafts retain original content for later three-way comparison; annotation edits retain their originating scene reference. Older drafts with an unmatched starting hash are marked unknown. Changing repository clears the old shared base without clearing local work. Updates shows the shared commit and local scene-draft count.
+
+Transfers are unchanged: Send updates still sends annotations only. Prose drafts are still local; peer text transfer and conflict resolution come in later steps. No APK update is needed (keep 0.1.11). Existing books and work are retained; no reset or re-download is required.

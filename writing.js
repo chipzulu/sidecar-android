@@ -1,3 +1,4 @@
+import {editOrigin,jsonOrigin} from './shared/peer-state.js';
 import {workKey} from './storage.js';
 import {inlineFragment,sceneNotes,annotatedHtml,colourMarks} from './inline-notes.js';
 import {htmlForPlainTextPaste} from './shared/html-format.js';
@@ -22,7 +23,7 @@ function save() {
   if (!current || !dirty || composing) return;
   try {
     const html = annotatedHtml(prose,current.notes);
-    localStorage.setItem(current.key, JSON.stringify({html, base: current.base}));
+    localStorage.setItem(current.key, JSON.stringify({html, base: current.base,syncOrigin:current.syncOrigin}));
     current.scene.html = html;
     dirty = false;
     status.textContent = 'Draft saved on this tablet';
@@ -33,13 +34,13 @@ function save() {
 
 export function storeAnnotatedScene(book,scene,html){
   const draft=readDraft(book,scene);
-  localStorage.setItem(draftKey(book,scene),JSON.stringify({html,base:draft?.base||scene.sha}));
+  localStorage.setItem(draftKey(book,scene),JSON.stringify({html,base:draft?.base||scene.sha,syncOrigin:jsonOrigin(editOrigin(book,scene.path,draft))}));
   scene.html=html;
 }
 
 export function writeScene(book, scene, blockIndex, finished) {
   const previous = readDraft(book, scene);
-  current = {key: draftKey(book, scene), scene, notes:sceneNotes(scene.html), base: previous?.base || scene.sha, finished};
+  current = {syncOrigin:jsonOrigin(editOrigin(book,scene.path,previous)),key: draftKey(book, scene), scene, notes:sceneNotes(scene.html), base: previous?.base || scene.sha, finished};
   dirty = composing = false;
   prose.replaceChildren(inlineFragment(scene.html));
   colourMarks(prose,current.notes);

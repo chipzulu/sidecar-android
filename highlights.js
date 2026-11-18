@@ -1,3 +1,4 @@
+import {editOrigin} from './shared/peer-state.js';
 import {resolveAnnotationConflict} from './annotation-conflict.js';
 import {workKey} from './storage.js';
 import {notePalette} from './note-palette.js';
@@ -206,6 +207,10 @@ export function mountHighlights({reader,viewport,status,onWriting,onEditScene}){
   function key(){return workKey(book,'highlights');}
 
   function persist(next){
+    for(const [id,row] of Object.entries(next)){
+      if(row.note&&row.dirty&&!row.syncOrigin){const origin=rows[id]?.syncOrigin||editOrigin(book,row.note.path,null);const {bytes,contentBase64,...reference}=origin;next[id]={...row,syncOrigin:reference};}
+    }
+
 
     localStorage.setItem(key(),JSON.stringify(next));
 
