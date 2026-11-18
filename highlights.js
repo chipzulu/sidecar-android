@@ -580,7 +580,7 @@ export function mountHighlights({reader,viewport,status,onWriting,onEditScene}){
 
   },true);
 
-  return {load,sceneEdited,beforeRender:()=>{gestures.setMode(null);if(menu.open)menu.close();if(!closePad())return false;resetWritingPosition(viewport);return true;},repaint,async send(inbox){
+  return {load,sceneEdited,prepareSend(){if(!closePad())throw Error('Finish the current pen stroke before sending.');mergeInk();},beforeRender:()=>{gestures.setMode(null);if(menu.open)menu.close();if(!closePad())return false;resetWritingPosition(viewport);return true;},repaint,async send(inbox){
 
     if(!closePad())throw Error('Save the handwriting before sending.');
 

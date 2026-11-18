@@ -1,4 +1,4 @@
-# Story Sidecar Android Reader 0.1.45
+# Story Sidecar Android Reader 0.1.46
 
 ## 0.1.39 — sensitivity and compact Configuration
 
@@ -302,3 +302,8 @@ With BOOX APK 0.1.11, confirmed local saves leave a green mark on the note’s l
 Verified downloaded snapshots now supply a shared base commit and file hashes. New local scene drafts retain original content for later three-way comparison; annotation edits retain their originating scene reference. Older drafts with an unmatched starting hash are marked unknown. Changing repository clears the old shared base without clearing local work. Updates shows the shared commit and local scene-draft count.
 
 Transfers are unchanged: Send updates still sends annotations only. Prose drafts are still local; peer text transfer and conflict resolution come in later steps. No APK update is needed (keep 0.1.11). Existing books and work are retained; no reset or re-download is required.
+
+## 0.1.46 — Send changes (Step 2)
+Send changes now publishes saved prose and inline annotations together, plus annotation records, to the configured book branch. It uses a normal non-force commit and requires Contents read/write permission. Remote changes stop the send; local work stays on the device. Failed or interrupted sends preserve work and support safe retries. Successful sends update the shared base and clear only the captured edits. No APK update (keep 0.1.11).
+
+PC scene receiving comes in Step 3 and is not in this release. Test with a test-book repository: change a short sentence, add a note, send, and inspect the scene HTML and Book/Notes on GitHub. Do not expect the old PC annotation-inbox button to fetch these new scene changes.

@@ -1,3 +1,4 @@
+import {publishPeerChanges,reconcilePublished} from './peer-send.js';
 import {pressureSensitivity} from './pressure.js';
 import {mountLibrary} from './library-view.js';
 import {readerClient,repositoryName} from './api.js';
@@ -42,7 +43,7 @@ function layout(){
   if(lastPageWidth!==fit.page){lastPageWidth=fit.page;clearTimeout(layoutTimer);layoutTimer=setTimeout(repaginate,100);}
 }
 function setOpen(id,open){if(id==='outline'||id==='configuration'){dock=open?id:'';for(const name of ['outline','configuration']){$(name).hidden=dock!==name;$(name+'-toggle').setAttribute('aria-expanded',String(dock===name));}layout();return;}$(id).hidden=!open;if(id!=='connection')$(id+'-toggle').setAttribute('aria-expanded',String(open));layout();}
-$('connection-toggle').onclick=()=>{if(busy||credentialBusy)return;const panel=$('updates-panel');panel.hidden=!panel.hidden;if(!panel.hidden&&snapshot){const drafts=Object.keys(localStorage).filter(k=>k.startsWith('sidecar-book:'+snapshot.id+':draft:')).length;$('peer-status').textContent=(snapshot.syncBase?'Shared base: '+snapshot.syncBase.commit.slice(0,8):'Shared base unknown')+' · '+drafts+' local scene draft(s), including inline annotations. Text transfer is not enabled yet.';}$('connection-toggle').setAttribute('aria-expanded',String(!panel.hidden));};
+$('connection-toggle').onclick=()=>{if(busy||credentialBusy)return;const panel=$('updates-panel');panel.hidden=!panel.hidden;if(!panel.hidden&&snapshot){const drafts=Object.keys(localStorage).filter(k=>k.startsWith('sidecar-book:'+snapshot.id+':draft:')).length;$('peer-status').textContent=(snapshot.syncBase?'Shared base: '+snapshot.syncBase.commit.slice(0,8):'Shared base unknown')+' · '+drafts+' local scene draft(s), including inline annotations. Scene text and annotations are sent together.';}$('connection-toggle').setAttribute('aria-expanded',String(!panel.hidden));};
 $('outline-toggle').onclick=()=>setOpen('outline',$('outline').hidden);
 $('configuration-toggle').onclick=()=>setOpen('configuration',$('configuration').hidden);$('close-panel').onclick=()=>setOpen(dock,false);
 // Closing a panel never consumes the outside action or changes note-edit state.
@@ -161,6 +162,7 @@ function step(direction){
   navigate(index+direction);
   }
 async function openBook(value,resume=true){
+  reconcilePublished(value);
   if(!highlights.beforeRender())throw Error('Save the handwriting before switching books.');
   if(client && clientKey!==JSON.stringify([value.repository,value.branch]))lockGitHub();
   if(coverUrl)URL.revokeObjectURL(coverUrl);coverUrl='';snapshot=value;model=bookModel(value);libraryMode=false;document.body.classList.remove('library-mode');$('library').hidden=true;$('library-toggle').hidden=false;layout();
@@ -201,8 +203,16 @@ $('send-highlights').onclick=async()=>{
   try{
     await targetCredentials(snapshot);
     await credentials.ensure();
-    const count=await highlights.send(client.inbox);if(count)await markBookSent(snapshot);message(count?'Sent '+count+' highlight note(s). On PC choose Get tablet highlights.':'No attached highlight notes waiting to send.');}
-  catch(e){message(e.message,true);}finally{busy=false;controls();}
+    highlights.prepareSend();
+    $('reader').inert=true;
+    const owner=snapshot;
+    await navigator.locks.request('sidecar-peer-send:'+owner.id,async()=>{
+      const result=await publishPeerChanges(owner,client.peer,p=>message('Sending changes: '+p.completed+' / '+p.total));
+      remember();await openBook(result.book);bookUpdates.postMessage('saved');
+      message(result.uploaded?'Sent scene text and annotations to GitHub. Receiving scene changes on PC is not available in this release yet.':'GitHub already matches your saved changes.');
+    });}
+
+  catch(e){message(e.message,true);}finally{$('reader').inert=false;busy=false;controls();}
 };
 async function targetCredentials(book){
  const different=$('repository').value.trim().toLowerCase()!==book.repository.toLowerCase();

@@ -1,3 +1,4 @@
+import {githubBackupClient} from './shared/github-backup.js';
 import {annotationInbox} from './shared/annotation-inbox.js';
 export function repositoryName(value) {
   const name=value.trim().replace(/^https:\/\/github\.com\//i,'').replace(/\/$/,'').replace(/\.git$/,'');
@@ -10,7 +11,7 @@ export async function blobSha(bytes) {
 }
 export function readerClient(repository,branch,token,{fetcher=fetch,signal}={}) {
   let activeSignal=signal;
-  const name=repositoryName(repository);if(!branch.trim())throw Error('Enter a branch, usually main.');if(!token.trim())throw Error('Enter a read-only GitHub token.');
+  const name=repositoryName(repository);if(!branch.trim())throw Error('Enter a branch, usually main.');if(!token.trim())throw Error('Enter a GitHub token. Sending changes requires Contents read/write permission.');
   const credential=token.trim();
   if(/[^!-~]/.test(credential))throw Error('The pasted token contains a space, line break, or unusual character. Copy the token again.');
   async function get(path){
@@ -66,5 +67,5 @@ export function readerClient(repository,branch,token,{fetcher=fetch,signal}={}) 
     return {repository:name,branch,commit:ref.object.sha,downloadedAt:new Date().toISOString(),files};
   }
   async function check(){activeSignal=signal;const repo=await get('');if(!repo.private)throw Error('Use a private book repository.');const ref=await get('/git/ref/heads/'+encodeURIComponent(branch));return ref.object.sha;}
-  return {download,check,inbox:annotationInbox(name,branch,token,fetcher)};
+  return {download,check,peer:githubBackupClient({repository:name,branch},token,{fetcher,signal}),inbox:annotationInbox(name,branch,token,fetcher)};
 }
