@@ -1,3 +1,4 @@
+import {tabletTextAllowed} from './shared/book-workflow.js';
 import {editOrigin,jsonOrigin} from './shared/peer-state.js';
 import {workKey} from './storage.js';
 import {inlineFragment,sceneNotes,annotatedHtml,colourMarks} from './inline-notes.js';
@@ -39,6 +40,7 @@ export function storeAnnotatedScene(book,scene,html){
 }
 
 export function writeScene(book, scene, blockIndex, finished) {
+  if(!tabletTextAllowed(book))throw Error('Manuscript editing is disabled for this book on the tablet.');
   const previous = readDraft(book, scene);
   current = {syncOrigin:jsonOrigin(editOrigin(book,scene.path,previous)),key: draftKey(book, scene), scene, notes:sceneNotes(scene.html), base: previous?.base || scene.sha, finished};
   dirty = composing = false;

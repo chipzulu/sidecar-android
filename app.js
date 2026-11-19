@@ -1,3 +1,4 @@
+import {tabletTextAllowed} from './shared/book-workflow.js';
 import {publishPeerChanges,reconcilePublished,receivePeerBook} from './peer-send.js';
 import {pressureSensitivity} from './pressure.js';
 import {mountLibrary} from './library-view.js';
@@ -18,7 +19,7 @@ const $=id=>document.getElementById(id);
 let libraryMode=true,libraryView,menuBook=null,configBook=null;
 let snapshot=null,model=null,index=-1,coverUrl='',busy=false,credentialBusy=false,client=null,clientKey='',abort=null,disposeCards=()=>{},selectedScene=null,renderRevision=0,rendering=false, replacing=false;
 function message(text,error=false){$('updates-status').textContent=text;if(libraryMode){$('library-error').textContent=text;$('library-error').classList.toggle('error',error);}$('status').textContent=text;$('status').classList.toggle('error',error);}
-const highlights=mountHighlights({reader:$('reader'),viewport:$('manuscript-scroll'),status:message,onEditScene:at=>editScene(at),onWriting:()=>{if(dock)setOpen(dock,false);}});
+const highlights=mountHighlights({reader:$('reader'),viewport:$('manuscript-scroll'),status:message,canEditScene:()=>tabletTextAllowed(snapshot),onEditScene:at=>editScene(at),onWriting:()=>{if(dock)setOpen(dock,false);}});
 function preference(key,value){try{if(value===undefined)return localStorage.getItem('sidecar-reader:'+key);localStorage.setItem('sidecar-reader:'+key,value);}catch{/* Reading remains usable without preferences. */}}
 function remember(){if(snapshot&&!libraryMode&&!rendering&&!replacing)localStorage.setItem(workKey(snapshot,'position'),JSON.stringify({scope:index===-2?'novel':selectedScene?'scene':index===-1?'cover':'chapter',chapter:model.chapters[index]?.key??null,scene:selectedScene,y:$('manuscript-scroll').scrollTop}));}
 let pageWidth=Math.max(280,Number(preference('page-width'))||740),pageLines=Math.max(15,Math.min(60,Number(preference('page-lines'))||28)),cardMode=preference('card-layout')||'none',dock='';
@@ -43,7 +44,7 @@ function layout(){
   if(lastPageWidth!==fit.page){lastPageWidth=fit.page;clearTimeout(layoutTimer);layoutTimer=setTimeout(repaginate,100);}
 }
 function setOpen(id,open){if(id==='outline'||id==='configuration'){dock=open?id:'';for(const name of ['outline','configuration']){$(name).hidden=dock!==name;$(name+'-toggle').setAttribute('aria-expanded',String(dock===name));}layout();return;}$(id).hidden=!open;if(id!=='connection')$(id+'-toggle').setAttribute('aria-expanded',String(open));layout();}
-$('connection-toggle').onclick=()=>{if(busy||credentialBusy)return;const panel=$('updates-panel');panel.hidden=!panel.hidden;if(!panel.hidden&&snapshot){const drafts=Object.keys(localStorage).filter(k=>k.startsWith('sidecar-book:'+snapshot.id+':draft:')).length;$('peer-status').textContent=(snapshot.syncBase?'Shared base: '+snapshot.syncBase.commit.slice(0,8):'Shared base unknown')+' · '+drafts+' local scene draft(s), including inline annotations. Scene text and annotations are sent together.';}$('connection-toggle').setAttribute('aria-expanded',String(!panel.hidden));};
+$('connection-toggle').onclick=()=>{if(busy||credentialBusy)return;const panel=$('updates-panel');panel.hidden=!panel.hidden;if(!panel.hidden&&snapshot){const drafts=Object.keys(localStorage).filter(k=>k.startsWith('sidecar-book:'+snapshot.id+':draft:')).length;$('peer-status').textContent=(snapshot.syncBase?'Shared base: '+snapshot.syncBase.commit.slice(0,8):'Shared base unknown')+' · '+drafts+' local scene draft(s), including inline annotations. '+(tabletTextAllowed(snapshot)?'Scene text and annotations are sent together.':'Annotation-only book. Prose drafts remain local.');}$('connection-toggle').setAttribute('aria-expanded',String(!panel.hidden));};
 $('outline-toggle').onclick=()=>setOpen('outline',$('outline').hidden);
 $('configuration-toggle').onclick=()=>setOpen('configuration',$('configuration').hidden);$('close-panel').onclick=()=>setOpen(dock,false);
 // Closing a panel never consumes the outside action or changes note-edit state.
@@ -140,6 +141,7 @@ async function render(which,scenePath=null,scroll=true,preserve=false){
 let tappedBlock=null;
 $('reader').addEventListener('click',event=>{tappedBlock=event.target.closest('[data-block]');});
 function editScene(at){
+  if(!tabletTextAllowed(snapshot)){message('This book is set to annotations only on the tablet. Existing text drafts are kept.',true);return;}
   if(rendering||busy)return;
   const viewport=$('manuscript-scroll').getBoundingClientRect();
   const visible=node=>node.getBoundingClientRect().bottom>viewport.top&&node.getBoundingClientRect().top<viewport.bottom;
@@ -209,7 +211,7 @@ $('send-highlights').onclick=async()=>{
     await navigator.locks.request('sidecar-peer-send:'+owner.id,async()=>{
       const result=await publishPeerChanges(owner,client.peer,p=>message('Sending changes: '+p.completed+' / '+p.total));
       remember();await openBook(result.book);bookUpdates.postMessage('saved');
-      message(result.uploaded?'Sent scene text and annotations to GitHub. Choose Receive changes on your other device.':'GitHub already matches your saved changes.');
+      message(result.restricted?(result.uploaded?'Annotations sent. ':'No annotation changes to send. ')+result.retainedDrafts+' prose draft(s) remain on this tablet.':result.uploaded?'Sent scene text and annotations to GitHub. Choose Receive changes on your other device.':'GitHub already matches your saved changes.');
     });}
 
   catch(e){message(e.message,true);}finally{$('reader').inert=false;busy=false;controls();}

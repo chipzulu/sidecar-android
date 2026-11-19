@@ -1,4 +1,16 @@
-# Story Sidecar Android Reader 0.1.47
+# Story Sidecar Android Reader 0.1.48
+
+## 0.1.48 — per-book annotation-only workflow
+
+Use PC 0.1.140 with the existing BOOX APK 0.1.11; no APK update is needed. Upload the contents of `site/` to your Reader hosting repository, then use Configuration → About → Check for app update.
+
+On PC, GitHub → Settings → Allow manuscript editing on tablet controls this book. Save settings and Send changes; on the Reader, Receive changes. With editing disabled, Edit scene is hidden, while highlights and handwriting remain available. Existing prose drafts are retained and counted. Send changes sends annotations only in this mode; annotations tied to changed prose are blocked until editing is enabled and the complete scene can be sent. Settings are a workflow restriction, not security.
+
+Normal Send changes and Receive changes exchange scene text and annotations through the shared book branch. Receive preserves independent local changes and refuses conflicting edits without replacing either copy. Refresh from remote remains the explicit replacement operation. Annotation-only sends preserve unreceived remote prose and track a partial base for later full receive.
+
+Test: disable tablet editing on PC, send, receive on Reader, verify Edit scene is absent, add a note, send, and receive on PC. Re-enable editing and repeat the settings transfer to restore Edit scene. Existing offline books, tokens and handwriting are retained.
+
+Automated browser checks pass for restricted sends, retained drafts, annotation tools, full peer send/receive and interrupted-transfer recovery. Physical tablet testing remains necessary.
 
 ## 0.1.39 — sensitivity and compact Configuration
 

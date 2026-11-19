@@ -1,3 +1,5 @@
+import {tabletTextAllowed} from './shared/book-workflow.js';
+import {annotationPaths,selectedFiles,selectedBase,guardAnnotationSend} from './shared/annotation-transfer.js';
 import {gitBlobSha,checkBackupInventory} from './shared/github-backup.js';
 import {peerIdentity,editOrigin,jsonOrigin,fileKind,receivePlan} from './shared/peer-state.js';
 import {encodeNote,noteFilename} from './shared/annotation-brush.js';
@@ -23,12 +25,16 @@ export async function preparePeerSend(book){
 export async function publishPeerChanges(book,client,progress=()=>{}){
  if(await readBookIdentity(book.id)!==bookIdentity(book))throw Error('The offline book changed. Reopen it before sending.');
  reconcilePublished(book);
- const capture=await preparePeerSend(book),remote=await client.inspect();
+ const capture=await preparePeerSend(book),restricted=!tabletTextAllowed(book);
+ const remote=restricted?await client.download(progress,book.files):await client.inspect();
+ let paths=null,files=capture.files,prior={head:book.syncBase.commit};
+ if(restricted){try{paths=annotationPaths(book.syncBase,capture.files);}catch(e){throw Error(e.message.replace('Use the full changes action.','Enable manuscript editing on PC, send the setting and receive it here before sending the complete scene. Your local work is kept.'));}guardAnnotationSend(book.syncBase,capture.files,remote.files,paths);files=selectedFiles(remote.files,capture.files,paths);prior={head:remote.head};}
  // Conservative Step 2: any competing remote commit stops the full snapshot send.
- const result=await client.upload(remote,capture.files,{head:book.syncBase.commit},progress);
+ const result=await client.upload(remote,files,prior,progress);
  if(await readBookIdentity(book.id)!==bookIdentity(book))throw Error('GitHub accepted the snapshot, but this device changed books during sending. Local work was retained. Reopen and check before retrying.');
- const next={...book,files:capture.files,commit:result.head,peerReceipt:{drafts:[...capture.drafts],notes:[...capture.notes]}};await saveBook(next,{sent:true});
- reconcilePublished(next);return {book:next,uploaded:result.uploaded,scenes:capture.drafts.size,annotations:capture.notes.size};
+ const base=restricted?selectedBase(book.syncBase,book.repository,book.branch,result.head,files,paths):null;
+ const next={...book,files:restricted?selectedFiles(book.files,files,paths):files,commit:base?base.commit:result.head,peerReceipt:{drafts:[...capture.drafts].filter(([path])=>!paths||paths.has(path)),notes:[...capture.notes].filter(([id])=>!paths||paths.has('Book/Notes/'+noteFilename(id)))}};await saveBook(next,{sent:true,base});
+ reconcilePublished(next);return {book:next,uploaded:result.uploaded,scenes:capture.drafts.size,annotations:capture.notes.size,restricted,retainedDrafts:restricted?[...capture.drafts.keys()].filter(path=>!paths.has(path)).length:0};
 }
 
 export function reconcilePublished(next){

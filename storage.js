@@ -45,12 +45,12 @@ export async function readBook(id){const d=await db();id ||= await request(d.tra
 export async function readBookIdentity(id){return bookIdentity(await readBook(id));}
 export async function findBook(repository,branch){const d=await db(),row=await request(d.transaction('library').objectStore('library').index('remote').get(connection({repository,branch}).key));return row?readBook(row.id):undefined;}
 export async function selectBook(id){const d=await db(),tx=d.transaction(['library','meta'],'readwrite'),done=completed(tx);const r=tx.objectStore('library').get(id);r.onsuccess=()=>{if(!r.result){tx.abort();return;}tx.objectStore('meta').put(id,'active');};await done;return readBook(id);}
-export async function saveBook(book,{sent=false}={}){
+export async function saveBook(book,{sent=false,base=null}={}){
  const d=await db(),c=connection(book),tx=d.transaction(['library','snapshots','meta','connections'],'readwrite'),done=completed(tx),store=tx.objectStore('library');let saved;
  const get=store.index('remote').get(c.key);
  get.onsuccess=()=>{
   const previous=get.result,id=previous?.id||crypto.randomUUID(),now=new Date().toISOString();
-  saved={...book,id,revision:crypto.randomUUID(),syncDetached:false,syncBase:sharedBase(book.repository,book.branch,book.commit,book.files)};
+  saved={...book,id,revision:crypto.randomUUID(),syncDetached:false,syncBase:base||sharedBase(book.repository,book.branch,book.commit,book.files)};
   store.put({id,remote:c.key,connection:c,title:book.title||previous?.title||book.repository,createdAt:previous?.createdAt||now,lastReceivedAt:sent?(previous?.lastReceivedAt||null):now,lastSentAt:sent?now:(previous?.lastSentAt||null)});
   tx.objectStore('snapshots').put(saved,id);tx.objectStore('meta').put(id,'active');tx.objectStore('connections').put(c);tx.objectStore('meta').put(c.key,'lastConnection');
  };

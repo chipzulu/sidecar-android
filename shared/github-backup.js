@@ -79,7 +79,7 @@ export function githubBackupClient(config, token, {fetcher=fetch, signal}={}) {
     catch {throw new Error(signal?.aborted?'Backup cancelled.':'GitHub connection failed. No upload is confirmed; reconnect and retry safely.');}
     if(!response.ok) {
       const errors={401:'Token expired or invalid.',403:'GitHub denied access or rate limited the request. Check token permissions.',404:'Repository or branch not found, or token cannot access it. Create the private repository with a README first.',409:'GitHub changed or cannot accept this commit. No force overwrite was attempted.',422:'GitHub refused the update. The branch may have changed or be protected.'};
-      throw new Error(errors[response.status] || `GitHub returned HTTP ${response.status}.`);
+      const error=new Error(errors[response.status] || `GitHub returned HTTP ${response.status}.`);error.status=response.status;throw error;
     }
     return response.json();
   }

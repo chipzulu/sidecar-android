@@ -16,7 +16,7 @@ import {decodeNote,encodeNote,isHighlightFile,noteFilename,selectionAnchor} from
 
 
 
-export function mountHighlights({reader,viewport,status,onWriting,onEditScene}){
+export function mountHighlights({reader,viewport,status,onWriting,onEditScene,canEditScene=()=>true}){
 
   const $=id=>document.getElementById(id);
 
@@ -505,7 +505,7 @@ export function mountHighlights({reader,viewport,status,onWriting,onEditScene}){
       });
       if(!minimal)add('More space',()=>{if(editingId!==noteId)openWriting(rows[noteId].note);pad?.more();});
     }else if(at){
-      add('Edit scene',()=>{if(closePad()){repaint();onEditScene?.(at);}});
+      if(canEditScene())add('Edit scene',()=>{if(closePad()){repaint();onEditScene?.(at);}});
       add('Add note here',()=>{const anchor=selectionAnchor(at.path,roots(at.path),at.range);if(anchor)apply({...anchor,anchorKind:'point'});});
       add('Highlight and annotate',()=>{if(!closePad())return;stopPicking();gestures.setMode('note');status('Draw across the words to highlight and annotate. Tap without dragging to cancel.');});
       add('Highlight only',()=>{if(!closePad())return;stopPicking();gestures.setMode('highlight');status('Draw across the words to highlight. Tap without dragging to cancel.');});
