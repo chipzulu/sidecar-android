@@ -95,3 +95,5 @@ body.library-mode #connection-toggle{display:none}
 body.resizing-page #right-panel{visibility:hidden;pointer-events:none}
 #width-feedback{position:fixed;top:90px;left:50%;transform:translateX(-50%);z-index:20;background:#345346;color:#fff;padding:7px 12px;border-radius:6px;font:13px system-ui;pointer-events:none}
 body.library-mode #width-handle,body.library-mode #width-feedback{display:none!important}
+
+.ink-recognition{width:min(650px,90vw);max-height:85vh;box-sizing:border-box}.ink-recognition textarea{width:100%;height:40vh;box-sizing:border-box;font:inherit;resize:vertical}.ink-recognition::backdrop{background:#0005}

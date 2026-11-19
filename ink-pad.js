@@ -91,8 +91,8 @@ export function inkPad(host, initial, save, inputFactory=adaptiveInkInput, {quie
   button('Undo stroke',()=>{if(history.length)ink=history.pop();else if(ink.strokes.length)ink={...ink,strokes:ink.strokes.slice(0,-1),strokeWidths:widths().slice(0,-1)};else return;redraw();checkpoint();});
   button('More space',()=>{remember();ink={...ink,height:Math.min(12000,ink.height+200)};svg.setAttribute('viewBox','0 0 800 '+ink.height);checkpoint();});
   button('Clear handwriting',()=>{if(!ink.strokes.length||!confirm('Clear the handwriting in this annotation?'))return;remember();ink={version:1,width:800,height:300,strokes:[]};redraw();checkpoint();});
-  function finish(){if(input.finish()===false){message("Finish the pen stroke before closing this note.");return false;}return flush();}
+  function finish(){if(input?.finish()===false){message("Finish the pen stroke before closing this note.");return false;}return flush();}
   const hidden=()=>{if(document.hidden)finish();};
   window.addEventListener('pagehide',finish);document.addEventListener('visibilitychange',hidden);
-  return {save:finish,tool:()=>mode,setTool,undo:()=>actions['Undo stroke'](),more:()=>actions['More space'](),clear:()=>actions['Clear handwriting'](),dispose(){clearTimeout(timer);input.dispose();window.removeEventListener('pagehide',finish);document.removeEventListener('visibilitychange',hidden);}};
+  return {snapshot:()=>finish()?structuredClone(ink):null,suspend(){input?.dispose();input=null;},resume(){if(!input)setTool(mode);},save:finish,tool:()=>mode,setTool,undo:()=>actions['Undo stroke'](),more:()=>actions['More space'](),clear:()=>actions['Clear handwriting'](),dispose(){clearTimeout(timer);input?.dispose();window.removeEventListener('pagehide',finish);document.removeEventListener('visibilitychange',hidden);}};
 }

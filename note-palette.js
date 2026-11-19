@@ -1,6 +1,6 @@
 const ns='http://www.w3.org/2000/svg';
 const paths={Pen:'M4 20l4-1 12-12-5-5L3 14z M13 4l5 5 M4 14l5 5',Eraser:'M3 14L13 4a2 2 0 0 1 3 0l5 5a2 2 0 0 1 0 3l-8 8H8z M7 10l10 10 M13 20h9',Undo:'M9 5L3 11l6 6 M3 11h11a6 6 0 0 1 0 12',More:'M4 12h.1 M12 12h.1 M20 12h.1'};
-export function notePalette({anchor,tool,setTool,undo,moreSpace,accept,more,onError}){
+export function notePalette({anchor,tool,setTool,undo,moreSpace,accept,convert,more,onError}){
  const root=document.createElement('div');root.className='note-palette';root.setAttribute('role','toolbar');root.setAttribute('aria-label','Handwriting tools');
  const handle=document.createElement('button');handle.type='button';handle.className='palette-handle';handle.textContent='⠿';handle.title='Move tools (drag or arrow keys)';handle.setAttribute('aria-label','Move handwriting tools');root.append(handle);
  const buttons={};
@@ -10,7 +10,7 @@ export function notePalette({anchor,tool,setTool,undo,moreSpace,accept,more,onEr
   b.onclick=()=>{try{action(b);refresh();}catch(e){onError?.(e.message,true);}};root.append(b);buttons[label]=b;
  }
  button('Pen','Pen',()=>setTool('pen'));button('Eraser','Eraser',()=>setTool('eraser'));
- button('Undo','Undo',undo);button('More space','+',moreSpace);button('Accept edit','✓',accept);
+ button('Undo','Undo',undo);if(convert)button('Convert to text','Aa',convert);button('More space','+',moreSpace);button('Accept edit','✓',accept);
  button('More note actions','⋯',b=>{const r=b.getBoundingClientRect();more(r.left,r.bottom);});
  document.body.append(root);
  let x=0,y=0,vertical=false,drag=null,saved=null;

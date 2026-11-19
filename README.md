@@ -1,4 +1,14 @@
-# Story Sidecar Android Reader 0.1.48
+# Story Sidecar Android Reader 0.1.49
+
+## 0.1.49 — BOOX Convert to text test
+
+Use BOOX APK **0.1.12**. The floating handwriting toolbar has an **Aa / Convert to text** button. Write a short English phrase, lift the pen, then press Aa. A dialog shows the recognized text with Copy and Close. Closing resumes note editing; the handwriting is retained unchanged. Nothing is inserted into the manuscript. Existing notes can be tested too.
+
+Conversion uses the BOOX device's local recognition service through the APK. This first test supports English (en_US); ensure English handwriting recognition works in native BOOX Notes first. The browser and old APKs show an explanatory message. Unsupported firmware, empty notes and recognition failures are reported without deleting ink. A request times out rather than leaving the dialog waiting indefinitely.
+
+Install: upload the contents of site/ to your Reader GitHub Pages repository. Install BOOX APK 0.1.12 over the current app, without uninstalling or clearing data. In Configuration → About, check for the Reader update. Confirm Reader 0.1.49 and BOOX 0.1.12.
+
+Tests pass for the simulated bridge, result/error/unsupported cases, native pen reconnection, retained ink after reopening, and existing handwriting workflow. Recognition accuracy and service compatibility require a real BOOX test. The recognition service is undocumented, using the Apache-2.0 AragoniteHWR adapter; it is not a supported public BOOX API.
 
 ## 0.1.48 — per-book annotation-only workflow
 

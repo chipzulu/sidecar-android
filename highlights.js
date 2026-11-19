@@ -1,3 +1,4 @@
+import {showRecognition} from './ink-recognition.js';
 import {editOrigin} from './shared/peer-state.js';
 import {resolveAnnotationConflict} from './annotation-conflict.js';
 import {workKey} from './storage.js';
@@ -135,7 +136,11 @@ export function mountHighlights({reader,viewport,status,onWriting,onEditScene,ca
       persist({...rows,[note.id]:{...old,note:next,inline:true,dirty:true,needsInline:true}});
     },undefined,{quiet:true,onHold:()=>{if(!box.isConnected||editingId!==note.id)return;const r=box.getBoundingClientRect();showMenu(r.right-20,r.top+20,null,note.id);}});
     positionWritingNote(box,viewport,reader);
-    palette=notePalette({anchor:box,tool:()=>pad?.tool(),setTool:value=>pad?.setTool(value),undo:()=>pad?.undo(),moreSpace:()=>pad?.more(),accept:()=>{if(closePad())repaint();},more:(x,y)=>showMenu(x,y,null,note.id,true),onError:status});
+    palette=notePalette({anchor:box,convert:()=>{
+      const current=pad,ink=current?.snapshot();if(!ink)return;
+      current.suspend();
+      showRecognition(ink).finally(()=>{if(pad===current&&box.isConnected)current.resume();});
+    },tool:()=>pad?.tool(),setTool:value=>pad?.setTool(value),undo:()=>pad?.undo(),moreSpace:()=>pad?.more(),accept:()=>{if(closePad())repaint();},more:(x,y)=>showMenu(x,y,null,note.id,true),onError:status});
   }
   // Palm contacts on surrounding prose must not finish or switch the active note.
   for(const type of ['pointerdown','click','contextmenu'])reader.addEventListener(type,e=>{
