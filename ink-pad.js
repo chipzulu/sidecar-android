@@ -1,5 +1,5 @@
 import {pressureSensitivity,DEFAULT_SENSITIVITY} from './pressure.js';
-import {inkSvg,appendStroke,validInk} from './shared/annotation-ink.js';
+import {inkSvg,appendStroke,validInk,MAX_INK_POINTS,MAX_INK_STROKES} from './shared/annotation-ink.js';
 import {adaptiveInkInput} from './ink-native.js';
 import {eraserInput,strokeTouchesSweep,eraserSweep,prepareStroke} from './ink-eraser.js';
 
@@ -33,7 +33,7 @@ export function inkPad(host, initial, save, inputFactory=adaptiveInkInput, {quie
       element?.remove();setTimeout(()=>onHold(),0);return true;
     }
     // Validate only the incoming stroke; existing strokes were validated on entry.
-    if(ink.strokes.length>=2000||count+points.length>24000){message('This note is full. Start another annotation.');return false;}
+    if(ink.strokes.length>=MAX_INK_STROKES||count+points.length>MAX_INK_POINTS){message('This note is full. Start another annotation.');return false;}
     if(!validInk({version:1,width:800,height:ink.height,strokes:[points],strokeWidths:[penWidth]})){message('Stroke could not be saved: invalid ink coordinates or width.');return false;}
 
     remember();
@@ -53,7 +53,7 @@ export function inkPad(host, initial, save, inputFactory=adaptiveInkInput, {quie
     if(input?.active()||!['pen','eraser'].includes(next))return false;
     if(input&&next===mode)return true;
     input?.dispose();mode=next;host.dataset.inkTool=mode;
-    if(mode==='pen')input=inputFactory(svg,{width:()=>penWidth,pressure:()=>pressure,sensitivity:()=>sensitivity,isSaved:()=>!failed,height:()=>ink.height,remaining:()=>ink.strokes.length>=2000?0:24000-count,begin:(source)=>{nativeStroke=source?.native===true;started=performance.now();clearTimeout(timer);},complete});
+    if(mode==='pen')input=inputFactory(svg,{width:()=>penWidth,pressure:()=>pressure,sensitivity:()=>sensitivity,isSaved:()=>!failed,height:()=>ink.height,remaining:()=>ink.strokes.length>=MAX_INK_STROKES?0:MAX_INK_POINTS-count,begin:(source)=>{nativeStroke=source?.native===true;started=performance.now();clearTimeout(timer);},complete});
     else {ink.strokes.forEach(prepareStroke);let erasingGesture=false,dirty=null;const erase={
       begin(){eraseStart=null;eraseLines=[...svg.querySelectorAll('.ink-stroke')];clearTimeout(timer);},
       sweep(a,b,r){

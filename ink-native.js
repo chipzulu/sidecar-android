@@ -11,6 +11,7 @@ export function adaptiveInkInput(svg, callbacks, {tool='pen',browserFactory=brow
   window.sidecarInkDiagnostic=diagnostic;
   function reject(reason){diagnostic.rejected++;diagnostic.last=reason;badge.textContent='Handwriting not accepted: '+reason;}
 
+  let capacityBlocked=false;
   let fallback=null,ready=false,disposed=false,busy=false,frame=0,last='',gesture=null,lastBatch=0;
   const received=new Set(),awaitingSave=new Set();
   const strip=document.createElementNS('http://www.w3.org/2000/svg','rect');
@@ -48,7 +49,7 @@ export function adaptiveInkInput(svg, callbacks, {tool='pen',browserFactory=brow
     for(const el of document.querySelectorAll('button,input,textarea,select,a,[role="button"],dialog[open],header,.note-palette,#right-panel:not([hidden]),#connection:not([hidden]),#updates-panel:not([hidden])')){
       const b=el.getBoundingClientRect();if(b.width&&b.height)exclude.push([b.left,b.top,b.right,b.bottom]);
     }
-    const enabled=!document.hidden&&!document.querySelector('dialog[open],.note-palette.dragging')&&(visualViewport?.scale||1)===1&&right>left&&bottom>top&&callbacks.remaining()>0;
+    const enabled=!capacityBlocked&&!document.hidden&&!document.querySelector('dialog[open],.note-palette.dragging')&&(visualViewport?.scale||1)===1&&right>left&&bottom>top&&callbacks.remaining()>0;
     const next={saveReceipts:!!callbacks.isSaved,viewportWidth:innerWidth,rect:[r.left,r.top,r.right,r.bottom],limit:[left,top,right,bottom],exclude,pressurePoints:!erasing&&!!callbacks.pressure?.(),width:(callbacks.width?.()??2.5)*r.width/800,color:'#31483b',tool,eraseRadius:18,liveErase:erasing&&!!callbacks.progress,enabled};
     const encoded=JSON.stringify(next);
     if(encoded===last)return;
@@ -99,7 +100,7 @@ export function adaptiveInkInput(svg, callbacks, {tool='pen',browserFactory=brow
       if(!mapped){reject('Native coordinates could not be converted');send('ack',{id});return;}
       try{
         if((msg.tool||'pen')!==tool)reject('Stroke arrived for a different tool');
-        else if(mapped.points.length>callbacks.remaining())reject('Note point limit reached');
+        else if(mapped.points.length>callbacks.remaining()){capacityBlocked=true;reject('Note capacity reached. This stroke was not saved. Use another note or erase some handwriting.');schedule();}
         else if(callbacks.complete(mapped.points,undefined,{radius:mapped.radius})===false)reject('Note rejected stroke; check the message below the note');
         else {awaitingSave.add(id);confirmSaved();diagnostic.accepted++;diagnostic.last='Accepted '+mapped.points.length+' points';}
       }catch(error){reject(error.message||'Stroke handling failed');}

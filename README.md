@@ -1,4 +1,20 @@
-# Story Sidecar Android Reader 0.1.49
+# Story Sidecar Android Reader 0.1.51
+
+## 0.1.51 — recognition progress and timeout diagnosis
+
+Pair with BOOX APK 0.1.15; PC remains 0.1.141. The Aa dialog now reports Connecting, Initializing English recognition, and Converting handwriting. Each stage has bounded waiting and a specific failure message. Progress updates keep the dialog listening for the final result. Handwriting is unchanged on failure.
+
+The user confirmed native writing on Note Max after APK 0.1.14, but recognition times out even on a short note. This release diagnoses that failure; it is not yet a confirmed recognition fix. Try English conversion in BOOX Notes, then “Hello world” in Sidecar and report the exact final error.
+
+
+Validation: large-note transfer round trip (240,000 points), browser conversion/reopen beyond the former limit, and capacity rejection without false save acknowledgement pass. Device performance at maximum size remains to be checked.
+
+## 0.1.50 — larger handwritten notes
+
+Each note now accepts 240,000 points and 20,000 strokes, ten times the former limit. Use PC 0.1.141 and BOOX APK 0.1.13 so transfer/display and conversion accept the same capacity. Existing saved notes need no migration. Individual native pen gestures retain their existing 24,000-point limit; this release increases the total note capacity.
+
+If a stroke exceeds the remaining note capacity, native capture stops with an explicit message instead of continuing to accept unsavable strokes. Rejected strokes are not falsely marked saved. Strokes rejected by the previous release are not recovered by this update. Normal device-storage limits still apply.
+
 
 ## 0.1.49 — BOOX Convert to text test
 

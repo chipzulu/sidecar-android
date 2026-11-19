@@ -18,12 +18,14 @@ export function showRecognition(ink) {
   bridge.onmessage=event=>{
    if(finished)return;
    let result;try{result=JSON.parse(event.data);}catch{return;}
-   if(result.id!==id)return;cleanup();
+   if(result.id!==id)return;
+   if(typeof result.stage==='string'){status.textContent=result.stage+'… Your handwriting is unchanged.';return;}
+   cleanup();
    if(result.error){status.textContent=result.error;return;}
    text.value=typeof result.text==='string'?result.text:'';text.hidden=false;copy.disabled=!text.value;
    status.textContent=text.value?'English recognition · handwriting unchanged.':'No text was recognized. Your handwriting is unchanged.';
   };
-  timer=setTimeout(()=>{cleanup();status.textContent='Recognition did not respond. Your handwriting is unchanged. Close and try again.';},30000);
+  timer=setTimeout(()=>{cleanup();status.textContent='Recognition did not respond. Your handwriting is unchanged. Close and try again.';},45000);
   try{bridge.postMessage(JSON.stringify({id,ink}));}catch{cleanup();status.textContent='Could not start BOOX recognition. Your handwriting is unchanged.';}
  });
 }

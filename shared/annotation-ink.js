@@ -1,13 +1,14 @@
+export const MAX_INK_POINTS=240000, MAX_INK_STROKES=20000;
 const namespace = 'http://www.w3.org/2000/svg';
 export function validInk(ink) {
   if (ink === undefined) return true;
   if (!ink || ink.version !== 1 || ink.width !== 800 ||
       !Number.isFinite(ink.height) || ink.height < 80 || ink.height > 12000 ||
-      !Array.isArray(ink.strokes) || ink.strokes.length > 2000) return false;
+      !Array.isArray(ink.strokes) || ink.strokes.length > MAX_INK_STROKES) return false;
   if (ink.strokeWidths !== undefined && (!Array.isArray(ink.strokeWidths) || ink.strokeWidths.length !== ink.strokes.length || !ink.strokeWidths.every(w => Number.isFinite(w) && w >= 1 && w <= 12))) return false;
   let points = 0;
   return ink.strokes.every(stroke => Array.isArray(stroke) && stroke.length > 0 &&
-    (points += stroke.length) <= 24000 && stroke.every(p => Array.isArray(p) && (p.length === 2 || (p.length === 3 && Number.isFinite(p[2]) && p[2] >= 0 && p[2] <= 1)) &&
+    (points += stroke.length) <= MAX_INK_POINTS && stroke.every(p => Array.isArray(p) && (p.length === 2 || (p.length === 3 && Number.isFinite(p[2]) && p[2] >= 0 && p[2] <= 1)) &&
       Number.isFinite(p[0]) && Number.isFinite(p[1]) && p[0] >= 0 && p[0] <= 800 && p[1] >= 0 && p[1] <= ink.height));
 }
 export function inkSvg(ink) {
