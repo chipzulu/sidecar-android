@@ -1,3 +1,5 @@
+import {allBlocks,newBlock,anchorIndex,appendDraftBlocks,finishAssimilation} from './draft-blocks.js';
+import {draftDialog,openBooxNotes} from './converted-ui.js';
 import {tabletTextAllowed} from './shared/book-workflow.js';
 import {publishPeerChanges,reconcilePublished,receivePeerBook} from './peer-send.js';
 import {pressureSensitivity} from './pressure.js';
@@ -12,14 +14,14 @@ import {fitLayout} from './layout.js';
 import {paginate} from './pages.js';
 import {mountCards} from './cards.js';
 import {mountCredentials} from './credentials-ui.js';
-import {readDraft, writeScene} from './writing.js';
+import {readDraft, writeScene, storeAnnotatedScene} from './writing.js';
 import {mountHighlights} from './highlights.js';
 try{await libraryReady;}catch(error){document.getElementById("status").textContent=error.message;throw error;}
 const $=id=>document.getElementById(id);
 let libraryMode=true,libraryView,menuBook=null,configBook=null;
 let snapshot=null,model=null,index=-1,coverUrl='',busy=false,credentialBusy=false,client=null,clientKey='',abort=null,disposeCards=()=>{},selectedScene=null,renderRevision=0,rendering=false, replacing=false;
 function message(text,error=false){$('updates-status').textContent=text;if(libraryMode){$('library-error').textContent=text;$('library-error').classList.toggle('error',error);}$('status').textContent=text;$('status').classList.toggle('error',error);}
-const highlights=mountHighlights({reader:$('reader'),viewport:$('manuscript-scroll'),status:message,canEditScene:()=>tabletTextAllowed(snapshot),onEditScene:at=>editScene(at),onWriting:()=>{if(dock)setOpen(dock,false);}});
+const highlights=mountHighlights({reader:$('reader'),viewport:$('manuscript-scroll'),status:message,canEditScene:()=>tabletTextAllowed(snapshot),onEditScene:at=>editScene(at),onConvertedDraft:at=>convertedDraft(at),onWriting:()=>{if(dock)setOpen(dock,false);}});
 function preference(key,value){try{if(value===undefined)return localStorage.getItem('sidecar-reader:'+key);localStorage.setItem('sidecar-reader:'+key,value);}catch{/* Reading remains usable without preferences. */}}
 function remember(){if(snapshot&&!libraryMode&&!rendering&&!replacing)localStorage.setItem(workKey(snapshot,'position'),JSON.stringify({scope:index===-2?'novel':selectedScene?'scene':index===-1?'cover':'chapter',chapter:model.chapters[index]?.key??null,scene:selectedScene,y:$('manuscript-scroll').scrollTop}));}
 let pageWidth=Math.max(280,Number(preference('page-width'))||740),pageLines=Math.max(15,Math.min(60,Number(preference('page-lines'))||28)),cardMode=preference('card-layout')||'none',dock='';
@@ -89,14 +91,16 @@ function chapterSource(chapter,scenePath){
     if(!scenePath&&heading.title)source.append(element('h1',heading.title,'chapter-title'));
     if(!scenePath&&heading.subtitle)source.append(element('p',heading.subtitle,'chapter-subtitle'));
     const scenes=scenePath?chapter.scenes.filter(scene=>scene.path===scenePath):chapter.scenes;
+    const pending=Object.values(allBlocks(snapshot)).filter(r=>r.state==='pending'&&!r.transaction);
     for(const [n,scene] of scenes.entries()){
       if(n)source.append(element('div','* * *','scene-break'));
       const subtitle=sceneHeadingParts(scene.filename).subtitle;if(subtitle){const h=element('h2',subtitle,'scene-subtitle');h.dataset.scene=scene.path;source.append(h);}
+      const draftRows=pending.filter(r=>r.path===scene.path).map(r=>({...r,index:anchorIndex(scene,r)}));
       const prose=element('div',undefined,'scene');prose.append(inlineFragment(scene.html));colourMarks(prose,sceneNotes(scene.html));
       convertItalicMarkers(prose,'decode');let group=null;
       for(const [blockIndex,block] of [...prose.children].entries()){block.dataset.block=String(blockIndex);const marker=keepMarker(block.textContent);if(marker){if(marker==='start'){group=element('div',undefined,'keep-unit');group.dataset.scene=scene.path;source.append(group);}else group=null;continue;}
         block.dataset.scene=scene.path;if(block.tagName==='BLOCKQUOTE'){block.classList.add('quote-unit');for(const p of block.children){p.dataset.block=String(blockIndex);p.classList.add('quote-line');p.dataset.scene=scene.path;}}
-        (group||source).append(block);}
+        (group||source).append(block);appendDraftBlocks(group||source,draftRows,blockIndex);}
     }
     return source;
 }
@@ -140,6 +144,38 @@ async function render(which,scenePath=null,scroll=true,preserve=false){
 }
 let tappedBlock=null;
 $('reader').addEventListener('click',event=>{tappedBlock=event.target.closest('[data-block]');});
+function convertedDraft(at){
+  if(!snapshot||busy||rendering||!tabletTextAllowed(snapshot)||!highlights.beforeRender())return;
+  try{
+    const target=at?.range?.startContainer;
+    const block=(target?.nodeType===3?target.parentElement:target)?.closest('[data-block]');
+    const scene=model.chapters.flatMap(c=>c.scenes).find(s=>s.path===at?.path);
+    if(!scene||!block)throw Error('Choose a manuscript paragraph first.');
+    showConverted(scene,newBlock(snapshot,scene,Number(block.dataset.block)));
+  }catch(e){message(e.message,true);}
+}
+function showConverted(scene,row){
+  if(!tabletTextAllowed(snapshot)){message('This book is set to annotations only.',true);return;}
+  if(row.transaction){try{finishAssimilation(snapshot,scene,row,storeAnnotatedScene);repaginate();return;}catch(e){message(e.message,true);return;}}
+  draftDialog(snapshot,scene,row,()=>{highlights.sceneEdited(scene);repaginate();});
+}
+$('reader').addEventListener('click',event=>{
+ const block=event.target.closest('[data-converted-draft]');if(!block||busy||rendering||!highlights.beforeRender())return;
+ const row=allBlocks(snapshot)[block.dataset.convertedDraft],scene=model.chapters.flatMap(c=>c.scenes).find(s=>s.path===row?.path);
+ if(scene)showConverted(scene,row);
+});
+$('reader').addEventListener('keydown',event=>{if(event.target.matches('[data-converted-draft]')&&['Enter',' '].includes(event.key)){event.preventDefault();event.target.click();}});
+$('converted-drafts-open').onclick=()=>{
+ if(!snapshot||busy||rendering||!highlights.beforeRender())return;
+ const dialog=document.createElement('dialog');dialog.className='converted-draft-dialog';
+ const heading=element('h2','BOOX Notes companion');dialog.append(heading);
+ dialog.append(element('p','Use Android split screen with Sidecar on the left and BOOX Notes on the right. Convert handwriting in Notes, copy it, then hold a manuscript paragraph and choose Paste converted draft after here.'));
+ const open=element('button','Open BOOX Notes');const status=element('p');status.setAttribute('role','status');open.onclick=()=>openBooxNotes(text=>status.textContent=text);dialog.append(open,status);
+ const rows=Object.values(allBlocks(snapshot)).filter(r=>r.state==='pending');
+ if(!rows.length)dialog.append(element('p','No unassimilated drafts in this book.'));
+ for(const row of rows){const scene=model.chapters.flatMap(c=>c.scenes).find(s=>s.path===row.path);const button=element('button',(row.notebook||'Unnamed notebook')+' — '+(scene?.name||'Missing scene')+(scene&&anchorIndex(scene,row)<0?' · insertion point changed':''));button.onclick=()=>{if(!scene){status.textContent='The original scene is missing. Draft text: '+row.text;return;}dialog.close();showConverted(scene,row);};dialog.append(button);}
+ const close=element('button','Close');close.onclick=()=>dialog.close();dialog.append(close);dialog.onclose=()=>dialog.remove();document.body.append(dialog);dialog.showModal();
+};
 function editScene(at){
   if(!tabletTextAllowed(snapshot)){message('This book is set to annotations only on the tablet. Existing text drafts are kept.',true);return;}
   if(rendering||busy)return;

@@ -1,3 +1,4 @@
+import {localBlocks,draftBlockPath,encodeBlock,reconcileBlocks} from './draft-blocks.js';
 import {tabletTextAllowed} from './shared/book-workflow.js';
 import {annotationPaths,selectedFiles,selectedBase,guardAnnotationSend} from './shared/annotation-transfer.js';
 import {gitBlobSha,checkBackupInventory} from './shared/github-backup.js';
@@ -19,8 +20,13 @@ export async function preparePeerSend(book){
   const path='Book/Notes/'+noteFilename(id),bytes=new TextEncoder().encode(encodeNote(row.note));
   files.set(path,{path,bytes,sha:await gitBlobSha(bytes)});notes.set(id,structuredClone(row.note));
  }
+ const blocks=new Map(Object.entries(localBlocks(book)));
+ for(const [id,row] of blocks){
+  if(row.transaction)throw Error('Finish the pending converted-draft assimilation before sending or receiving. Open it under Configuration → BOOX Notes / converted drafts.');
+  const path=draftBlockPath(id),bytes=new TextEncoder().encode(encodeBlock(row));files.set(path,{path,bytes,sha:await gitBlobSha(bytes)});
+ }
  const captured=[...files.values()].map(f=>({...f,size:f.bytes.length}));checkBackupInventory(captured);
- return {files:captured,drafts,notes};
+ return {files:captured,drafts,notes,blocks};
 }
 export async function publishPeerChanges(book,client,progress=()=>{}){
  if(await readBookIdentity(book.id)!==bookIdentity(book))throw Error('The offline book changed. Reopen it before sending.');
@@ -33,12 +39,12 @@ export async function publishPeerChanges(book,client,progress=()=>{}){
  const result=await client.upload(remote,files,prior,progress);
  if(await readBookIdentity(book.id)!==bookIdentity(book))throw Error('GitHub accepted the snapshot, but this device changed books during sending. Local work was retained. Reopen and check before retrying.');
  const base=restricted?selectedBase(book.syncBase,book.repository,book.branch,result.head,files,paths):null;
- const next={...book,files:restricted?selectedFiles(book.files,files,paths):files,commit:base?base.commit:result.head,peerReceipt:{drafts:[...capture.drafts].filter(([path])=>!paths||paths.has(path)),notes:[...capture.notes].filter(([id])=>!paths||paths.has('Book/Notes/'+noteFilename(id)))}};await saveBook(next,{sent:true,base});
+ const next={...book,files:restricted?selectedFiles(book.files,files,paths):files,commit:base?base.commit:result.head,peerReceipt:{blocks:[...capture.blocks].filter(([id])=>!paths||paths.has(draftBlockPath(id))),drafts:[...capture.drafts].filter(([path])=>!paths||paths.has(path)),notes:[...capture.notes].filter(([id])=>!paths||paths.has('Book/Notes/'+noteFilename(id)))}};await saveBook(next,{sent:true,base});
  reconcilePublished(next);return {book:next,uploaded:result.uploaded,scenes:capture.drafts.size,annotations:capture.notes.size,restricted,retainedDrafts:restricted?[...capture.drafts.keys()].filter(path=>!paths.has(path)).length:0};
 }
 
 export function reconcilePublished(next){
- const receipt=next.peerReceipt;if(!receipt)return;
+ const receipt=next.peerReceipt;if(!receipt)return;reconcileBlocks(next,receipt.blocks);
  for(const [path,draft] of receipt.drafts){
   const key=workKey(next,'draft',path),latest=JSON.parse(localStorage.getItem(key)||'null');if(!latest)continue;
   if(JSON.stringify(latest)===JSON.stringify(draft))localStorage.removeItem(key);
@@ -58,7 +64,7 @@ export async function receivePeerBook(previous,incoming){
  const local=await preparePeerSend(previous),plan=receivePlan(previous.syncBase,previous.repository,previous.branch,local.files,incoming.files);
  if(plan.conflicts.length)throw Error('Receive stopped. Both copies changed these files: '+plan.conflicts.join('; ')+'. No local files or drafts were changed. Comparison is not available yet.');
  const remote=new Map(incoming.files.map(f=>[f.path,f.sha])),current=new Map(local.files.map(f=>[f.path,f.sha]));
- incoming.peerReceipt={drafts:[...local.drafts].filter(([path])=>current.get(path)===remote.get(path)),notes:[...local.notes].filter(([id])=>{const path='Book/Notes/'+noteFilename(id);return current.get(path)===remote.get(path);})};
+ incoming.peerReceipt={blocks:[...local.blocks].filter(([id])=>current.get(draftBlockPath(id))===remote.get(draftBlockPath(id))),drafts:[...local.drafts].filter(([path])=>current.get(path)===remote.get(path)),notes:[...local.notes].filter(([id])=>{const path='Book/Notes/'+noteFilename(id);return current.get(path)===remote.get(path);})};
  await saveBook(incoming);reconcilePublished(incoming);
  return {applied:plan.apply.length,kept:plan.keep.length};
 }

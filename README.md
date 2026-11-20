@@ -1,4 +1,24 @@
-# Story Sidecar Android Reader 0.1.51
+# Story Sidecar Android Reader 0.1.52
+
+## BOOX Notes companion — Reader 0.1.52 / APK 0.1.16
+
+First-stage native Notes workflow. PC remains 0.1.141. Handwriting capture and recognition code are unchanged; direct recognition on Note Max is still awaiting a firmware retest.
+
+### Try it on the Note Max
+
+1. Upload the **contents of `site/`** from the Reader ZIP to the existing Pages repository. Check for update until About shows Reader **0.1.52**.
+2. Install APK **0.1.16** over the existing app (do not uninstall). About should show the new APK version.
+3. In Configuration, choose **BOOX Notes / converted drafts → Open BOOX Notes**. The APK requests Android adjacent-window launch. If Notes opens full screen, use BOOX system split screen manually: Sidecar left, Notes right. Resize with the system divider. Native notebook selection remains manual.
+4. In Sidecar, hold a distinctive paragraph and choose **Paste converted draft after here**. Enter the matching BOOX notebook name. Open Notes, write, convert there, and copy the text.
+5. Return to the draft dialog and choose **Replace from clipboard**, or long-press the text field and Paste if clipboard permission is unavailable. Save/close: a dashed draft block appears after the paragraph. Tap it to edit, replace text, or reopen Notes.
+6. **Assimilate** inserts ordinary prose paragraphs after confirmation. The separate draft disappears. **Remove draft** removes only the Sidecar draft; native notebooks are untouched.
+
+Drafts autosave on input. They are backed up by full **Send changes** as `Book/Notes/Converted draft <UUID>.md`, including the notebook name and exact insertion anchor. Until assimilation they are absent from scene HTML, so manuscript exports exclude them. On PC they are ordinary note files for now, not inline draft blocks. Assimilated text travels through normal scene sync. Annotation-only restrictions also prohibit creating/assimilating prose drafts. Pending drafts remain accessible from Configuration if their paragraph changed or scene disappeared. Exact repeated paragraphs are rejected as ambiguous. No guessed insertion or automatic private BOOX-file access.
+
+Assimilation journals its before/after HTML locally before updating the scene draft. If storage fails, reopen the draft from Configuration to finish; sending/receiving is blocked while a journal is unfinished. Original native handwriting remains in BOOX Notes, outside Sidecar backup. Refresh-from-remote discards unsent local work as before.
+
+Validation: browser workflow covers persistence, replacement, note/prose separation, stale/repeated anchors, idempotent assimilation and two storage-failure points. Native split-screen placement and notebook launch still need physical-device testing. Android's adjacent launch is best-effort: https://developer.android.com/develop/ui/views/layout/support-multi-window-mode
+
 
 ## 0.1.51 — recognition progress and timeout diagnosis
 
