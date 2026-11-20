@@ -106,3 +106,25 @@ body.library-mode #width-handle,body.library-mode #width-feedback{display:none!i
 .converted-draft-dialog input,.converted-draft-dialog textarea{display:block;width:100%;box-sizing:border-box;font:inherit}
 .converted-draft-dialog button{margin:4px}.draft-actions{display:flex;flex-wrap:wrap;gap:4px}
 .converted-status{font-size:14px;color:#345346}
+
+/* Writer workspace, step 1: independent layout, no ink or editing surfaces. */
+.layout.writer-mode #manuscript-scroll{transform:none;--writing-shift:0px}
+.layout.writer-mode .card-column{display:none!important}
+#writer-workspace{position:absolute;top:0;bottom:0;min-width:0;display:flex;flex-direction:column;border:1px solid #bcb7a8;background:#f7f4eb;overflow:hidden}
+.writer-toolbar{flex:none;display:flex;flex-wrap:wrap;align-items:center;gap:7px;padding:8px 10px;border-bottom:1px solid #cbc5b6;font-size:13px}
+.writer-toolbar strong{flex:1;min-width:100px}.writer-toolbar small{display:block;font-size:11px;font-weight:400;color:#6a665b}
+.writer-toolbar label{display:flex;align-items:center;gap:6px;flex:1;white-space:nowrap}
+.writer-toolbar select,.writer-toolbar button{font-size:13px;padding:5px 8px;min-height:40px;min-width:0}
+.writer-frames{position:relative;flex:1;min-height:0;overflow:hidden}
+#writer-ink,#writer-text{position:absolute;left:0;right:0;overflow:auto;overscroll-behavior:contain;padding:12px 16px;background:#faf8f0}
+#writer-ink{background:#f4eedc}#writer-workspace h2{font:16px system-ui;margin:0 0 15px;color:#345346}
+.writer-placeholder{font:14px/1.6 system-ui;color:#746f63;margin:0;max-width:28em}
+.writer-edge{position:absolute;touch-action:none;user-select:none;z-index:4;background:#e4e0d6;outline-offset:-3px}
+.writer-edge.vertical{top:0;bottom:0;width:28px;cursor:col-resize}
+.writer-edge.horizontal{left:0;right:0;height:28px;cursor:row-resize}
+.writer-edge:before{content:'';position:absolute;border-radius:4px;background:#6b8070}
+.writer-edge.vertical:before{width:4px;height:64px;left:12px;top:calc(50% - 32px)}
+.writer-edge.horizontal:before{height:4px;width:64px;top:12px;left:calc(50% - 32px)}
+.writer-edge:focus-visible{outline:3px solid #345346}.writer-edge:hover:before,.writer-resizing .writer-edge:before{background:#345346}
+.writer-resizing{user-select:none}.writer-resizing #right-panel{visibility:hidden;pointer-events:none}
+@media(max-width:600px){.writer-toolbar{gap:3px;padding:5px}.writer-toolbar label{font-size:11px;gap:3px}.writer-toolbar select,.writer-toolbar button{font-size:11px;padding:3px}.writer-placeholder{font-size:12px}#writer-ink,#writer-text{padding:10px}}

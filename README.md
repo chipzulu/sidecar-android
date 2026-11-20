@@ -1,4 +1,28 @@
-# Story Sidecar Android Reader 0.1.52
+# Story Sidecar Android Reader 0.1.53
+
+## Writer workspace, step 1 — Reader 0.1.53
+
+Use BOOX APK 0.1.17; no APK update is required. PC stays 0.1.141. This release adds a layout preview for a dedicated handwriting workspace, distinct from annotation notes and the external BOOX Notes companion.
+
+Open a book, then **Configuration → Writer mode**. The familiar manuscript remains scrollable and paginated alongside two labelled placeholder frames: Handwriting and Converted text. **Writing side** places the workspace left/right; **Handwriting** places its frame top/bottom. Drag the full shared vertical edge to resize manuscript/workspace, and the shared horizontal edge to resize handwriting/converted text. The green grips indicate the draggable edges, with 28 CSS-pixel hit regions. Keyboard users can focus either separator and use arrow keys or Home/End.
+
+Choose **Reader mode** in the workspace toolbar to leave. Normal manuscript page width and card preferences are retained; corner cards hide temporarily while Writer mode uses that space. Page width shrinks to fit the manuscript column. Outline and Configuration remain available as overlays. Both divider proportions and panel placements are remembered on this device, independently of normal Reader page width. After a reload the app opens through the normal library/reader flow; entering Writer mode restores the arrangement. Resizing preserves the visible manuscript paragraph where it can be located.
+
+There is deliberately no pen capture, conversion, Accept, or insertion inside these new frames yet. Existing annotation handwriting/conversion continues to work separately. This step is for testing panel placement, proportions, and palm comfort on the Note Max. Small windows clamp both columns to fit; on a wide tablet normal minimum columns are 280 CSS pixels and frame minimum heights are 100 CSS pixels.
+
+Validation: browser test exercises both panel orders, real mouse/touch drags, keyboard limits, narrow-window bounds, saved preferences after reload, manuscript-anchor preservation, return to normal width, and absence of prose edits. Physical Note Max layout and palm comfort still need user testing.
+
+Next: connect the proven pen/eraser with durable draft storage; then Convert replaces the pending unit and Accept saves it before clearing handwriting; finally insert accepted text as an unassimilated manuscript block.
+
+
+## Recognition stroke completion — BOOX APK 0.1.17
+
+Reader stays 0.1.52; PC stays 0.1.141. After the Note Max firmware update, recognition succeeds quickly but can time out after reopening a note. Inspection found a definite encoder defect: a one-point stroke was serialized as DOWN only, without UP. Such strokes are valid for dots or brief taps. The recognition copy now includes a matching UP at the same location; saved ink, pressure, and drawing code remain unchanged. Multi-point strokes retain their original events. This is a candidate fix for the reported timeout, not hardware-confirmed yet; timeouts and service lifecycle are unchanged.
+
+Install APK 0.1.17 over the existing app (versionCode 18, same app ID/signature). No Pages upload is needed. Test Aa on the same note, close the dialog, accept/save the note, reopen, and convert again several times. Also try a note with dotted letters or a full stop. If a timeout persists, report whether repeating Aa without adding ink succeeds. Do not erase the affected note merely to test conversion.
+
+Encoder regression tests decode the actual protobuf and verify balanced DOWN/UP events for dots and mixed strokes, preserved coordinates/pressure, increasing timestamps, empty-stroke handling, and unchanged source ink. Native BOOX service behavior still requires device testing.
+
 
 ## BOOX Notes companion — Reader 0.1.52 / APK 0.1.16
 

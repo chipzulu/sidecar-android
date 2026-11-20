@@ -1,3 +1,4 @@
+import {mountWriterWorkspace} from './writer-workspace.js';
 import {allBlocks,newBlock,anchorIndex,appendDraftBlocks,finishAssimilation} from './draft-blocks.js';
 import {draftDialog,openBooxNotes} from './converted-ui.js';
 import {tabletTextAllowed} from './shared/book-workflow.js';
@@ -25,14 +26,39 @@ const highlights=mountHighlights({reader:$('reader'),viewport:$('manuscript-scro
 function preference(key,value){try{if(value===undefined)return localStorage.getItem('sidecar-reader:'+key);localStorage.setItem('sidecar-reader:'+key,value);}catch{/* Reading remains usable without preferences. */}}
 function remember(){if(snapshot&&!libraryMode&&!rendering&&!replacing)localStorage.setItem(workKey(snapshot,'position'),JSON.stringify({scope:index===-2?'novel':selectedScene?'scene':index===-1?'cover':'chapter',chapter:model.chapters[index]?.key??null,scene:selectedScene,y:$('manuscript-scroll').scrollTop}));}
 let pageWidth=Math.max(280,Number(preference('page-width'))||740),pageLines=Math.max(15,Math.min(60,Number(preference('page-lines'))||28)),cardMode=preference('card-layout')||'none',dock='';
-let layoutTimer,lastPageWidth=0;
+let layoutTimer,lastPageWidth=0,writerAnchor=null;
+const writer=mountWriterWorkspace({container:document.querySelector('.layout'),preference,
+ canChange:()=>!libraryMode&&!busy&&!credentialBusy&&!rendering&&highlights.beforeRender(),beforeChange:()=>{},
+ onChange:()=>{if(dock)setOpen(dock,false);else layout();$('writer-mode-open').textContent=writer.active()?'Return to Reader mode':'Writer mode';}
+});
+$('writer-mode-open').onclick=()=>writer.setActive(!writer.active());
+function captureWriterAnchor(){
+ if(writerAnchor||rendering)return;
+ const view=$('manuscript-scroll').getBoundingClientRect();
+ const node=[...$('reader').querySelectorAll('[data-scene][data-block]')].find(n=>n.getBoundingClientRect().bottom>view.top&&n.getBoundingClientRect().top<view.bottom);
+ if(node)writerAnchor={path:node.dataset.scene,block:node.dataset.block,text:node.textContent.slice(0,40),offset:node.getBoundingClientRect().top-view.top};
+}
+function restoreWriterAnchor(){
+ if(!writerAnchor)return false;
+ const anchor=writerAnchor;writerAnchor=null;
+ const nodes=[...$('reader').querySelectorAll('[data-scene][data-block]')].filter(n=>n.dataset.scene===anchor.path&&n.dataset.block===anchor.block);
+ const node=nodes.find(n=>n.textContent.includes(anchor.text))||nodes[0];if(!node)return false;
+ const scroller=$('manuscript-scroll');scroller.scrollTop+=node.getBoundingClientRect().top-scroller.getBoundingClientRect().top-anchor.offset;return true;
+}
 function repaginate(){if(!model||index===-1)return;return render(index,selectedScene,false,true);}
 function layout(){
   const headerBottom=document.querySelector('header').getBoundingClientRect().bottom;
   $('connection').style.top=(headerBottom+8)+'px';$('updates-panel').style.top=(headerBottom+8)+'px';
   $('connection').style.maxHeight=Math.max(80,innerHeight-headerBottom-20)+'px';
   if(libraryMode)return;
-  const available=document.querySelector('.layout').clientWidth;const fit=fitLayout(available,pageWidth,cardMode,Boolean(dock));
+  const available=document.querySelector('.layout').clientWidth;
+  const writing=writer.active(),area=writing?writer.measure():null;
+  const fit=writing?{page:Math.max(1,Math.min(pageWidth,area.width-32)),left:0,right:0,dock:0,overlay:Boolean(dock)}:fitLayout(available,pageWidth,cardMode,Boolean(dock));
+  if(lastPageWidth&&lastPageWidth!==fit.page)captureWriterAnchor();
+  const scroll=$('manuscript-scroll');
+  if(writing){scroll.style.left=area.left+'px';scroll.style.width=area.width+'px';}else{scroll.style.removeProperty('left');scroll.style.removeProperty('width');}
+  $('page-width').disabled=writing;$('card-layout').disabled=writing;
+
   document.documentElement.style.setProperty('--page-width',fit.page+'px');
   for(const [id,width] of [['left-cards',fit.left],['right-cards',fit.right]]){$(id).hidden=!width;$(id).style.width=width+'px';}
   const edge=(available-fit.page-32)/2;
@@ -40,9 +66,9 @@ function layout(){
   $('right-panel').hidden=!dock;$('right-panel').classList.toggle('overlay',fit.overlay);$('right-panel').style.width=(fit.dock||Math.min(280,available))+'px';
   $('page-width').max=Math.floor(Math.max(1,available-32));$('page-width').value=Math.round(fit.page);$('page-width').min=Math.min(280,fit.page);
   $('width-feedback').textContent='Page width: '+Math.round(fit.page)+' px';
-  $('width-handle').hidden=dock!=='configuration';
+  $('width-handle').hidden=writing||dock!=='configuration';
   requestAnimationFrame(()=>{$('width-handle').style.left=(Math.max(0,$('reader').getBoundingClientRect().left-16))+'px';});
-  $('layout-note').textContent=(cardMode!=='none'&&!fit.left?'Cards hidden: there is no usable space beside this page. ':cardMode==='both'&&!fit.right?'Right cards hidden at this width. ':'')+(fit.overlay?'The right panel overlays the page at this width.':'');
+  $('layout-note').textContent=writing?'Writer mode: drag the shared panel edges. Normal page width and card settings are kept.':(cardMode!=='none'&&!fit.left?'Cards hidden: there is no usable space beside this page. ':cardMode==='both'&&!fit.right?'Right cards hidden at this width. ':'')+(fit.overlay?'The right panel overlays the page at this width.':'');
   if(lastPageWidth!==fit.page){lastPageWidth=fit.page;clearTimeout(layoutTimer);layoutTimer=setTimeout(repaginate,100);}
 }
 function setOpen(id,open){if(id==='outline'||id==='configuration'){dock=open?id:'';for(const name of ['outline','configuration']){$(name).hidden=dock!==name;$(name+'-toggle').setAttribute('aria-expanded',String(dock===name));}layout();return;}$(id).hidden=!open;if(id!=='connection')$(id+'-toggle').setAttribute('aria-expanded',String(open));layout();}
@@ -136,7 +162,7 @@ async function render(which,scenePath=null,scroll=true,preserve=false){
     }
     if(revision!==renderRevision)return;
     highlights.repaint();
-    if(preserve)scroller.scrollTop=fraction*Math.max(0,scroller.scrollHeight-scroller.clientHeight);else if(scroll)scroller.scrollTop=0;
+    if(preserve){if(!restoreWriterAnchor())scroller.scrollTop=fraction*Math.max(0,scroller.scrollHeight-scroller.clientHeight);}else{writerAnchor=null;if(scroll)scroller.scrollTop=0;}
     $('previous').disabled=index===-1;$('next').disabled=index>=model.chapters.length-1&&!selectedScene;
     if(selectedScene){const all=model.chapters.flatMap(c=>c.scenes);const sceneIndex=all.findIndex(s=>s.path===selectedScene);$('previous').disabled=sceneIndex===0;$('next').disabled=sceneIndex===all.length-1;}
   }catch(error){if(revision===renderRevision){$('page-count').textContent='Page estimate unavailable';message(error.message,true);setOpen('connection',true);}}
@@ -203,7 +229,7 @@ async function openBook(value,resume=true){
   reconcilePublished(value);
   if(!highlights.beforeRender())throw Error('Save the handwriting before switching books.');
   if(client && clientKey!==JSON.stringify([value.repository,value.branch]))lockGitHub();
-  if(coverUrl)URL.revokeObjectURL(coverUrl);coverUrl='';snapshot=value;model=bookModel(value);libraryMode=false;document.body.classList.remove('library-mode');$('library').hidden=true;$('library-toggle').hidden=false;layout();
+  writerAnchor=null;if(coverUrl)URL.revokeObjectURL(coverUrl);coverUrl='';snapshot=value;model=bookModel(value);libraryMode=false;document.body.classList.remove('library-mode');$('library').hidden=true;$('library-toggle').hidden=false;layout();
   for(const chapter of model.chapters)for(const scene of chapter.scenes){
     const draft=readDraft(value,scene);
     if(draft)scene.html=draft.html;
