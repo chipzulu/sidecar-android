@@ -1,5 +1,6 @@
 import {sharedBase} from './shared/peer-state.js';
 import {listCredentialRepositories} from './token-vault.js';
+import {validInk} from './shared/annotation-ink.js';
 const request=r=>new Promise((resolve,reject)=>{r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});
 const completed=tx=>new Promise((resolve,reject)=>{tx.oncomplete=resolve;tx.onerror=tx.onabort=()=>reject(tx.error||Error('Library transaction cancelled.'));});
 const database=new Promise((resolve,reject)=>{
@@ -59,11 +60,11 @@ export async function saveBook(book,{sent=false,base=null}={}){
 export async function removeBook(book){
  const d=await db(),tx=d.transaction(['library','snapshots','meta'],'readwrite'),done=completed(tx);
  const r=tx.objectStore('snapshots').get(book.id);
- r.onsuccess=()=>{if(bookIdentity(r.result)!==bookIdentity(book)){tx.abort();return;}tx.objectStore('library').delete(book.id);tx.objectStore('snapshots').delete(book.id);const a=tx.objectStore('meta').get('active');a.onsuccess=()=>{if(a.result===book.id)tx.objectStore('meta').delete('active');};};
+ r.onsuccess=()=>{if(bookIdentity(r.result)!==bookIdentity(book)){tx.abort();return;}tx.objectStore('library').delete(book.id);tx.objectStore('snapshots').delete(book.id);tx.objectStore('meta').delete('writer:'+book.id);tx.objectStore('meta').delete('writer-info:'+book.id);const a=tx.objectStore('meta').get('active');a.onsuccess=()=>{if(a.result===book.id)tx.objectStore('meta').delete('active');};};
  await done;clearBookWork(book);
 }
 export async function markBookSent(book){const d=await db(),tx=d.transaction('library','readwrite'),done=completed(tx),s=tx.objectStore('library'),r=s.get(book.id);r.onsuccess=()=>{if(r.result)s.put({...r.result,lastSentAt:new Date().toISOString()});};await done;}
-export async function listBooks(){const d=await db(),rows=await request(d.transaction('library').objectStore('library').getAll());return rows.map(row=>({...row,offline:true,hasLocalWork:Object.keys(localStorage).some(k=>k.startsWith('sidecar-book:'+row.id+':draft:')),remoteStatus:row.remoteCheckedAt?(row.remoteChanged?'newer-backup':'up-to-date'):'not-checked'}));}
+export async function listBooks(){const d=await db(),rows=await request(d.transaction('library').objectStore('library').getAll());return Promise.all(rows.map(async row=>({...row,writerStrokes:(await request(d.transaction('meta').objectStore('meta').get('writer-info:'+row.id)))?.strokes||0,offline:true,hasLocalWork:Object.keys(localStorage).some(k=>k.startsWith('sidecar-book:'+row.id+':draft:')),remoteStatus:row.remoteCheckedAt?(row.remoteChanged?'newer-backup':'up-to-date'):'not-checked'})));}
 
 export async function relinkBook(book,repository,branch){
  const d=await db(),c=connection({repository,branch}),tx=d.transaction(['library','snapshots','connections'],'readwrite'),done=completed(tx);
@@ -76,3 +77,26 @@ export async function recordRemoteCheck(book,commit){
  const d=await db(),tx=d.transaction(['library','snapshots'],'readwrite'),done=completed(tx),r=tx.objectStore('snapshots').get(book.id);
  r.onsuccess=()=>{if(bookIdentity(r.result)!==bookIdentity(book)){tx.abort();return;}const rows=tx.objectStore('library'),get=rows.get(book.id);get.onsuccess=()=>{if(!get.result){tx.abort();return;}rows.put({...get.result,remoteCheckedAt:new Date().toISOString(),checkedCommit:commit,remoteChanged:commit!==book.commit});};};await done;
 }
+
+export async function readWriterDraft(book){
+ const d=await db(),row=await request(d.transaction('meta').objectStore('meta').get('writer:'+book.id));
+ if(row&&(!row.ink||!validInk(row.ink)))throw Error('The saved writer draft could not be read. It has not been overwritten.');
+ return row||null;
+}
+export async function writeWriterDraft(book,ink,expectedRevision){
+ if(!ink||!validInk(ink))throw Error('Invalid writer handwriting.');
+ const d=await db(),tx=d.transaction(['library','meta'],'readwrite'),done=completed(tx),meta=tx.objectStore('meta');
+ let reason,revision=crypto.randomUUID();
+ const found=tx.objectStore('library').get(book.id);
+ found.onsuccess=()=>{
+  if(!found.result){reason=Error('This book was removed. Your handwriting is still on screen.');tx.abort();return;}
+  const previous=meta.get('writer-info:'+book.id);previous.onsuccess=()=>{
+   if((previous.result?.revision||null)!==(expectedRevision||null)){reason=Error('Another Reader window changed this writer draft. This copy is still on screen.');tx.abort();return;}
+   const updatedAt=new Date().toISOString();
+   meta.put({ink,revision,updatedAt},'writer:'+book.id);
+   meta.put({revision,updatedAt,strokes:ink.strokes.length},'writer-info:'+book.id);
+  };
+ };
+ try{await done;}catch(e){throw reason||e;}return revision;
+}
+export async function clearWriterDraft(book){const d=await db(),tx=d.transaction('meta','readwrite'),done=completed(tx);tx.objectStore('meta').delete('writer:'+book.id);tx.objectStore('meta').delete('writer-info:'+book.id);await done;}

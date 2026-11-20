@@ -1,4 +1,19 @@
-# Story Sidecar Android Reader 0.1.53
+# Story Sidecar Android Reader 0.1.54
+
+## Writer handwriting, step 2 — Reader 0.1.54
+
+Keep BOOX APK 0.1.17 and PC 0.1.141. Upload the Reader ZIP's `site/` contents to the existing Pages repository; use the Reader update flow until About shows 0.1.54. No APK installation is required.
+
+**Reader / Writer** is now a dropdown directly beside the Story Sidecar name. The large workspace toolbar has gone. Writing-side and top/bottom placement controls are under **Configuration → Writer layout**; both draggable edges and remembered proportions remain.
+
+The Handwriting frame now uses the existing native BOOX pen/eraser interface, pressure and thickness settings, with browser pen fallback. A compact icon row contains **Pen, Eraser, Undo, Pause (✓), and More (⋯)**. More offers extra writing space, Clear (with confirmation), Retry save, and Copy ink data (JSON). The browser also offers Save ink copy as a download. Resizing or swapping panels pauses handwriting; select Pen or Eraser to resume. While pen input is enabled, palm/finger contacts cannot draw or scroll the manuscript/converted-text surfaces. Pause allows finger scrolling again. UI controls and Android system controls remain available. Editing annotation handwriting requires returning to Reader mode, so the native pen cannot be attached to two drawing surfaces at once.
+
+One writer draft is saved per book in IndexedDB, separately from annotation localStorage. Completed strokes trigger a transaction immediately; subsequent updates coalesce while a write is in flight. The native saved receipt is emitted only after the database confirms the current draft. Failed saves retain the ink on screen and block leaving the draft until saving succeeds; Retry save or Copy ink data is available. A revision check rejects overwriting a draft changed by another Reader window. Drafts recover after mode changes, book changes, and app reload. Library status shows stored writer strokes. Normal GitHub send/receive retains writer drafts but does **not** send them in this step. Refresh/overwrite and removing a book delete its writer draft after the existing destructive confirmation. Native notebook files are not used.
+
+The Converted text frame remains a placeholder: **Convert and Accept are step 3**; manuscript insertion is step 4. Writer ink is local to this installation for now, not part of GitHub backup. Copy ink data puts JSON on the clipboard so it can be pasted into a text file; the browser also offers a file download. In-app importing that recovery data is not implemented yet. Draft capacity remains 240,000 points / 20,000 strokes, with existing maximum canvas height. No handwriting detail is reduced.
+
+Test on Note Max: choose Writer, write/erase/undo, pause and scroll, resume, change panel layout and resume, then switch Reader/Writer and reopen the app. Check the same strokes return. Compare native writing feel against annotation handwriting. Browser checks cover native-bridge simulation, browser fallback, real mouse/touch divider handling, palm-event filtering, saved draft recovery, per-book isolation, stale-write rejection, and delayed/failed saves without false acknowledgements. Physical BOOX latency and palm ergonomics still require device testing.
+
 
 ## Writer workspace, step 1 — Reader 0.1.53
 

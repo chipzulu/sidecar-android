@@ -4,7 +4,7 @@ import {adaptiveInkInput} from './ink-native.js';
 import {eraserInput,strokeTouchesSweep,eraserSweep,prepareStroke} from './ink-eraser.js';
 
 // Input adapters provide completed strokes. Persistence never runs during pointer movement.
-export function inkPad(host, initial, save, inputFactory=adaptiveInkInput, {quiet=false,onHold}={}) {
+export function inkPad(host, initial, save, inputFactory=adaptiveInkInput, {quiet=false,onHold,asyncSave=false,writer=false}={}) {
   let ink=structuredClone(initial||{version:1,width:800,height:300,strokes:[]});
   let penWidth=2.5;try{const value=Number(localStorage.getItem("sidecar-reader:pen-width"));if([2.5,4,6].includes(value))penWidth=value;}catch{}
   let pressure=false;try{pressure=localStorage.getItem('sidecar-reader:pen-pressure')==='true';}catch{}
@@ -12,17 +12,32 @@ export function inkPad(host, initial, save, inputFactory=adaptiveInkInput, {quie
   const widths=()=>ink.strokeWidths||ink.strokes.map(()=>2.5);
   let count=ink.strokes.reduce((n,s)=>n+s.length,0),timer=0,pending=false,failed=false,started=0,nativeStroke=false;
   let input,mode='pen',eraseStart=null,eraseLines=[];const history=[];
+  let version=0,savedVersion=0,writeTask=null;
   function remember(){history.push(ink);if(history.length>50)history.shift();}
   const svg=inkSvg(ink),toolbar=document.createElement('div'),status=document.createElement('small');
-  svg.setAttribute('aria-label','Write your annotation with a pen');toolbar.className='ink-actions';toolbar.hidden=quiet;status.setAttribute('role','status');
+  svg.setAttribute('aria-label',writer?'Writer handwriting':'Write your annotation with a pen');toolbar.className='ink-actions';toolbar.hidden=quiet;status.setAttribute('role','status');
   function message(text){if(mode==='eraser'&&!text.startsWith('Eraser'))text='Eraser · '+text;if(status.textContent!==text)status.textContent=text;}
+  function persistAsync(){
+    if(writeTask)return writeTask;
+    if(savedVersion===version)return Promise.resolve(true);
+    message('Saving handwriting on this device…');
+    writeTask=(async()=>{
+      while(savedVersion<version){const captured=ink,revision=version;
+        try{await save(captured,true);savedVersion=revision;failed=false;pending=savedVersion!==version;
+          if(!pending){input?.confirmSaved?.();message('Saved on this device · '+ink.strokes.length+' strokes');window.sidecarInkSavedCount=ink.strokes.length;}
+        }catch(e){failed=true;pending=true;message('Could not save handwriting: '+e.message);return false;}
+      }return true;
+    })().finally(()=>{writeTask=null;});return writeTask;
+  }
   function flush(){
     clearTimeout(timer);
+    if(asyncSave){void persistAsync();return !pending&&!failed;}
     try{if(failed){save(ink,false);failed=false;}if(pending){save(ink,true);pending=false;}input?.confirmSaved?.();message('Saved on this device · '+ink.strokes.length+' strokes');window.sidecarInkSavedCount=ink.strokes.length;return true;}
     catch(e){message('Could not save handwriting: '+e.message);return false;}
   }
   function checkpoint(){
     pending=true;
+    if(asyncSave){version++;void persistAsync();return;}
     try{save(ink,false);failed=false;message('Saved on this device');}
     catch(e){failed=true;message('Could not save handwriting: '+e.message);}
     clearTimeout(timer);timer=setTimeout(flush,800);
@@ -33,7 +48,7 @@ export function inkPad(host, initial, save, inputFactory=adaptiveInkInput, {quie
       element?.remove();setTimeout(()=>onHold(),0);return true;
     }
     // Validate only the incoming stroke; existing strokes were validated on entry.
-    if(ink.strokes.length>=MAX_INK_STROKES||count+points.length>MAX_INK_POINTS){message('This note is full. Start another annotation.');return false;}
+    if(ink.strokes.length>=MAX_INK_STROKES||count+points.length>MAX_INK_POINTS){message(writer?'This writing draft is full. Save a copy before clearing it.':'This note is full. Start another annotation.');return false;}
     if(!validInk({version:1,width:800,height:ink.height,strokes:[points],strokeWidths:[penWidth]})){message('Stroke could not be saved: invalid ink coordinates or width.');return false;}
 
     remember();
@@ -53,7 +68,7 @@ export function inkPad(host, initial, save, inputFactory=adaptiveInkInput, {quie
     if(input?.active()||!['pen','eraser'].includes(next))return false;
     if(input&&next===mode)return true;
     input?.dispose();mode=next;host.dataset.inkTool=mode;
-    if(mode==='pen')input=inputFactory(svg,{width:()=>penWidth,pressure:()=>pressure,sensitivity:()=>sensitivity,isSaved:()=>!failed,height:()=>ink.height,remaining:()=>ink.strokes.length>=MAX_INK_STROKES?0:MAX_INK_POINTS-count,begin:(source)=>{nativeStroke=source?.native===true;started=performance.now();clearTimeout(timer);},complete});
+    if(mode==='pen')input=inputFactory(svg,{width:()=>penWidth,pressure:()=>pressure,sensitivity:()=>sensitivity,isSaved:()=>!failed&&(!asyncSave||!pending),height:()=>ink.height,remaining:()=>ink.strokes.length>=MAX_INK_STROKES?0:MAX_INK_POINTS-count,begin:(source)=>{nativeStroke=source?.native===true;started=performance.now();clearTimeout(timer);},complete});
     else {ink.strokes.forEach(prepareStroke);let erasingGesture=false,dirty=null;const erase={
       begin(){eraseStart=null;eraseLines=[...svg.querySelectorAll('.ink-stroke')];clearTimeout(timer);},
       sweep(a,b,r){
@@ -67,7 +82,7 @@ export function inkPad(host, initial, save, inputFactory=adaptiveInkInput, {quie
       end(){if(eraseStart){eraseStart=null;checkpoint();}}
     };
     input=adaptiveInkInput(svg,{
-      isSaved:()=>!failed,height:()=>ink.height,remaining:()=>24000,
+      isSaved:()=>!failed&&(!asyncSave||!pending),height:()=>ink.height,remaining:()=>24000,
       begin(){erase.begin();erasingGesture=true;},
       progress(points,meta){
         if(!erasingGesture){erase.begin();erasingGesture=true;}
@@ -87,12 +102,12 @@ export function inkPad(host, initial, save, inputFactory=adaptiveInkInput, {quie
   }
   setTool('pen');
   const actions={};
-  function button(label,action){actions[label]=()=>{if(!input.active())action();};const b=document.createElement('button');b.type='button';b.textContent=label;b.onclick=()=>{if(!input.active())action();};toolbar.append(b);}
+  function button(label,action){actions[label]=()=>{if(!input?.active())action();};const b=document.createElement('button');b.type='button';b.textContent=label;b.onclick=actions[label];toolbar.append(b);}
   button('Undo stroke',()=>{if(history.length)ink=history.pop();else if(ink.strokes.length)ink={...ink,strokes:ink.strokes.slice(0,-1),strokeWidths:widths().slice(0,-1)};else return;redraw();checkpoint();});
   button('More space',()=>{remember();ink={...ink,height:Math.min(12000,ink.height+200)};svg.setAttribute('viewBox','0 0 800 '+ink.height);checkpoint();});
-  button('Clear handwriting',()=>{if(!ink.strokes.length||!confirm('Clear the handwriting in this annotation?'))return;remember();ink={version:1,width:800,height:300,strokes:[]};redraw();checkpoint();});
+  button('Clear handwriting',()=>{if(!ink.strokes.length||!confirm(writer?'Clear this writer draft? Undo is available while this workspace remains open.':'Clear the handwriting in this annotation?'))return;remember();ink={version:1,width:800,height:initial?.height||300,strokes:[]};redraw();checkpoint();});
   function finish(){if(input?.finish()===false){message("Finish the pen stroke before closing this note.");return false;}return flush();}
   const hidden=()=>{if(document.hidden)finish();};
   window.addEventListener('pagehide',finish);document.addEventListener('visibilitychange',hidden);
-  return {snapshot:()=>finish()?structuredClone(ink):null,suspend(){input?.dispose();input=null;},resume(){if(!input)setTool(mode);},save:finish,tool:()=>mode,setTool,undo:()=>actions['Undo stroke'](),more:()=>actions['More space'](),clear:()=>actions['Clear handwriting'](),dispose(){clearTimeout(timer);input?.dispose();window.removeEventListener('pagehide',finish);document.removeEventListener('visibilitychange',hidden);}};
+  return {active:()=>!!input?.active(),settle:async()=>{if(input?.active())return false;return asyncSave?persistAsync():finish();},copy:()=>structuredClone(ink),snapshot:()=>finish()?structuredClone(ink):null,suspend(){if(input?.active())return false;input?.dispose();input=null;return true;},resume(){if(!input)setTool(mode);},save:finish,tool:()=>mode,setTool,undo:()=>actions['Undo stroke'](),more:()=>actions['More space'](),clear:()=>actions['Clear handwriting'](),dispose(){clearTimeout(timer);input?.dispose();window.removeEventListener('pagehide',finish);document.removeEventListener('visibilitychange',hidden);}};
 }

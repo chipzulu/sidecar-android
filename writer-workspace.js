@@ -6,16 +6,16 @@ export function splitSize(size,share,min){
  return {first,second:usable-first,gap:GAP,usable,minimum};
 }
 
-// Step 1 is deliberately presentation-only: no ink capture or text conversion.
+// Layout remains independent of the writer ink lifecycle.
 export function mountWriterWorkspace({container,preference,canChange,beforeChange,onChange}){
  let active=false,pointer=null;
  const number=(key,fallback)=>{const n=Number(preference(key));return Number.isFinite(n)&&n>0&&n<1?n:fallback;};
  const state={side:preference('writer-side')==='left'?'left':'right',top:preference('writer-top')==='text'?'text':'ink',column:number('writer-column',.5),row:number('writer-row',.6)};
  const panel=document.createElement('section');panel.id='writer-workspace';panel.hidden=true;panel.setAttribute('aria-label','Handwriting workspace');
- panel.innerHTML='<div class="writer-toolbar"><strong>Writer mode <small>Layout preview</small></strong><button id="writer-exit" type="button">Reader mode</button><label>Writing side<select id="writer-side"><option value="left">Left</option><option value="right">Right</option></select></label><label>Handwriting<select id="writer-top"><option value="ink">Top</option><option value="text">Bottom</option></select></label></div><div class="writer-frames"><section id="writer-ink" aria-labelledby="writer-ink-title"><h2 id="writer-ink-title">Handwriting</h2><p class="writer-placeholder">Handwriting area · layout preview<br>Pen input comes in the next step.</p></section><div id="writer-row-edge" class="writer-edge horizontal" role="separator" aria-label="Resize handwriting and converted text" aria-orientation="horizontal" aria-controls="writer-ink writer-text" tabindex="0"></div><section id="writer-text" aria-labelledby="writer-text-title"><h2 id="writer-text-title">Converted text</h2><p class="writer-placeholder">Converted text will appear here.</p></section></div>';
+ panel.innerHTML='<div class="writer-frames"><section id="writer-ink" aria-labelledby="writer-ink-title"><div class="writer-ink-heading"><h2 id="writer-ink-title">Handwriting</h2><div id="writer-ink-tools" role="toolbar" aria-label="Writer handwriting tools"></div></div><div class="writer-ink-scroll"><div id="writer-ink-canvas"></div></div></section><div id="writer-row-edge" class="writer-edge horizontal" role="separator" aria-label="Resize handwriting and converted text" aria-orientation="horizontal" aria-controls="writer-ink writer-text" tabindex="0"></div><section id="writer-text" aria-labelledby="writer-text-title"><h2 id="writer-text-title">Converted text</h2><p class="writer-placeholder">Conversion and Accept come in the next step.</p><p class="writer-local-hint">Your writing draft saves on this device. It is not sent to GitHub yet.</p></section></div>';
  const edge=document.createElement('div');edge.id='writer-column-edge';edge.className='writer-edge vertical';edge.hidden=true;edge.tabIndex=0;edge.setAttribute('role','separator');edge.setAttribute('aria-label','Resize manuscript and handwriting workspace');edge.setAttribute('aria-orientation','vertical');edge.setAttribute('aria-controls','manuscript-scroll writer-workspace');
  container.append(panel,edge);
- const $=id=>panel.querySelector('#'+id),frames=panel.querySelector('.writer-frames'),row=$('writer-row-edge');
+ const $=id=>document.getElementById(id),frames=panel.querySelector('.writer-frames'),row=$('writer-row-edge');
  $('writer-side').value=state.side;$('writer-top').value=state.top;
  function remember(){for(const [key,value] of Object.entries(state))preference('writer-'+key,String(value));}
  function aria(node,size,label){node.setAttribute('aria-valuemin',String(Math.round(size.minimum/size.usable*100)));node.setAttribute('aria-valuemax',String(Math.round((size.usable-size.minimum)/size.usable*100)));node.setAttribute('aria-valuenow',String(Math.round(size.first/size.usable*100)));node.setAttribute('aria-valuetext',`${label}: ${Math.round(size.first/size.usable*100)} percent`);}
@@ -29,9 +29,8 @@ export function mountWriterWorkspace({container,preference,canChange,beforeChang
   aria(edge,size,'Manuscript width');arrangeRows();
   return {width:size.first,left:inkLeft?size.second+GAP:0};
  }
- function change(fn){if(!canChange())return false;beforeChange();fn();remember();onChange();return true;}
+ function change(fn){if(!canChange()||beforeChange()===false)return false;fn();remember();onChange();return true;}
  function setActive(value){return change(()=>{active=value;panel.hidden=edge.hidden=!active;container.classList.toggle('writer-mode',active);});}
- $('writer-exit').onclick=()=>setActive(false);
  $('writer-side').onchange=()=>{const value=$('writer-side').value;if(!change(()=>state.side=value))$('writer-side').value=state.side;};
  $('writer-top').onchange=()=>{const value=$('writer-top').value;if(!change(()=>state.top=value))$('writer-top').value=state.top;};
  function move(axis,position){const box=(axis==='column'?container:frames).getBoundingClientRect(),size=splitSize(axis==='column'?box.width:box.height,state[axis],axis==='column'?280:100);
@@ -41,11 +40,11 @@ export function mountWriterWorkspace({container,preference,canChange,beforeChang
   measure();onChange();
  }
  for(const [handle,axis] of [[edge,'column'],[row,'row']]){
-  handle.onpointerdown=e=>{if(e.button!==0||pointer||!canChange())return;e.preventDefault();beforeChange();pointer={id:e.pointerId,handle,axis};handle.setPointerCapture(e.pointerId);container.classList.add('writer-resizing');};
+  handle.onpointerdown=e=>{if(e.button!==0||pointer||!canChange())return;e.preventDefault();if(beforeChange()===false)return;pointer={id:e.pointerId,handle,axis};handle.setPointerCapture(e.pointerId);container.classList.add('writer-resizing');};
   handle.onpointermove=e=>{if(pointer?.id!==e.pointerId||pointer.handle!==handle)return;e.preventDefault();move(axis,axis==='column'?e.clientX:e.clientY);};
   const end=()=>{if(pointer?.handle!==handle)return;pointer=null;container.classList.remove('writer-resizing');remember();onChange();};
   handle.onpointerup=handle.onpointercancel=handle.onlostpointercapture=end;
-  handle.onkeydown=e=>{const keys=axis==='column'?['ArrowLeft','ArrowRight']:['ArrowUp','ArrowDown'];if(![...keys,'Home','End'].includes(e.key)||!canChange())return;e.preventDefault();beforeChange();
+  handle.onkeydown=e=>{const keys=axis==='column'?['ArrowLeft','ArrowRight']:['ArrowUp','ArrowDown'];if(![...keys,'Home','End'].includes(e.key)||!canChange())return;e.preventDefault();if(beforeChange()===false)return;
    const box=handle.getBoundingClientRect(),bounds=(axis==='column'?container:frames).getBoundingClientRect();
    const current=axis==='column'?box.left+box.width/2:box.top+box.height/2;
    const start=axis==='column'?bounds.left:bounds.top,end=axis==='column'?bounds.right:bounds.bottom;

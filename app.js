@@ -1,3 +1,4 @@
+import {mountWriterInk} from './writer-ink.js';
 import {mountWriterWorkspace} from './writer-workspace.js';
 import {allBlocks,newBlock,anchorIndex,appendDraftBlocks,finishAssimilation} from './draft-blocks.js';
 import {draftDialog,openBooxNotes} from './converted-ui.js';
@@ -7,7 +8,7 @@ import {pressureSensitivity} from './pressure.js';
 import {mountLibrary} from './library-view.js';
 import {readerClient,repositoryName} from './api.js';
 import {bookModel,chapterHeadingParts,sceneHeadingParts} from './model.js';
-import {readBook,saveBook,bookIdentity,readBookIdentity,removeBook,clearBookWork,workKey,libraryReady,lastConnection,listConnections,findBook,markBookSent,selectBook,relinkBook,recordRemoteCheck} from './storage.js';
+import {readBook,saveBook,bookIdentity,readBookIdentity,removeBook,clearBookWork,workKey,libraryReady,lastConnection,listConnections,findBook,markBookSent,selectBook,relinkBook,recordRemoteCheck,clearWriterDraft} from './storage.js';
 import {inlineFragment,sceneNotes,colourMarks} from './inline-notes.js';
 import {convertItalicMarkers} from './shared/italic-markers.js';
 import {keepMarker} from './shared/keep-together.js';
@@ -22,16 +23,27 @@ const $=id=>document.getElementById(id);
 let libraryMode=true,libraryView,menuBook=null,configBook=null;
 let snapshot=null,model=null,index=-1,coverUrl='',busy=false,credentialBusy=false,client=null,clientKey='',abort=null,disposeCards=()=>{},selectedScene=null,renderRevision=0,rendering=false, replacing=false;
 function message(text,error=false){$('updates-status').textContent=text;if(libraryMode){$('library-error').textContent=text;$('library-error').classList.toggle('error',error);}$('status').textContent=text;$('status').classList.toggle('error',error);}
-const highlights=mountHighlights({reader:$('reader'),viewport:$('manuscript-scroll'),status:message,canEditScene:()=>tabletTextAllowed(snapshot),onEditScene:at=>editScene(at),onConvertedDraft:at=>convertedDraft(at),onWriting:()=>{if(dock)setOpen(dock,false);}});
+const highlights=mountHighlights({reader:$('reader'),viewport:$('manuscript-scroll'),status:message,canEditScene:()=>tabletTextAllowed(snapshot),onEditScene:at=>editScene(at),onConvertedDraft:at=>convertedDraft(at),onWriting:()=>{if(writer.active()){message('Switch to Reader mode to edit annotation handwriting.');return false;}if(dock)setOpen(dock,false);}});
 function preference(key,value){try{if(value===undefined)return localStorage.getItem('sidecar-reader:'+key);localStorage.setItem('sidecar-reader:'+key,value);}catch{/* Reading remains usable without preferences. */}}
 function remember(){if(snapshot&&!libraryMode&&!rendering&&!replacing)localStorage.setItem(workKey(snapshot,'position'),JSON.stringify({scope:index===-2?'novel':selectedScene?'scene':index===-1?'cover':'chapter',chapter:model.chapters[index]?.key??null,scene:selectedScene,y:$('manuscript-scroll').scrollTop}));}
 let pageWidth=Math.max(280,Number(preference('page-width'))||740),pageLines=Math.max(15,Math.min(60,Number(preference('page-lines'))||28)),cardMode=preference('card-layout')||'none',dock='';
-let layoutTimer,lastPageWidth=0,writerAnchor=null;
+let layoutTimer,lastPageWidth=0,writerAnchor=null,writerTransition=false;
 const writer=mountWriterWorkspace({container:document.querySelector('.layout'),preference,
- canChange:()=>!libraryMode&&!busy&&!credentialBusy&&!rendering&&highlights.beforeRender(),beforeChange:()=>{},
- onChange:()=>{if(dock)setOpen(dock,false);else layout();$('writer-mode-open').textContent=writer.active()?'Return to Reader mode':'Writer mode';}
+ canChange:()=>!libraryMode&&!busy&&!credentialBusy&&!rendering&&!writerInk.activeStroke()&&highlights.beforeRender(),beforeChange:()=>writerInk.pause(),
+ onChange:()=>{if(dock)setOpen(dock,false);else layout();$('ui-mode').value=writer.active()?'writer':'reader';}
 });
-$('writer-mode-open').onclick=()=>writer.setActive(!writer.active());
+const writerInk=mountWriterInk({status:message});
+$('ui-mode').onchange=async()=>{
+ const value=$('ui-mode').value==='writer';
+ if(writerTransition||libraryMode||busy||credentialBusy||rendering){$('ui-mode').value=writer.active()?'writer':'reader';return;}
+ writerTransition=true;controls();
+ try{
+  if(!value&&!await writerInk.close())return;
+  if(!writer.setActive(value))return;
+  if(value)await writerInk.open(snapshot);
+ }catch(e){message(e.message,true);}
+ finally{writerTransition=false;$('ui-mode').value=writer.active()?'writer':'reader';controls();}
+};
 function captureWriterAnchor(){
  if(writerAnchor||rendering)return;
  const view=$('manuscript-scroll').getBoundingClientRect();
@@ -226,6 +238,7 @@ function step(direction){
   navigate(index+direction);
   }
 async function openBook(value,resume=true){
+  if(!await writerInk.close())throw Error('Finish saving the writing draft before changing books.');
   reconcilePublished(value);
   if(!highlights.beforeRender())throw Error('Save the handwriting before switching books.');
   if(client && clientKey!==JSON.stringify([value.repository,value.branch]))lockGitHub();
@@ -249,18 +262,20 @@ async function openBook(value,resume=true){
   const expectedRevision=renderRevision+1;
   await render(chosen,saved?.scope==='scene'?saved.scene:null,false);
   if(resume&&saved&&renderRevision===expectedRevision){$('manuscript-scroll').scrollTop=Number(saved.y)||0;pageStatus();remember();}
+  if(writer.active())await writerInk.open(value);
 }
 function navigate(n,path){if(innerWidth<=700)setOpen('outline',false);render(n,path);$('reader').focus({preventScroll:true});}
 $('previous').onclick=()=>step(-1);$('next').onclick=()=>step(1);
 let scrollTimer;$('manuscript-scroll').addEventListener('scroll',()=>{clearTimeout(scrollTimer);scrollTimer=setTimeout(()=>{remember();pageStatus();},100);},{passive:true});addEventListener('pagehide',remember);
 function textSize(value){const size=['18','21','24','28'].includes(value)?value:'21';document.documentElement.style.setProperty('--reading-size',size+'px');$('size').value=size;preference('size',size);}
 textSize(preference('size'));$('size').onchange=()=>{textSize($('size').value);repaginate();};
-function controls(){for(const id of ['repository','branch','token','download','send-highlights','remember-token','save-token','replace-token','cancel-token','forget-saved-token','remove-book','fresh-copy','receive-updates','book-settings','book-refresh','book-check','save-connection','library-toggle','library-add','book-menu-open','saved-connections'])$(id).disabled=busy||credentialBusy;$('cancel').hidden=!busy||!abort;$('progress').hidden=!busy;$('updates-cancel').hidden=!busy||!abort;}
+function controls(){writerInk.setBusy(busy||credentialBusy);for(const id of ['ui-mode','repository','branch','token','download','send-highlights','remember-token','save-token','replace-token','cancel-token','forget-saved-token','remove-book','fresh-copy','receive-updates','book-settings','book-refresh','book-check','save-connection','library-toggle','library-add','book-menu-open','saved-connections'])$(id).disabled=busy||credentialBusy||writerTransition;$('cancel').hidden=!busy||!abort;$('progress').hidden=!busy;$('updates-cancel').hidden=!busy||!abort;}
 function lockGitHub(){client=null;clientKey='';$('token').value='';}
 const rescued=await lastConnection();if(rescued){$('repository').value=rescued.repository;$('branch').value=rescued.branch;}
 const profiles=await listConnections();const choices=$('saved-connections');for(const c of profiles)choices.add(new Option(c.repository+' · '+c.branch,c.key));choices.hidden=!profiles.length;choices.onchange=()=>{const c=profiles.find(c=>c.key===choices.value);if(c){$('repository').value=c.repository;$('branch').value=c.branch;credentials.refresh();}};
 const credentials=mountCredentials({activate:(repository,branch,token)=>{client=readerClient(repository,branch,token);clientKey=JSON.stringify([repository,branch]);},lock:lockGitHub,message,onBusy:value=>{credentialBusy=value;controls();}});
 $('send-highlights').onclick=async()=>{
+  if(!writerInk.pause()||!await writerInk.settle())return;
   if(!snapshot){message('Download a book first.',true);return;}
   if(busy||credentialBusy)return;
   busy=true;controls();
@@ -321,8 +336,9 @@ $('fresh-copy').onclick=()=>downloadBook(true,snapshot);
 $('receive-updates').onclick=()=>downloadBook(false,snapshot);
 $('updates-cancel').onclick=()=>abort?.abort();
 async function downloadBook(fresh,target=null){
+  if(!writerInk.pause()||!await writerInk.settle())return;
   if(busy||credentialBusy)return;
-  if(fresh&&!confirm('Replace '+(target?.title||target?.repository||'this book')+' with a fresh copy from GitHub? All local scene edits, annotations and reading position for this repository will be discarded, including unsent work. GitHub files and your token are kept.'))return;
+  if(fresh&&!confirm('Replace '+(target?.title||target?.repository||'this book')+' with a fresh copy from GitHub? All local scene edits, annotations, writer handwriting and reading position for this repository will be discarded, including unsent work. GitHub files and your token are kept.'))return;
   if(!highlights.beforeRender())return;
   try{highlights.prepareSend();}catch(error){message(error.message,true);return;}$('reader').inert=true;
   busy=true;controls();abort=new AbortController();$('progress').removeAttribute('value');
@@ -340,7 +356,7 @@ async function downloadBook(fresh,target=null){
     const previous=!fresh?(target||await findBook(repository,branch)):null;
     const received=previous?await receivePeerBook(previous,next):null;
     if(!previous)await saveBook(next);
-    if(fresh){clearTimeout(scrollTimer);clearBookWork(next);bookUpdates.postMessage('saved');if(libraryMode){if(snapshot?.id===next.id)snapshot=null;await libraryView.refresh(next.id);}else{replacing=true;await openBook(next,false);replacing=false;}message('Fresh copy received. Local work for this book was replaced.');return;}
+    if(fresh){if(!await writerInk.close())throw Error('Finish saving the writer draft first.');clearTimeout(scrollTimer);clearBookWork(next);await clearWriterDraft(next);bookUpdates.postMessage('saved');if(libraryMode){if(snapshot?.id===next.id)snapshot=null;await libraryView.refresh(next.id);}else{replacing=true;await openBook(next,false);replacing=false;}message('Fresh copy received. Local work for this book was replaced.');return;}
     bookUpdates.postMessage('saved');remember();await openBook(next);message(received?`Received ${received.applied} changed file(s); ${received.kept} locally changed file(s) kept.`:'Book verified and saved for offline reading. No GitHub files were changed.');
     navigator.storage?.persist?.().catch(()=>{});
   }catch(error){message(error.message,true);if(!target)setOpen('connection',true);}finally{$('reader').inert=false;busy=false;controls();abort=null;void reconcileBook();}
@@ -348,7 +364,7 @@ async function downloadBook(fresh,target=null){
 // The installed reader and Chrome can share the database while keeping separate pages in memory.
 const bookUpdates=new BroadcastChannel('sidecar-reader-book');
 let checking=false, checkAgain=false;
-function canSwitchBook(){return !libraryMode&&!replacing&&!busy&&!credentialBusy&&!document.querySelector('dialog[open]');}
+function canSwitchBook(){return !writerTransition&&!writerInk.activeStroke()&&!libraryMode&&!replacing&&!busy&&!credentialBusy&&!document.querySelector('dialog[open]');}
 async function reconcileBook(){
   if(!canSwitchBook())return;
   if(checking){checkAgain=true;return;}
@@ -370,7 +386,7 @@ async function reconcileBook(){
 }
 libraryView=mountLibrary({open:async id=>{if(busy||credentialBusy||!highlights.beforeRender())return;remember();await openBook(await selectBook(id));},add:()=>{void openSettings();},options:row=>{if(busy||credentialBusy)return;menuBook=row;$('book-menu-title').textContent=row.title;$('book-menu').showModal();},error:text=>{$('library-error').textContent=text;}});
 async function showLibrary(){
- if(busy||credentialBusy||!highlights.beforeRender())return;
+ if(writerTransition||busy||credentialBusy||!highlights.beforeRender()||!await writerInk.close())return;
  remember();clearTimeout(scrollTimer);$('updates-panel').hidden=true;libraryMode=true;document.body.classList.add('library-mode');$('library').hidden=false;$('library-toggle').hidden=true;
  if(dock)setOpen(dock,false);setOpen('connection',false);document.title='Your library · Story Sidecar';
  await libraryView.refresh(snapshot?.id);$('library-add').focus({preventScroll:true});

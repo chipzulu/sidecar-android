@@ -128,3 +128,30 @@ body.library-mode #width-handle,body.library-mode #width-feedback{display:none!i
 .writer-edge:focus-visible{outline:3px solid #345346}.writer-edge:hover:before,.writer-resizing .writer-edge:before{background:#345346}
 .writer-resizing{user-select:none}.writer-resizing #right-panel{visibility:hidden;pointer-events:none}
 @media(max-width:600px){.writer-toolbar{gap:3px;padding:5px}.writer-toolbar label{font-size:11px;gap:3px}.writer-toolbar select,.writer-toolbar button{font-size:11px;padding:3px}.writer-placeholder{font-size:12px}#writer-ink,#writer-text{padding:10px}}
+
+/* Compact mode control and real writer ink. Layout settings live in Configuration. */
+header strong{margin-right:0}header #ui-mode{margin-right:auto;min-height:38px;padding:4px 8px}
+body.library-mode #ui-mode{display:none!important}
+#writer-ink{padding:0;display:flex;flex-direction:column;overflow:hidden}
+.writer-ink-heading{flex:none;display:flex;align-items:center;justify-content:space-between;gap:4px;padding:3px 8px;border-bottom:1px solid #d9d0bc;min-height:38px}
+#writer-workspace .writer-ink-heading h2{font:12px system-ui;margin:0}
+#writer-ink-tools{display:flex;align-items:center;gap:2px}
+#writer-ink-tools>button,#writer-ink-tools>details>summary{min-height:32px;height:32px;min-width:32px;padding:2px 5px;font-size:22px;line-height:28px;text-align:center;border:0;border-radius:4px;background:transparent;color:#345346;cursor:pointer}
+#writer-ink-tools>button[aria-pressed=true]{background:#345346;color:#fff}
+.writer-more>summary{list-style:none}.writer-more>summary::-webkit-details-marker{display:none}
+.writer-more>div{position:absolute;right:4px;top:38px;z-index:8;background:#faf8f1;border:1px solid #b8ac93;box-shadow:0 4px 12px #0002;padding:4px;display:flex;flex-direction:column;max-height:calc(100% - 44px);overflow:auto}
+.writer-more>div button{font-size:13px;text-align:left;min-height:40px}
+.writer-ink-scroll{flex:1;min-height:0;overflow:auto;scrollbar-gutter:stable;overscroll-behavior:contain}
+#writer-ink-canvas{padding:0 5px;min-height:100%}
+#writer-ink-canvas .annotation-ink{touch-action:none;user-select:none;cursor:crosshair}
+#writer-ink-canvas>small{display:block;font:10px/1.4 system-ui;color:#52624e;padding:2px 4px;overflow-wrap:anywhere}
+#writer-ink-canvas>[role=status]{position:sticky;bottom:0;background:#f4eedc;pointer-events:none}
+.writer-local-hint{font:12px/1.5 system-ui;color:#706b61;margin-top:20px}
+body.writer-pen-active #manuscript-scroll,body.writer-pen-active #writer-text{touch-action:none}
+body.writer-pen-active #writer-ink-canvas{touch-action:none}
+#writer-placement .compact-hint{margin:8px 0}
+
+.writer-tools-locked{pointer-events:none;opacity:.5}
+
+#writer-ink-tools>button svg{width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;display:block}
+body:not(.writer-pen-active) #writer-ink-canvas .annotation-ink{touch-action:pan-y}

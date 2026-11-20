@@ -27,6 +27,7 @@ export function mountLibrary({open,add,error,options}){
   const line=text=>{const p=document.createElement('p');p.textContent=text;$('library-details').append(p);};
   if(item.id==='add'){line('Bring a book here from your GitHub backup.');line('Downloaded books remain available offline.');return;}
   line('Available offline');
+  if(item.writerStrokes)line('Writer draft: '+item.writerStrokes+' strokes saved on this device (not sent to GitHub).');
   let notes=0;try{notes=Object.values(JSON.parse(localStorage.getItem(workKey(item,'highlights'))||'{}')).filter(r=>r.dirty&&!r.discarded).length;}catch{}
   if(notes)line(`${notes} annotation${notes===1?'':'s'} waiting to send`);
   line(item.hasLocalWork?'Local edits stored on this device':'No local edits');

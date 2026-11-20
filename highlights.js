@@ -122,9 +122,10 @@ export function mountHighlights({reader,viewport,status,onWriting,onEditScene,on
     }
   }
   function openWriting(note){
+    if(onWriting?.()===false)return;
     if(!closePad())return;
     if(!note.ink){save({...note,noteDeleted:false,ink:{version:1,width:800,height:300,strokes:[]}});note=rows[note.id].note;}
-    onWriting?.();annotationsVisible=true;setLayer();tip.hidden=true;
+    annotationsVisible=true;setLayer();tip.hidden=true;
     if(rows[note.id]?.collapsed)persist({...rows,[note.id]:{...rows[note.id],collapsed:false}});
     repaint();reader.querySelector('.ink-note[data-note="'+note.id+'"]')?.remove();
     const box=document.createElement('aside');if(!insert(note,box)){open(note);return;}
