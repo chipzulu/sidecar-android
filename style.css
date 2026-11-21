@@ -160,3 +160,8 @@ body.writer-pen-active #writer-column-edge,body.writer-pen-active #writer-row-ed
 
 [data-working-draft]{background:#dfe8df;box-shadow:inset 0 -1px #6f8c75;box-decoration-break:clone;-webkit-box-decoration-break:clone}
 .working-draft-dialog{width:min(650px,90vw);max-height:85vh;overflow:auto;background:#faf7ed;border:1px solid #b9ae98;border-radius:8px;padding:20px}.working-draft-dialog textarea{display:block;width:100%;min-height:160px;font:17px/1.5 Georgia}.working-draft-dialog button{margin:8px 8px 0 0}.working-draft-dialog select{max-width:100%}
+
+.annotation-menu { z-index:1000; }
+.annotation-menu[open]:not(:modal) { display:flex; flex-wrap:wrap; align-items:center; gap:3px; }
+.annotation-menu:not(:modal) button { display:inline-block; width:auto; text-align:center; }
+.annotation-menu .annotation-menu-drag { cursor:move; touch-action:none; }

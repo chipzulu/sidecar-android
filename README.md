@@ -1,4 +1,15 @@
-# Story Sidecar Android Reader 0.1.64
+# Story Sidecar Android Reader 0.1.65
+
+## Reader 0.1.65 — compact floating manuscript menu
+
+Long-press or right-click prose to open Insert, Edit, Highlight and Note, with a drag handle and × close button. Dragging moves the menu without changing the original insertion/note target; the handle also supports arrow keys. Escape closes the menu. The manuscript toolbar is nonmodal so Highlight can paint words while it remains visible. After painting, Note attaches to the newly highlighted passage. Dialogs and handwriting editing close the menu.
+
+Inside a highlight, Highlight becomes Remove highlight. Removing its colour preserves the prose, annotation identity, attached typed text and ink; it remains anchored and saved through the existing scene/annotation sync format. Note opens the existing annotation instead of creating a second one. Outside a marked passage, Note creates an unhighlighted point note.
+
+Removed Insert accepted text from the conversion panel. Use the manuscript menu's Insert action; in Writer mode it still prefills accepted text. Writer handwriting pauses before manuscript menus and inline-note editing, and resuming Writer closes the inline note editor before taking pen ownership.
+
+Validation: annotation-flow and Writer-conversion browser suites cover compact labels, dragging, highlighting then Note, removing colour with ink retained after reload, insertion, clipboard handling, cancellation and Writer/inline-note input handoff. Native save and recognition regression suites also passed, including 24-stroke save/accept/reload and recognition failures with ink preserved; the native bridge is mocked in these browser tests. Physical BOOX testing remains needed. Reader update only: APK stays 0.1.20 and PC stays 0.1.143.
+
 
 ## Reader 0.1.64 — accepted Writer text at the chosen manuscript location
 

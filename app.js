@@ -23,7 +23,7 @@ const $=id=>document.getElementById(id);
 let libraryMode=true,libraryView,menuBook=null,configBook=null;
 let snapshot=null,model=null,index=-1,coverUrl='',busy=false,credentialBusy=false,client=null,clientKey='',abort=null,disposeCards=()=>{},selectedScene=null,renderRevision=0,rendering=false, replacing=false;
 function message(text,error=false){$('updates-status').textContent=text;if(libraryMode){$('library-error').textContent=text;$('library-error').classList.toggle('error',error);}$('status').textContent=text;$('status').classList.toggle('error',error);}
-const highlights=mountHighlights({reader:$('reader'),viewport:$('manuscript-scroll'),status:message,beforeMenu:()=>writerInk.pause(),canEditScene:()=>tabletTextAllowed(snapshot),onEditScene:at=>editScene(at),onConvertedDraft:at=>convertedDraft(at),onWriting:()=>{if(writer.active()){message('Switch to Reader mode to edit annotation handwriting.');return false;}if(dock)setOpen(dock,false);}});
+const highlights=mountHighlights({reader:$('reader'),viewport:$('manuscript-scroll'),status:message,beforeMenu:()=>writerInk.pause(),canEditScene:()=>tabletTextAllowed(snapshot),onEditScene:at=>editScene(at),onConvertedDraft:at=>convertedDraft(at),onWriting:()=>{if(!writerInk.pause())return false;if(dock)setOpen(dock,false);}});
 function preference(key,value){try{if(value===undefined)return localStorage.getItem('sidecar-reader:'+key);localStorage.setItem('sidecar-reader:'+key,value);}catch{/* Reading remains usable without preferences. */}}
 function remember(){if(snapshot&&!libraryMode&&!rendering&&!replacing)localStorage.setItem(workKey(snapshot,'position'),JSON.stringify({scope:index===-2?'novel':selectedScene?'scene':index===-1?'cover':'chapter',chapter:model.chapters[index]?.key??null,scene:selectedScene,y:$('manuscript-scroll').scrollTop}));}
 let pageWidth=Math.max(280,Number(preference('page-width'))||740),pageLines=Math.max(15,Math.min(60,Number(preference('page-lines'))||28)),cardMode=preference('card-layout')||'none',dock='';
@@ -32,7 +32,7 @@ const writer=mountWriterWorkspace({container:document.querySelector('.layout'),p
  canChange:()=>!libraryMode&&!busy&&!credentialBusy&&!rendering&&!writerInk.activeStroke()&&highlights.beforeRender(),beforeChange:()=>writerInk.pause(),
  onChange:()=>{if(dock)setOpen(dock,false);else layout();$('ui-mode').value=writer.active()?'writer':'reader';}
 });
-const writerInk=mountWriterInk({status:message,onInsert:text=>insertText(text)});
+const writerInk=mountWriterInk({status:message,beforeWriting:()=>highlights.beforeRender()});
 $('ui-mode').onchange=async()=>{
  const value=$('ui-mode').value==='writer';
  if(writerTransition||libraryMode||busy||credentialBusy||rendering){$('ui-mode').value=writer.active()?'writer':'reader';return;}

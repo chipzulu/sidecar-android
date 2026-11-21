@@ -324,6 +324,7 @@ export function mountHighlights({reader,viewport,status,onWriting,onEditScene,on
 
     }
 
+    for(const mark of root.querySelectorAll('mark[data-annotation="'+note.id+'"]'))mark.dataset.anchorKind=note.anchorKind||'highlight';
     note.unattached=!root.querySelector('mark[data-annotation="'+note.id+'"]');
 
     const notes=sceneNotes(scene.html).filter(n=>n.id!==note.id);
@@ -468,7 +469,7 @@ export function mountHighlights({reader,viewport,status,onWriting,onEditScene,on
 
     const note={...(reattach?rows[reattach].note:{id:crypto.randomUUID(),body:'',color:'honey'}),...anchor};
 
-    try{save(note,true);lastCreated=note.id;stopPicking();getSelection().removeAllRanges();if(write)openWriting(rows[note.id].note);else repaint();}
+    try{save(note,true);lastCreated=note.id;stopPicking();getSelection().removeAllRanges();if(write)openWriting(rows[note.id].note);else repaint();return rows[note.id].note;}
 
     catch(e){hint.textContent='Could not save highlight: '+e.message;status(e.message,true);}
 
@@ -477,8 +478,11 @@ export function mountHighlights({reader,viewport,status,onWriting,onEditScene,on
   const menu=document.createElement('dialog');menu.className='annotation-menu';document.body.append(menu);
   let lastCreated=null,menuPress=false;
   const gestures=annotationGestures(reader,{
-    menu:showMenu,
-    select:({path,range},write)=>{status('');const anchor=selectionAnchor(path,roots(path),range);if(anchor)apply(anchor,write);},
+    menu:(x,y,at)=>showMenu(x,y+28,at),
+    select:({path,range},write)=>{
+      status('');const anchor=selectionAnchor(path,roots(path),range),note=anchor&&apply(anchor,write);
+      if(note&&!write){const mark=reader.querySelector('mark[data-annotation="'+note.id+'"]');if(mark){const range=document.createRange();range.selectNodeContents(mark);showMenu(menu.offsetLeft,menu.offsetTop,{path,range});}}
+    },
     cancel:()=>status('Reading mode')
   });
   function undoNote(id){
@@ -497,7 +501,7 @@ export function mountHighlights({reader,viewport,status,onWriting,onEditScene,on
     // Writer's palm guard can block the very controls needed to dismiss it.
     if(beforeMenu?.()===false)return;
     if(menu.open)menu.close();menuPress=false;menu.replaceChildren();
-    const add=(label,action)=>{const b=document.createElement('button');b.textContent=label;b.type='button';b.onclick=()=>{menu.close();try{action();palette?.refresh();}catch(e){status(e.message,true);}};menu.append(b);};
+    const add=(label,action,keep=false)=>{const b=document.createElement('button');b.textContent=label;b.type='button';b.onclick=()=>{if(!keep)menu.close();try{action();palette?.refresh();}catch(e){status(e.message,true);}};menu.append(b);};
     if(noteId){
       if(!minimal)add('Pen',()=>{if(editingId!==noteId)openWriting(rows[noteId].note);pad?.setTool('pen');});
       if(!minimal)add('Eraser',()=>{if(editingId!==noteId)openWriting(rows[noteId].note);pad?.setTool('eraser');});
@@ -514,19 +518,34 @@ export function mountHighlights({reader,viewport,status,onWriting,onEditScene,on
       });
       if(!minimal)add('More space',()=>{if(editingId!==noteId)openWriting(rows[noteId].note);pad?.more();});
     }else if(at){
-      if(canEditScene()&&onConvertedDraft)add('Insert text / working draft',()=>{if(closePad()){repaint();onConvertedDraft(at);}});
-      if(canEditScene())add('Edit scene',()=>{if(closePad()){repaint();onEditScene?.(at);}});
-      add('Add note here',()=>{const anchor=selectionAnchor(at.path,roots(at.path),at.range);if(anchor)apply({...anchor,anchorKind:'point'});});
-      add('Highlight and annotate',()=>{if(!closePad())return;stopPicking();gestures.setMode('note');status('Draw across the words to highlight and annotate. Tap without dragging to cancel.');});
-      add('Highlight only',()=>{if(!closePad())return;stopPicking();gestures.setMode('highlight');status('Draw across the words to highlight. Tap without dragging to cancel.');});
-      if(lastCreated)add('Undo',()=>undoNote(null));
+      const node=at.range.startContainer,mark=(node.nodeType===3?node.parentElement:node).closest('mark[data-annotation]');
+      const id=mark?.dataset.annotation,existing=id&&rows[id]?.note;
+      if(canEditScene()&&onConvertedDraft)add('Insert',()=>{if(closePad()){repaint();onConvertedDraft(at);}});
+      if(canEditScene())add('Edit',()=>{if(closePad()){repaint();onEditScene?.(at);}});
+      if(existing&&existing.anchorKind!=='point')add('Remove highlight',()=>{
+        if(!closePad())return;save({...rows[id].note,anchorKind:'point'});repaint();
+        showMenu(menu.offsetLeft,menu.offsetTop,at);
+      },true);
+      else add('Highlight',()=>{if(!closePad())return;stopPicking();gestures.setMode('highlight');status('Draw across the words to highlight. Then choose Note to annotate them.');},true);
+      add('Note',()=>{
+        if(existing){openWriting(rows[id].note);return;}
+        const anchor=selectionAnchor(at.path,roots(at.path),at.range);if(anchor)apply({...anchor,anchorKind:'point'});
+      });
     }
     if(!menu.childElementCount)return;
-    menu.showModal();const r=menu.getBoundingClientRect();menu.style.left=Math.max(6,Math.min(x,innerWidth-r.width-6))+'px';menu.style.top=Math.max(6,Math.min(y,innerHeight-r.height-6))+'px';
+    const handle=document.createElement('button');handle.type='button';handle.className='annotation-menu-drag';handle.textContent='⠿';handle.setAttribute('aria-label','Move manuscript menu');
+    const close=document.createElement('button');close.type='button';close.textContent='×';close.setAttribute('aria-label','Close manuscript menu');close.onclick=()=>{gestures.setMode(null);menu.close();};
+    menu.prepend(handle);menu.append(close);
+    let drag=null;
+    handle.onpointerdown=e=>{if(e.button!==0)return;e.preventDefault();const r=menu.getBoundingClientRect();drag={id:e.pointerId,x:e.clientX-r.x,y:e.clientY-r.y};handle.setPointerCapture(e.pointerId);};
+    handle.onpointermove=e=>{if(!drag||drag.id!==e.pointerId)return;e.preventDefault();menu.style.left=Math.max(6,Math.min(e.clientX-drag.x,innerWidth-menu.offsetWidth-6))+'px';menu.style.top=Math.max(6,Math.min(e.clientY-drag.y,innerHeight-menu.offsetHeight-6))+'px';};
+    handle.onpointerup=handle.onpointercancel=()=>{drag=null;};
+    handle.onkeydown=e=>{const delta={ArrowLeft:[-16,0],ArrowRight:[16,0],ArrowUp:[0,-16],ArrowDown:[0,16]}[e.key];if(!delta)return;e.preventDefault();menu.style.left=Math.max(6,Math.min(menu.offsetLeft+delta[0],innerWidth-menu.offsetWidth-6))+'px';menu.style.top=Math.max(6,Math.min(menu.offsetTop+delta[1],innerHeight-menu.offsetHeight-6))+'px';};
+    if(noteId)menu.showModal();else menu.show();const r=menu.getBoundingClientRect();menu.style.left=Math.max(6,Math.min(x,innerWidth-r.width-6))+'px';menu.style.top=Math.max(6,Math.min(y,innerHeight-r.height-6))+'px';
   }
   menu.addEventListener('pointerdown',()=>{menuPress=true;});
   menu.addEventListener('click',e=>{if(e.detail>0&&!menuPress){e.preventDefault();e.stopImmediatePropagation();}menuPress=false;},true);
-  menu.onclick=e=>{if(e.target===menu)menu.close();};
+  menu.addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();gestures.setMode(null);menu.close();}});
   reader.addEventListener('contextmenu',e=>{
     if(e.target.closest('.note-collapse')){e.preventDefault();return;}const box=e.target.closest('.ink-note');if(!box)return;e.preventDefault();if(window.SidecarNativePen&&box.classList.contains('editing')&&e.target.closest('svg'))return;showMenu(e.clientX,e.clientY,null,box.dataset.note);
   });
