@@ -1,6 +1,24 @@
 import {adjustedPressure} from './pressure.js';
 import {browserInkInput} from './ink-input.js';
 
+// Closed <details> content can retain nonzero layout bounds in Chromium.
+// Native exclusion rectangles must describe painted controls, not layout alone.
+export function visiblePenRect(el,limit){
+ for(let node=el;node;node=node.parentElement){
+  const style=getComputedStyle(node);
+  if(node.hidden||style.display==='none'||style.visibility==='hidden'||style.visibility==='collapse'||Number(style.opacity)===0)return null;
+  const parent=node.parentElement;
+  if(parent?.tagName==='DETAILS'&&!parent.open&&node!==parent.querySelector(':scope > summary'))return null;
+ }
+ const b=el.getBoundingClientRect();if(!b.width||!b.height)return null;
+ let [left,top,right,bottom]=[Math.max(limit[0],b.left),Math.max(limit[1],b.top),Math.min(limit[2],b.right),Math.min(limit[3],b.bottom)];
+ for(let p=el.parentElement;p;p=p.parentElement){const s=getComputedStyle(p),r=p.getBoundingClientRect();
+  if(/auto|scroll|hidden|clip/.test(s.overflowX)){left=Math.max(left,r.left);right=Math.min(right,r.right);}
+  if(/auto|scroll|hidden|clip/.test(s.overflowY)){top=Math.max(top,r.top);bottom=Math.min(bottom,r.bottom);}
+ }
+ return right>left&&bottom>top?[left,top,right,bottom]:null;
+}
+
 // Protocol 1 uses CSS viewport pixels; the native host converts to physical view pixels.
 export function adaptiveInkInput(svg, callbacks, {tool='pen',browserFactory=browserInkInput}={}) {
   const erasing=tool==='eraser';
@@ -46,8 +64,8 @@ export function adaptiveInkInput(svg, callbacks, {tool='pen',browserFactory=brow
       if(/auto|scroll|hidden|clip/.test(style.overflowY)){top=Math.max(top,b.top);bottom=Math.min(bottom,b.bottom);}
     }
     const exclude=[];
-    for(const el of document.querySelectorAll('button,input,textarea,select,a,[role="button"],[role="separator"],summary,.writer-more[open],#writer-ink-canvas>[role="status"],dialog[open],header,.note-palette,#right-panel:not([hidden]),#connection:not([hidden]),#updates-panel:not([hidden])')){
-      const b=el.getBoundingClientRect();if(b.width&&b.height)exclude.push([b.left,b.top,b.right,b.bottom]);
+    for(const el of document.querySelectorAll('button,input,textarea,select,a,[role="button"],[role="separator"],summary,.writer-more[open],.writer-more[open]>div,#writer-ink-canvas>[role="status"],dialog[open],header,.note-palette,#right-panel:not([hidden]),#connection:not([hidden]),#updates-panel:not([hidden])')){
+      const bounds=visiblePenRect(el,[left,top,right,bottom]);if(bounds)exclude.push(bounds);
     }
     const enabled=!capacityBlocked&&!document.hidden&&!document.querySelector('dialog[open],.note-palette.dragging,.writer-resizing')&&(visualViewport?.scale||1)===1&&right>left&&bottom>top&&callbacks.remaining()>0;
     const next={saveReceipts:!!callbacks.isSaved,viewportWidth:innerWidth,rect:[r.left,r.top,r.right,r.bottom],limit:[left,top,right,bottom],exclude,pressurePoints:!erasing&&!!callbacks.pressure?.(),width:(callbacks.width?.()??2.5)*r.width/800,color:'#31483b',tool,eraseRadius:18,liveErase:erasing&&!!callbacks.progress,enabled};

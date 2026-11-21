@@ -5,7 +5,7 @@ import {readWriterDraft,writeWriterDraft} from './storage.js';
 
 // One independent writing draft per library book. Only commit-complete saves
 // acknowledge native strokes; unfinished writes keep their warning indicator.
-export function mountWriterInk({status}){
+export function mountWriterInk({status,onInsert}){
  const host=document.getElementById('writer-ink-canvas'),tools=document.getElementById('writer-ink-tools');
  let pad=null,owner=null,capturing=false,generation=0,locked=false,fitTimer=0,touch=null,operation=false,textDirty=false,revision=null,textState={accepted:[],pending:null};
  const button=(label,glyph,fn)=>{const b=document.createElement('button');b.type='button';b.title=label;b.setAttribute('aria-label',label);b.textContent=glyph;if(label==='Writer pen'||label==='Writer eraser'){const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('viewBox','0 0 26 26');svg.setAttribute('aria-hidden','true');const path=document.createElementNS(svg.namespaceURI,'path');path.setAttribute('d',label==='Writer pen'?'M4 20l4-1 12-12-5-5L3 14z M13 4l5 5 M4 14l5 5':'M3 14L13 4a2 2 0 0 1 3 0l5 5a2 2 0 0 1 0 3l-8 8H8z M7 10l10 10 M13 20h9');svg.append(path);b.replaceChildren(svg);}b.onclick=async()=>{try{await fn();}catch(e){status(e.message,true);}refresh();};tools.append(b);return b;};
@@ -41,6 +41,7 @@ export function mountWriterInk({status}){
   convertButton.disabled=!pad||locked||operation||!pad.strokeCount();
   accept.disabled=!pad||locked||operation||!textState.pending||textState.pending.stale;
   copy.disabled=operation||!textState.accepted.length;
+  document.getElementById('writer-insert').disabled=locked||operation||!textState.accepted.length;
  }
  function choose(tool){if(!pad||locked||operation)return;if(pad.setTool(tool)!==false){capturing=true;refresh();}}
  function pause(){if(operation)return false;if(!pad)return true;if(!pad.suspend()){status('Finish the pen stroke before changing the workspace.');return false;}capturing=false;refresh();return true;}
@@ -112,6 +113,7 @@ export function mountWriterInk({status}){
   conversionStatus.textContent='Accepted and saved on this device. Ready for the next passage.';
  });
  copy.onclick=async()=>{try{await navigator.clipboard.writeText(textState.accepted.map(unit=>unit.text).join('\n\n'));conversionStatus.textContent='Accepted text copied.';}catch{conversionStatus.textContent='Copy failed. Pause handwriting to select and copy the text.';}};
+ document.getElementById('writer-insert').onclick=async()=>{if(!pause()||!await settle())return;try{onInsert?.(textState.accepted.map(unit=>unit.text).join('\n\n'));}catch(e){status(e.message,true);}};
  function fitSurface(){
   clearTimeout(fitTimer);if(!pad||operation)return;
   const svg=host.querySelector('svg.annotation-ink'),width=svg?.getBoundingClientRect().width;

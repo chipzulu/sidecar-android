@@ -511,7 +511,7 @@ export function mountHighlights({reader,viewport,status,onWriting,onEditScene,on
       });
       if(!minimal)add('More space',()=>{if(editingId!==noteId)openWriting(rows[noteId].note);pad?.more();});
     }else if(at){
-      if(canEditScene()&&onConvertedDraft)add('Paste converted draft after here',()=>{if(closePad()){repaint();onConvertedDraft(at);}});
+      if(canEditScene()&&onConvertedDraft)add('Insert text / working draft',()=>{if(closePad()){repaint();onConvertedDraft(at);}});
       if(canEditScene())add('Edit scene',()=>{if(closePad()){repaint();onEditScene?.(at);}});
       add('Add note here',()=>{const anchor=selectionAnchor(at.path,roots(at.path),at.range);if(anchor)apply({...anchor,anchorKind:'point'});});
       add('Highlight and annotate',()=>{if(!closePad())return;stopPicking();gestures.setMode('note');status('Draw across the words to highlight and annotate. Tap without dragging to cancel.');});

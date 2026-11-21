@@ -1,3 +1,4 @@
+import {validDraftId} from './working-draft.js';
 import { keepMarker } from './keep-together.js';
 import { normalizeBlockIndent } from "./manuscript-format.js";
 
@@ -56,10 +57,12 @@ function cleanInline(source, targetDocument, keepAnnotations) {
 
   const styledItalic = source.tagName === "SPAN" && /italic/i.test(source.style?.fontStyle || "");
   const annotation = keepAnnotations && source.tagName === 'MARK' && /^[a-f0-9-]{36}$/.test(source.dataset.annotation || '');
-  const fragmentOrElement = annotation ? targetDocument.createElement('mark') : INLINE_ELEMENTS.has(source.tagName) || styledItalic
+  const workingDraft=source.tagName==='SPAN'&&validDraftId(source.dataset.workingDraft);
+  const fragmentOrElement = workingDraft ? targetDocument.createElement('span') : annotation ? targetDocument.createElement('mark') : INLINE_ELEMENTS.has(source.tagName) || styledItalic
     ? targetDocument.createElement(styledItalic || source.tagName === "I" ? "em" : source.tagName === "B" ? "strong" : source.tagName.toLowerCase())
     : targetDocument.createDocumentFragment();
 
+  if(workingDraft)fragmentOrElement.dataset.workingDraft=source.dataset.workingDraft;
   if (annotation) fragmentOrElement.dataset.annotation = source.dataset.annotation;
   for (const child of source.childNodes) {
     const cleanChild = cleanInline(child, targetDocument, keepAnnotations);
@@ -126,7 +129,7 @@ function appendRootNode(source, destination, targetDocument, keepAnnotations) {
     return;
   }
 
-  if (INLINE_ELEMENTS.has(source.tagName)) {
+  if (INLINE_ELEMENTS.has(source.tagName)||(source.tagName==='SPAN'&&validDraftId(source.dataset.workingDraft))) {
     const paragraph = targetDocument.createElement("p");
     const cleanChild = cleanInline(source, targetDocument, keepAnnotations);
     if (cleanChild) paragraph.append(cleanChild);

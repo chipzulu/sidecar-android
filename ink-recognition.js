@@ -16,7 +16,7 @@ export function recognizeInk(ink,onProgress=()=>{}){
 export function showRecognition(ink) {
  const dialog=document.createElement('dialog');dialog.className='ink-recognition';
  dialog.setAttribute('aria-label','Recognized handwriting');
- dialog.innerHTML='<h2>Recognized text</h2><p role="status"></p><textarea aria-label="Recognized text" readonly hidden></textarea><div><button data-copy disabled>Copy</button> <button data-close>Close</button></div>';
+ dialog.innerHTML='<h2>Recognized text</h2><p role="status"></p><textarea aria-label="Recognized text" readonly hidden></textarea><div><button data-copy disabled>Copy</button> <button data-insert disabled>Insert into manuscript…</button> <button data-close>Close</button></div>';
  const status=dialog.querySelector('[role=status]'),text=dialog.querySelector('textarea'),copy=dialog.querySelector('[data-copy]');
  document.body.append(dialog);dialog.showModal();
  return new Promise(resolve=>{
@@ -25,6 +25,7 @@ export function showRecognition(ink) {
   function cleanup(){clearTimeout(timer);if(bridge)bridge.onmessage=previous;}
   function close(){if(finished)return;finished=true;cleanup();dialog.close();dialog.remove();resolve();}
   dialog.querySelector('[data-close]').onclick=close;dialog.oncancel=e=>{e.preventDefault();close();};
+  dialog.querySelector('[data-insert]').onclick=()=>{const value=text.value;close();queueMicrotask(()=>document.dispatchEvent(new CustomEvent('insert-recognized-text',{detail:{text:value}})));};
   copy.onclick=async()=>{try{await navigator.clipboard.writeText(text.value);status.textContent='Copied. Your handwritten note is unchanged.';}catch{status.textContent='Copy is unavailable. Select the text and use the system Copy command.';text.focus();text.select();}};
   if(!bridge?.postMessage){status.textContent='Conversion requires BOOX APK 0.1.12 or newer. It is not available in the browser Reader.';return;}
   if(!ink?.strokes?.length){status.textContent='Write something in this note before converting.';return;}
@@ -36,7 +37,7 @@ export function showRecognition(ink) {
    if(typeof result.stage==='string'){status.textContent=result.stage+'… Your handwriting is unchanged.';return;}
    cleanup();
    if(result.error){status.textContent=result.error;return;}
-   text.value=typeof result.text==='string'?result.text:'';text.hidden=false;copy.disabled=!text.value;
+   text.value=typeof result.text==='string'?result.text:'';text.hidden=false;copy.disabled=!text.value;dialog.querySelector('[data-insert]').disabled=!text.value;
    status.textContent=text.value?'English recognition · handwriting unchanged.':'No text was recognized. Your handwriting is unchanged.';
   };
   timer=setTimeout(()=>{cleanup();status.textContent='Recognition did not respond. Your handwriting is unchanged. Close and try again.';},45000);

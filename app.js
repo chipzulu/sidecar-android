@@ -1,3 +1,4 @@
+import {insertManuscriptDialog,assimilateManuscriptDraft} from './manuscript-insert.js';
 import {mountWriterInk} from './writer-ink.js';
 import {mountWriterWorkspace} from './writer-workspace.js';
 import {allBlocks,newBlock,anchorIndex,appendDraftBlocks,finishAssimilation} from './draft-blocks.js';
@@ -32,7 +33,7 @@ const writer=mountWriterWorkspace({container:document.querySelector('.layout'),p
  canChange:()=>!libraryMode&&!busy&&!credentialBusy&&!rendering&&!writerInk.activeStroke()&&highlights.beforeRender(),beforeChange:()=>writerInk.pause(),
  onChange:()=>{if(dock)setOpen(dock,false);else layout();$('ui-mode').value=writer.active()?'writer':'reader';}
 });
-const writerInk=mountWriterInk({status:message});
+const writerInk=mountWriterInk({status:message,onInsert:text=>insertText(text)});
 $('ui-mode').onchange=async()=>{
  const value=$('ui-mode').value==='writer';
  if(writerTransition||libraryMode||busy||credentialBusy||rendering){$('ui-mode').value=writer.active()?'writer':'reader';return;}
@@ -182,16 +183,23 @@ async function render(which,scenePath=null,scroll=true,preserve=false){
 }
 let tappedBlock=null;
 $('reader').addEventListener('click',event=>{tappedBlock=event.target.closest('[data-block]');});
-function convertedDraft(at){
-  if(!snapshot||busy||rendering||!tabletTextAllowed(snapshot)||!highlights.beforeRender())return;
-  try{
-    const target=at?.range?.startContainer;
-    const block=(target?.nodeType===3?target.parentElement:target)?.closest('[data-block]');
-    const scene=model.chapters.flatMap(c=>c.scenes).find(s=>s.path===at?.path);
-    if(!scene||!block)throw Error('Choose a manuscript paragraph first.');
-    showConverted(scene,newBlock(snapshot,scene,Number(block.dataset.block)));
-  }catch(e){message(e.message,true);}
+function insertText(text='',at=null){
+ if(!snapshot||busy||rendering||!highlights.beforeRender())return;
+ const target=at?.range?.startContainer;
+ const block=(target?.nodeType===3?target.parentElement:target)?.closest('[data-block]')||tappedBlock;
+ insertManuscriptDialog(snapshot,model.chapters.flatMap(c=>c.scenes),{text,path:at?.path||block?.dataset.scene,index:Number(block?.dataset.block)||0},scene=>{highlights.sceneEdited(scene);repaginate();message('Inserted and saved on this tablet. Send changes to share the scene with your PC.');});
 }
+function convertedDraft(at){try{insertText('',at);}catch(e){message(e.message,true);}}
+document.addEventListener('insert-recognized-text',event=>{try{insertText(event.detail.text);}catch(e){message(e.message,true);}});
+$('reader').addEventListener('click',event=>{
+ const draft=event.target.closest('[data-working-draft]');if(!draft||busy||rendering)return;
+ event.stopImmediatePropagation();if(!highlights.beforeRender())return;
+ const block=draft.closest('[data-block]'),scene=model.chapters.flatMap(c=>c.scenes).find(s=>s.path===block?.dataset.scene);if(!scene)return;
+ const dialog=document.createElement('dialog');dialog.className='working-draft-dialog';dialog.innerHTML='<h3>Working draft</h3><p>This text is not yet assimilated.</p><button data-assimilate>Assimilate</button><button data-edit>Edit scene</button><button data-close>Close</button><p role="status"></p>';
+ const close=()=>{dialog.close();dialog.remove();};dialog.querySelector('[data-close]').onclick=close;dialog.oncancel=e=>{e.preventDefault();close();};
+ dialog.querySelector('[data-assimilate]').onclick=()=>{try{assimilateManuscriptDraft(snapshot,scene,draft.dataset.workingDraft);close();highlights.sceneEdited(scene);repaginate();}catch(e){dialog.querySelector('[role=status]').textContent=e.message;}};
+ dialog.querySelector('[data-edit]').onclick=()=>{close();writeScene(snapshot,scene,Number(block.dataset.block),()=>{highlights.sceneEdited(scene);repaginate();});};document.body.append(dialog);dialog.showModal();
+},true);
 function showConverted(scene,row){
   if(!tabletTextAllowed(snapshot)){message('This book is set to annotations only.',true);return;}
   if(row.transaction){try{finishAssimilation(snapshot,scene,row,storeAnnotatedScene);repaginate();return;}catch(e){message(e.message,true);return;}}

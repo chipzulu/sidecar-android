@@ -1,4 +1,32 @@
-# Story Sidecar Android Reader 0.1.59
+# Story Sidecar Android Reader 0.1.61
+
+## Working-draft foundation — PC 0.1.143 / Reader 0.1.61
+
+Keep BOOX APK 0.1.19. Update both PC extension and Pages Reader before editing these blocks: older versions do not understand or preserve the new marker.
+
+Non-assimilated text now lives inside the scene HTML as a validated `data-working-draft` span identifier, shared by paragraphs belonging to one inserted block. It has a faint green background and subtle underline, with full-contrast text. The status survives sanitization, scene saving and the normal full Send changes / Receive changes path. It is independent of annotation highlights. Assimilate removes the draft status from that group in the scene without changing its prose or intentional emphasis.
+
+PC: right-click inside manuscript prose to open Insert normally / Insert as working draft. Paste or type into the dialog; insertion uses the saved cursor/selection. Ordinary Ctrl+V remains ordinary paste. Existing working-draft text can be edited directly; right-click it for Assimilate this block. New draft insertion uses direct marked DOM insertion because Chromium's insertHTML was observed stripping the marker; multiline PC insertions use soft breaks inside the group.
+
+Reader: after accepting Writer conversions, choose Insert accepted text… and select a scene and paragraph position (or the beginning of the scene). Choose Insert normally or Insert as working draft. The source accepted text remains available in Writer; insertion does not delete it. In Reader mode, the manuscript context menu offers Insert text / working draft for pasted or typed text. The recognized-handwriting dialog also offers Insert into manuscript… with the same choices. Insertions are explicit paragraph positions in this step, not arbitrary character offsets. Tap a marked draft for Assimilate or Edit scene. The existing annotations-only restriction blocks text insertion/assimilation.
+
+Manuscript DOCX retains ordinary 12 pt prose and emits draft text at 10 pt, without an added label or forced italics; intentional emphasis remains. Publication DOCX (both sizes) and EPUB stop with the affected chapter/scene list until working drafts are assimilated, including empty marked blocks. The old BOOX Notes companion notes remain separate notes; they are not silently converted to this new inline format.
+
+Still for subsequent steps: reopen an inline block in Writer and replace that same block after editing; highlight-removal controls. This release supplies the shared format, insertion, direct scene editing, assimilation, sync and export safeguards.
+
+Validation: 196 unit tests plus five browser suites passed. Working-draft tests cover grouped marker round-trip, preservation of italics, manuscript 10/12 pt output, publication/EPUB rejection, PC insertion/assimilation, tablet insertion/assimilation and Send preparation preserving markers. Writer conversion tests now exercise inserting accepted text into a scene. Existing handwriting, recognition and receive/conflict tests pass.
+
+
+## Reader 0.1.60 — remove invisible Writer pen exclusion
+
+Step 1 only. Keep BOOX APK 0.1.19 and PC 0.1.142. Update the Pages Reader using this ZIP; no new APK is needed. Non-assimilated draft insertion/export is not implemented in this release.
+
+Reproduced an exclusion below the Writer toolbar caused by descendants of the closed More (⋯) menu retaining layout bounds. The native bridge previously accepted any nonzero button rectangle, even when closed details content was not painted. Closed Writer menu content now explicitly has display:none, and pen exclusions reject hidden/closed-details ancestors. Visible exclusion rectangles are clipped to the actual writing surface and clipping ancestors; controls outside the surface do not create holes. The full visible More popup is protected while open and excluded bounds disappear when it closes. Existing ink coordinates, pressure and save behavior are unchanged.
+
+Validation: the new regression failed before the fix with a blocked point beneath the closed menu. It now passes, including opening/closing the menu and deliberately retained nonzero hidden bounds. Four browser suites pass: Writer ink, native pen bridge, native annotation save/reload, and Writer conversion. Hardware remains mocked in automated tests.
+
+Device test: write strokes through the former dead rectangle below Aa. Open and close ⋯ and repeat, then move/scroll the writing area and repeat. The entire unobscured frame should accept ink. Retain APK 0.1.19's palm/Back protection.
+
 
 ## Native Writer palm gate and input diagnostics — Reader 0.1.59 / APK 0.1.18
 
