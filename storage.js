@@ -64,7 +64,7 @@ export async function removeBook(book){
  await done;clearBookWork(book);
 }
 export async function markBookSent(book){const d=await db(),tx=d.transaction('library','readwrite'),done=completed(tx),s=tx.objectStore('library'),r=s.get(book.id);r.onsuccess=()=>{if(r.result)s.put({...r.result,lastSentAt:new Date().toISOString()});};await done;}
-export async function listBooks(){const d=await db(),rows=await request(d.transaction('library').objectStore('library').getAll());return Promise.all(rows.map(async row=>({...row,writerStrokes:(await request(d.transaction('meta').objectStore('meta').get('writer-info:'+row.id)))?.strokes||0,offline:true,hasLocalWork:Object.keys(localStorage).some(k=>k.startsWith('sidecar-book:'+row.id+':draft:')),remoteStatus:row.remoteCheckedAt?(row.remoteChanged?'newer-backup':'up-to-date'):'not-checked'})));}
+export async function listBooks(){const d=await db(),rows=await request(d.transaction('library').objectStore('library').getAll());return Promise.all(rows.map(async row=>({...row,writerStrokes:(await request(d.transaction('meta').objectStore('meta').get('writer-info:'+row.id)))?.strokes||0,writerTextUnits:(await request(d.transaction('meta').objectStore('meta').get('writer-info:'+row.id)))?.textUnits||0,offline:true,hasLocalWork:Object.keys(localStorage).some(k=>k.startsWith('sidecar-book:'+row.id+':draft:')),remoteStatus:row.remoteCheckedAt?(row.remoteChanged?'newer-backup':'up-to-date'):'not-checked'})));}
 
 export async function relinkBook(book,repository,branch){
  const d=await db(),c=connection({repository,branch}),tx=d.transaction(['library','snapshots','connections'],'readwrite'),done=completed(tx);
@@ -83,7 +83,7 @@ export async function readWriterDraft(book){
  if(row&&(!row.ink||!validInk(row.ink)))throw Error('The saved writer draft could not be read. It has not been overwritten.');
  return row||null;
 }
-export async function writeWriterDraft(book,ink,expectedRevision){
+export async function writeWriterDraft(book,ink,expectedRevision,textState){
  if(!ink||!validInk(ink))throw Error('Invalid writer handwriting.');
  const d=await db(),tx=d.transaction(['library','meta'],'readwrite'),done=completed(tx),meta=tx.objectStore('meta');
  let reason,revision=crypto.randomUUID();
@@ -93,8 +93,13 @@ export async function writeWriterDraft(book,ink,expectedRevision){
   const previous=meta.get('writer-info:'+book.id);previous.onsuccess=()=>{
    if((previous.result?.revision||null)!==(expectedRevision||null)){reason=Error('Another Reader window changed this writer draft. This copy is still on screen.');tx.abort();return;}
    const updatedAt=new Date().toISOString();
-   meta.put({ink,revision,updatedAt},'writer:'+book.id);
-   meta.put({revision,updatedAt,strokes:ink.strokes.length},'writer-info:'+book.id);
+   const current=meta.get('writer:'+book.id);current.onsuccess=()=>{
+    const text=textState===undefined?(current.result?.text||{accepted:[],pending:null}):textState;
+    try{
+     meta.put({ink,revision,updatedAt,text},'writer:'+book.id);
+     meta.put({revision,updatedAt,strokes:ink.strokes.length,textUnits:text.accepted.length+(text.pending?1:0)},'writer-info:'+book.id);
+    }catch(e){reason=e;try{tx.abort();}catch{}}
+   };
   };
  };
  try{await done;}catch(e){throw reason||e;}return revision;

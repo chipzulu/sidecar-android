@@ -1,3 +1,17 @@
+// Writer conversion returns text without opening another editing surface.
+export function recognizeInk(ink,onProgress=()=>{}){
+ return new Promise((resolve,reject)=>{
+  const bridge=window.SidecarRecognition,id=crypto.randomUUID();
+  if(!bridge?.postMessage){reject(Error('Conversion requires the BOOX APK. Your handwriting is unchanged.'));return;}
+  const previous=bridge.onmessage;let timer;
+  const finish=(error,text)=>{clearTimeout(timer);if(bridge.onmessage===receive)bridge.onmessage=previous;error?reject(Error(error)):resolve(text);};
+  const receive=event=>{let result;try{result=JSON.parse(event.data);}catch{return;}if(result.id!==id)return;
+   if(result.stage){onProgress(result.stage);return;}finish(result.error,typeof result.text==='string'?result.text:'');};
+  bridge.onmessage=receive;
+  timer=setTimeout(()=>finish('BOOX recognition timed out. Your handwriting is unchanged.'),45000);
+  try{bridge.postMessage(JSON.stringify({id,ink}));}catch{finish('Could not start recognition. Your handwriting is unchanged.');}
+ });
+}
 // Experimental BOOX-only conversion. Never mutates or replaces saved ink.
 export function showRecognition(ink) {
  const dialog=document.createElement('dialog');dialog.className='ink-recognition';

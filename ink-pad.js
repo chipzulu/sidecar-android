@@ -4,7 +4,7 @@ import {adaptiveInkInput} from './ink-native.js';
 import {eraserInput,strokeTouchesSweep,eraserSweep,prepareStroke} from './ink-eraser.js';
 
 // Input adapters provide completed strokes. Persistence never runs during pointer movement.
-export function inkPad(host, initial, save, inputFactory=adaptiveInkInput, {quiet=false,onHold,asyncSave=false,writer=false}={}) {
+export function inkPad(host, initial, save, inputFactory=adaptiveInkInput, {quiet=false,onHold,asyncSave=false,writer=false,onContentChange}={}) {
   let ink=structuredClone(initial||{version:1,width:800,height:300,strokes:[]});
   let penWidth=2.5;try{const value=Number(localStorage.getItem("sidecar-reader:pen-width"));if([2.5,4,6].includes(value))penWidth=value;}catch{}
   let pressure=false;try{pressure=localStorage.getItem('sidecar-reader:pen-pressure')==='true';}catch{}
@@ -35,7 +35,8 @@ export function inkPad(host, initial, save, inputFactory=adaptiveInkInput, {quie
     try{if(failed){save(ink,false);failed=false;}if(pending){save(ink,true);pending=false;}input?.confirmSaved?.();message('Saved on this device · '+ink.strokes.length+' strokes');window.sidecarInkSavedCount=ink.strokes.length;return true;}
     catch(e){message('Could not save handwriting: '+e.message);return false;}
   }
-  function checkpoint(){
+  function checkpoint(contentChanged=true){
+    if(contentChanged)onContentChange?.();
     pending=true;
     if(asyncSave){version++;void persistAsync();return;}
     try{save(ink,false);failed=false;message('Saved on this device');}
@@ -105,10 +106,10 @@ export function inkPad(host, initial, save, inputFactory=adaptiveInkInput, {quie
   const actions={};
   function button(label,action){actions[label]=()=>{if(!input?.active())action();};const b=document.createElement('button');b.type='button';b.textContent=label;b.onclick=actions[label];toolbar.append(b);}
   button('Undo stroke',()=>{if(history.length)ink=history.pop();else if(ink.strokes.length)ink={...ink,strokes:ink.strokes.slice(0,-1),strokeWidths:widths().slice(0,-1)};else return;redraw();checkpoint();});
-  button('More space',()=>{remember();ink={...ink,height:Math.min(12000,ink.height+200)};svg.setAttribute('viewBox','0 0 800 '+ink.height);checkpoint();});
+  button('More space',()=>{remember();ink={...ink,height:Math.min(12000,ink.height+200)};svg.setAttribute('viewBox','0 0 800 '+ink.height);checkpoint(false);});
   button('Clear handwriting',()=>{if(!ink.strokes.length||!confirm(writer?'Clear this writer draft? Undo is available while this workspace remains open.':'Clear the handwriting in this annotation?'))return;remember();ink={version:1,width:800,height:initial?.height||300,strokes:[]};redraw();checkpoint();});
   function finish(){if(input?.finish()===false){message("Finish the pen stroke before closing this note.");return false;}return flush();}
   const hidden=()=>{if(document.hidden)finish();};
   window.addEventListener('pagehide',finish);document.addEventListener('visibilitychange',hidden);
-  return {ensureHeight(value){minimumHeight=Math.max(80,Math.min(12000,Math.ceil(value)));if(input?.active())return false;if(ink.height<minimumHeight){ink={...ink,height:minimumHeight};svg.setAttribute('viewBox','0 0 800 '+ink.height);checkpoint();}return true;},active:()=>!!input?.active(),settle:async()=>{if(input?.active())return false;return asyncSave?persistAsync():finish();},copy:()=>structuredClone(ink),snapshot:()=>finish()?structuredClone(ink):null,suspend(){if(input?.active())return false;input?.dispose();input=null;return true;},resume(){if(!input)setTool(mode);},save:finish,tool:()=>mode,setTool,undo:()=>actions['Undo stroke'](),more:()=>actions['More space'](),clear:()=>actions['Clear handwriting'](),dispose(){clearTimeout(timer);input?.dispose();window.removeEventListener('pagehide',finish);document.removeEventListener('visibilitychange',hidden);}};
+  return {strokeCount:()=>ink.strokes.length,ensureHeight(value){minimumHeight=Math.max(80,Math.min(12000,Math.ceil(value)));if(input?.active())return false;if(ink.height<minimumHeight){ink={...ink,height:minimumHeight};svg.setAttribute('viewBox','0 0 800 '+ink.height);checkpoint(false);}return true;},active:()=>!!input?.active(),settle:async()=>{if(input?.active())return false;return asyncSave?persistAsync():finish();},copy:()=>structuredClone(ink),snapshot:()=>finish()?structuredClone(ink):null,suspend(){if(input?.active())return false;input?.dispose();input=null;return true;},resume(){if(!input)setTool(mode);},save:finish,tool:()=>mode,setTool,undo:()=>actions['Undo stroke'](),more:()=>actions['More space'](),clear:()=>actions['Clear handwriting'](),dispose(){clearTimeout(timer);input?.dispose();window.removeEventListener('pagehide',finish);document.removeEventListener('visibilitychange',hidden);}};
 }

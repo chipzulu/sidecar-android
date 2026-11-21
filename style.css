@@ -159,3 +159,5 @@ body:not(.writer-pen-active) #writer-ink-canvas .annotation-ink{touch-action:pan
 /* Match the native white ink surface throughout the writer frame. */
 #writer-ink,.writer-ink-scroll,#writer-ink-canvas,#writer-ink-canvas .annotation-ink,#writer-ink-canvas>[role=status]{background:#fff}
 body.writer-pen-active #writer-column-edge,body.writer-pen-active #writer-row-edge{touch-action:none}
+
+#writer-text-controls{display:flex;gap:6px;flex-wrap:wrap} #writer-accepted p,#writer-pending{white-space:pre-wrap;overflow-wrap:anywhere} #writer-pending{border-left:3px solid #345346;padding:10px;background:#f3f5ee} #writer-pending.stale{border-color:#92723d} #writer-conversion-status{font-size:.85rem}

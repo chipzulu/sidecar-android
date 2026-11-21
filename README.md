@@ -1,4 +1,17 @@
-# Story Sidecar Android Reader 0.1.55
+# Story Sidecar Android Reader 0.1.56
+
+## Writer conversion, step 3 — Reader 0.1.56
+
+Keep BOOX APK 0.1.17 and PC 0.1.141. Upload the ZIP's `site/` contents to Pages and update Reader until About shows 0.1.56. No new APK is needed.
+
+Configuration no longer has a Close button: tap Configuration again or outside the panel. Native Eraser style now lives in Configuration, rather than About.
+
+In Writer mode, use **Aa (Convert)** in the Handwriting strip. BOOX recognition fills one pending passage in Converted text without deleting ink. Convert again replaces only that pending passage. Changing handwriting makes the pending result stale; convert again before accepting. **Accept** atomically saves the passage and clears the handwriting only after the database commit. Earlier accepted passages remain. Failed saves retain ink and text; Retry save is in ⋯. Copy accepted text copies the accumulated passages. Writer ink and text recover per book after closing/reloading and remain local to this device; manuscript insertion and GitHub transfer are later steps. Removing a book or refreshing/overwriting it removes these local drafts after confirmation.
+
+Test: write, Convert, amend ink, Convert again, Accept, then write and accept another passage. Reopen the book and verify both passages. Browser tests cover pending replacement, stale rejection, forced acceptance failure without ink loss, committed acceptance, append/recovery, and existing handwriting/layout behavior. Physical BOOX recognition and palm behavior still need device testing.
+
+For system navigation, BOOX Settings → System Navigation offers navigation-bar/bottom-gesture settings and side gestures (firmware-dependent). The Navigation Ball can be dragged away from the writing hand, for example to the upper left. A swipe down from the top right opens Control Center. Android navigation is outside Reader's touch protection; this release does not change system settings.
+
 
 ## Writer palm and full-height surface fix — Reader 0.1.55
 
