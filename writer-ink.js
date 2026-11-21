@@ -5,7 +5,7 @@ import {readWriterDraft,writeWriterDraft} from './storage.js';
 // acknowledge native strokes; unfinished writes keep their warning indicator.
 export function mountWriterInk({status}){
  const host=document.getElementById('writer-ink-canvas'),tools=document.getElementById('writer-ink-tools');
- let pad=null,owner=null,capturing=false,generation=0,locked=false;
+ let pad=null,owner=null,capturing=false,generation=0,locked=false,fitTimer=0,touch=null;
  const button=(label,glyph,fn)=>{const b=document.createElement('button');b.type='button';b.title=label;b.setAttribute('aria-label',label);b.textContent=glyph;if(label==='Writer pen'||label==='Writer eraser'){const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('viewBox','0 0 26 26');svg.setAttribute('aria-hidden','true');const path=document.createElementNS(svg.namespaceURI,'path');path.setAttribute('d',label==='Writer pen'?'M4 20l4-1 12-12-5-5L3 14z M13 4l5 5 M4 14l5 5':'M3 14L13 4a2 2 0 0 1 3 0l5 5a2 2 0 0 1 0 3l-8 8H8z M7 10l10 10 M13 20h9');svg.append(path);b.replaceChildren(svg);}b.onclick=async()=>{try{await fn();}catch(e){status(e.message,true);}refresh();};tools.append(b);return b;};
  const pen=button('Writer pen','✎',()=>choose('pen'));
  const eraser=button('Writer eraser','▱',()=>choose('eraser'));
@@ -35,7 +35,7 @@ export function mountWriterInk({status}){
  function choose(tool){if(!pad||locked)return;if(pad.setTool(tool)!==false){capturing=true;refresh();}}
  function pause(){if(!pad)return true;if(!pad.suspend()){status('Finish the pen stroke before changing the workspace.');return false;}capturing=false;refresh();return true;}
  async function close(){
-  generation++;
+  generation++;clearTimeout(fitTimer);
   if(pad){if(!pause())return false;if(!await pad.settle()){status('Handwriting has not finished saving. Stay here and retry, or copy ink data from ⋯.',true);return false;}pad.dispose();pad=null;}
   owner=null;capturing=false;host.replaceChildren();refresh();return true;
  }
@@ -49,12 +49,33 @@ export function mountWriterInk({status}){
    const bounds=host.parentElement.getBoundingClientRect();
    const initial=saved?.ink||{version:1,width:800,height:Math.max(300,Math.min(12000,Math.floor((bounds.height-50)*800/Math.max(1,bounds.width)))),strokes:[]};
    pad=inkPad(host,initial,async ink=>{revision=await writeWriterDraft(book,ink,revision);},undefined,{quiet:true,asyncSave:true,writer:true});
-   capturing=true;if(locked)pause();refresh();
+   capturing=true;if(locked)pause();refresh();fitSurface();
   }catch(e){if(ticket!==generation)return;owner=null;host.textContent='Could not load writing draft. '+e.message;const retry=document.createElement('button');retry.textContent='Retry';retry.onclick=()=>{void open(book);};host.append(retry);status(e.message,true);refresh();}
  }
+ function fitSurface(){
+  clearTimeout(fitTimer);if(!pad)return;
+  const svg=host.querySelector('svg.annotation-ink'),width=svg?.getBoundingClientRect().width;
+  if(!width||host.parentElement.clientHeight<=0)return;
+  if(!pad.ensureHeight(host.parentElement.clientHeight*800/width))fitTimer=setTimeout(fitSurface,100);
+ }
+ new ResizeObserver(fitSurface).observe(host.parentElement);
+ new ResizeObserver(fitSurface).observe(host);
+ // A resting palm must not press a tool. Finger tools require a short, small,
+ // completed tap; the pen and keyboard retain ordinary button behaviour.
+ for(const name of ['pointerdown','pointermove','pointerup','pointercancel','click'])document.addEventListener(name,e=>{
+  if(!capturing||e.pointerType!=='touch'||!tools.contains(e.target))return;
+  e.preventDefault();e.stopImmediatePropagation();
+  const target=e.target.closest('button,summary');
+  if(name==='pointerdown'){
+   if(touch){touch=null;return;}
+   touch=target&&!pad?.active()&&e.width<32&&e.height<32?{id:e.pointerId,target,x:e.clientX,y:e.clientY,time:performance.now()}:null;
+  }else if(name==='pointermove'&&touch?.id===e.pointerId){if(Math.hypot(e.clientX-touch.x,e.clientY-touch.y)>8||e.width>=32||e.height>=32)touch=null;}
+  else if(name==='pointerup'&&touch?.id===e.pointerId){const tap=touch;touch=null;if(target===tap.target&&performance.now()-tap.time<400&&!pad?.active())tap.target.click();}
+  else if(name==='pointercancel')touch=null;
+ },true);
  // Fingers/palms cannot draw. While the pen is enabled, also protect the two
  // reading surfaces from palm scrolling/clicks. Explicit controls remain usable.
- const surface=target=>target.closest?.('#manuscript-scroll,#writer-text,#writer-ink-canvas');
+ const surface=target=>target.closest?.('#manuscript-scroll,#writer-text,#writer-ink-canvas,#writer-column-edge,#writer-row-edge');
  for(const name of ['pointerdown','pointermove','pointerup','click'])document.addEventListener(name,e=>{
   if(capturing&&surface(e.target)&&(e.pointerType==='touch'||e.sourceCapabilities?.firesTouchEvents)){e.preventDefault();e.stopImmediatePropagation();}
  },true);

@@ -1,4 +1,15 @@
-# Story Sidecar Android Reader 0.1.54
+# Story Sidecar Android Reader 0.1.55
+
+## Writer palm and full-height surface fix — Reader 0.1.55
+
+Keep APK 0.1.17 and PC 0.1.141. Two Writer-mode defects are addressed: touch contact on a divider previously paused the pen immediately, and a saved ink surface could occupy only part of a larger handwriting frame.
+
+While handwriting is enabled, palm/finger contacts on the dividers are ignored. Use the pen to resize, or deliberately tap ✓ first and then drag by finger. Tool touches must be a short completed tap with little movement and a small contact area; broad or resting contacts do not trigger Pen/Eraser/Pause. Pen and keyboard controls retain normal behaviour. Hardware may report contact sizes differently, so Note Max palm testing is still needed.
+
+The drawing surface now grows to cover the visible frame when reopening or resizing. Existing stroke coordinates and pressure are preserved; resizing does not stretch or delete the recorded stroke data. Growth waits until the current stroke is finished and is saved with the draft. Undo cannot restore a canvas smaller than the current visible area. The whole handwriting frame uses white to match the native writing surface, eliminating the deliberate colour boundary outside the old shorter canvas. Native refresh quality still requires physical-device verification.
+
+Validation covers broad palm contacts on both dividers and Pause, deliberate short finger taps, reopening a short saved surface, a stroke near the frame bottom, growth after resizing without changes to existing points, saved-draft recovery and save acknowledgements.
+
 
 ## Writer handwriting, step 2 — Reader 0.1.54
 

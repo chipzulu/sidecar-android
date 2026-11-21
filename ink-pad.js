@@ -12,7 +12,7 @@ export function inkPad(host, initial, save, inputFactory=adaptiveInkInput, {quie
   const widths=()=>ink.strokeWidths||ink.strokes.map(()=>2.5);
   let count=ink.strokes.reduce((n,s)=>n+s.length,0),timer=0,pending=false,failed=false,started=0,nativeStroke=false;
   let input,mode='pen',eraseStart=null,eraseLines=[];const history=[];
-  let version=0,savedVersion=0,writeTask=null;
+  let version=0,savedVersion=0,writeTask=null,minimumHeight=80;
   function remember(){history.push(ink);if(history.length>50)history.shift();}
   const svg=inkSvg(ink),toolbar=document.createElement('div'),status=document.createElement('small');
   svg.setAttribute('aria-label',writer?'Writer handwriting':'Write your annotation with a pen');toolbar.className='ink-actions';toolbar.hidden=quiet;status.setAttribute('role','status');
@@ -58,6 +58,7 @@ export function inkPad(host, initial, save, inputFactory=adaptiveInkInput, {quie
   }
   host.append(toolbar,svg,status);
   function redraw(){
+    if(ink.height<minimumHeight)ink={...ink,height:minimumHeight};
     svg.querySelectorAll('.ink-stroke').forEach(n=>n.remove());
     ink.strokes.forEach((stroke,i)=>appendStroke(svg,stroke,widths()[i]));
     // Keep the eraser cursor above permanent ink.
@@ -109,5 +110,5 @@ export function inkPad(host, initial, save, inputFactory=adaptiveInkInput, {quie
   function finish(){if(input?.finish()===false){message("Finish the pen stroke before closing this note.");return false;}return flush();}
   const hidden=()=>{if(document.hidden)finish();};
   window.addEventListener('pagehide',finish);document.addEventListener('visibilitychange',hidden);
-  return {active:()=>!!input?.active(),settle:async()=>{if(input?.active())return false;return asyncSave?persistAsync():finish();},copy:()=>structuredClone(ink),snapshot:()=>finish()?structuredClone(ink):null,suspend(){if(input?.active())return false;input?.dispose();input=null;return true;},resume(){if(!input)setTool(mode);},save:finish,tool:()=>mode,setTool,undo:()=>actions['Undo stroke'](),more:()=>actions['More space'](),clear:()=>actions['Clear handwriting'](),dispose(){clearTimeout(timer);input?.dispose();window.removeEventListener('pagehide',finish);document.removeEventListener('visibilitychange',hidden);}};
+  return {ensureHeight(value){minimumHeight=Math.max(80,Math.min(12000,Math.ceil(value)));if(input?.active())return false;if(ink.height<minimumHeight){ink={...ink,height:minimumHeight};svg.setAttribute('viewBox','0 0 800 '+ink.height);checkpoint();}return true;},active:()=>!!input?.active(),settle:async()=>{if(input?.active())return false;return asyncSave?persistAsync():finish();},copy:()=>structuredClone(ink),snapshot:()=>finish()?structuredClone(ink):null,suspend(){if(input?.active())return false;input?.dispose();input=null;return true;},resume(){if(!input)setTool(mode);},save:finish,tool:()=>mode,setTool,undo:()=>actions['Undo stroke'](),more:()=>actions['More space'](),clear:()=>actions['Clear handwriting'](),dispose(){clearTimeout(timer);input?.dispose();window.removeEventListener('pagehide',finish);document.removeEventListener('visibilitychange',hidden);}};
 }
