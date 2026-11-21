@@ -17,7 +17,7 @@ import {decodeNote,encodeNote,isHighlightFile,noteFilename,selectionAnchor} from
 
 
 
-export function mountHighlights({reader,viewport,status,onWriting,onEditScene,onConvertedDraft,canEditScene=()=>true}){
+export function mountHighlights({reader,viewport,status,onWriting,onEditScene,onConvertedDraft,beforeMenu,canEditScene=()=>true}){
 
   const $=id=>document.getElementById(id);
 
@@ -493,6 +493,9 @@ export function mountHighlights({reader,viewport,status,onWriting,onEditScene,on
     }
   }
   function showMenu(x,y,at=null,noteId=null,minimal=false){
+    // Hand off pen ownership before making the manuscript modal. Otherwise
+    // Writer's palm guard can block the very controls needed to dismiss it.
+    if(beforeMenu?.()===false)return;
     if(menu.open)menu.close();menuPress=false;menu.replaceChildren();
     const add=(label,action)=>{const b=document.createElement('button');b.textContent=label;b.type='button';b.onclick=()=>{menu.close();try{action();palette?.refresh();}catch(e){status(e.message,true);}};menu.append(b);};
     if(noteId){

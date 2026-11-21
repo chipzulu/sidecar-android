@@ -1,4 +1,11 @@
-# Story Sidecar Android Reader 0.1.62
+# Story Sidecar Android Reader 0.1.63
+
+## Reader 0.1.63 — release Writer input lock for manuscript menus
+
+Opening the manuscript context menu now pauses Writer handwriting and releases the native palm lock before showing the popup. Insert-text and working-draft dialogs also pause Writer. Dismissing the menu leaves handwriting paused; tap the Writer pen to resume. Accepted conversion text and handwriting remain saved. APK stays 0.1.20; no new APK installation is needed.
+
+Validation: Writer conversion and annotation-flow browser suites passed. The new regression long-presses prose during active Writer capture, checks native unlock, opens insertion using touch, cancels without losing accepted text, and resumes pen capture. Physical BOOX verification remains required.
+
 
 ## Reader 0.1.62 / APK 0.1.20 — retire BOOX Notes companion; clear conversion text
 

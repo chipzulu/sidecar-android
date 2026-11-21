@@ -23,7 +23,7 @@ const $=id=>document.getElementById(id);
 let libraryMode=true,libraryView,menuBook=null,configBook=null;
 let snapshot=null,model=null,index=-1,coverUrl='',busy=false,credentialBusy=false,client=null,clientKey='',abort=null,disposeCards=()=>{},selectedScene=null,renderRevision=0,rendering=false, replacing=false;
 function message(text,error=false){$('updates-status').textContent=text;if(libraryMode){$('library-error').textContent=text;$('library-error').classList.toggle('error',error);}$('status').textContent=text;$('status').classList.toggle('error',error);}
-const highlights=mountHighlights({reader:$('reader'),viewport:$('manuscript-scroll'),status:message,canEditScene:()=>tabletTextAllowed(snapshot),onEditScene:at=>editScene(at),onConvertedDraft:at=>convertedDraft(at),onWriting:()=>{if(writer.active()){message('Switch to Reader mode to edit annotation handwriting.');return false;}if(dock)setOpen(dock,false);}});
+const highlights=mountHighlights({reader:$('reader'),viewport:$('manuscript-scroll'),status:message,beforeMenu:()=>writerInk.pause(),canEditScene:()=>tabletTextAllowed(snapshot),onEditScene:at=>editScene(at),onConvertedDraft:at=>convertedDraft(at),onWriting:()=>{if(writer.active()){message('Switch to Reader mode to edit annotation handwriting.');return false;}if(dock)setOpen(dock,false);}});
 function preference(key,value){try{if(value===undefined)return localStorage.getItem('sidecar-reader:'+key);localStorage.setItem('sidecar-reader:'+key,value);}catch{/* Reading remains usable without preferences. */}}
 function remember(){if(snapshot&&!libraryMode&&!rendering&&!replacing)localStorage.setItem(workKey(snapshot,'position'),JSON.stringify({scope:index===-2?'novel':selectedScene?'scene':index===-1?'cover':'chapter',chapter:model.chapters[index]?.key??null,scene:selectedScene,y:$('manuscript-scroll').scrollTop}));}
 let pageWidth=Math.max(280,Number(preference('page-width'))||740),pageLines=Math.max(15,Math.min(60,Number(preference('page-lines'))||28)),cardMode=preference('card-layout')||'none',dock='';
@@ -181,6 +181,7 @@ async function render(which,scenePath=null,scroll=true,preserve=false){
 let tappedBlock=null;
 $('reader').addEventListener('click',event=>{tappedBlock=event.target.closest('[data-block]');});
 function insertText(text='',at=null){
+ if(!writerInk.pause())return;
  if(!snapshot||busy||rendering||!highlights.beforeRender())return;
  const target=at?.range?.startContainer;
  const block=(target?.nodeType===3?target.parentElement:target)?.closest('[data-block]')||tappedBlock;
@@ -190,7 +191,7 @@ function convertedDraft(at){try{insertText('',at);}catch(e){message(e.message,tr
 document.addEventListener('insert-recognized-text',event=>{try{insertText(event.detail.text);}catch(e){message(e.message,true);}});
 $('reader').addEventListener('click',event=>{
  const draft=event.target.closest('[data-working-draft]');if(!draft||busy||rendering)return;
- event.stopImmediatePropagation();if(!highlights.beforeRender())return;
+ event.stopImmediatePropagation();if(!writerInk.pause()||!highlights.beforeRender())return;
  const block=draft.closest('[data-block]'),scene=model.chapters.flatMap(c=>c.scenes).find(s=>s.path===block?.dataset.scene);if(!scene)return;
  const dialog=document.createElement('dialog');dialog.className='working-draft-dialog';dialog.innerHTML='<h3>Working draft</h3><p>This text is not yet assimilated.</p><button data-assimilate>Assimilate</button><button data-edit>Edit scene</button><button data-close>Close</button><p role="status"></p>';
  const close=()=>{dialog.close();dialog.remove();};dialog.querySelector('[data-close]').onclick=close;dialog.oncancel=e=>{e.preventDefault();close();};
