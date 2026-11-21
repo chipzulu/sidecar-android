@@ -1,4 +1,11 @@
-# Story Sidecar Android Reader 0.1.57
+# Story Sidecar Android Reader 0.1.58
+
+## Writer toolbar tap regression — Reader 0.1.58
+
+Keep BOOX APK 0.1.17. The whole-interface guard in 0.1.57 was too restrictive around the handwriting toolbar. Deliberate small finger taps now work on handwriting and converted-text controls, including ✓ and Aa. Broad/resting contacts and touch navigation elsewhere remain blocked while writing. Pen tool taps are activated on pointer-up; their subsequent WebView compatibility click is suppressed so touch classification cannot swallow the action or invoke it twice. A new pointer gesture resets duplicate suppression, allowing repeated deliberate taps. Resizing is not needed to unlock the tools.
+
+Validation covers native-stroke fixtures followed by pen Aa taps with a touch-classified compatibility click, single recognition invocation, deliberate finger Eraser and Pause, repeated toolbar use, broad palm rejection, header/link protection, conversion/accept/recovery, and workspace layout. All three browser suites pass. Actual Note Max input still requires device confirmation.
+
 
 ## Whole-interface Writer palm protection — Reader 0.1.57
 

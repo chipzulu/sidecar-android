@@ -118,27 +118,39 @@ export function mountWriterInk({status}){
  new ResizeObserver(fitSurface).observe(host);
  // Protect the whole app, not just the ink surface. A palm can land on
  // headers, menus or links and WebView may synthesize a later mouse click.
- // Only a deliberate small finger tap on Pause is allowed while writing.
- let lastBlockedTouch=-Infinity,lastPointer='';
+ // Handwriting controls accept deliberate short taps; other app controls stay
+ // protected. Activate pen tools from pointer-up, before WebView synthesizes
+ // a compatibility click that may incorrectly claim to be a touch event.
+ let lastBlockedTouch=-Infinity,lastPointer='',penTap=null,handledTap=null;
+ const writingControl=target=>{const b=target.closest?.('button,summary');return b&&(tools.contains(b)||textControls.contains(b))?b:null;};
  const stop=e=>{e.preventDefault();e.stopImmediatePropagation();};
  for(const name of ['pointerdown','pointermove','pointerup','pointercancel','click','contextmenu','mousedown','mouseup'])document.addEventListener(name,e=>{
+  const control=writingControl(e.target);
+  if(name==='pointerdown')handledTap=null;
+  if(name==='click'&&e.detail!==0&&handledTap?.target===control&&performance.now()-handledTap.time<1000){stop(e);return;}
   if(e.pointerType==='pen'||e.pointerType==='mouse')lastPointer=e.pointerType;
-  if(e.pointerType==='pen')return;
+  if(e.pointerType==='pen'){
+   if(name==='pointerdown')penTap=control?{id:e.pointerId,target:control,x:e.clientX,y:e.clientY}:null;
+   else if(name==='pointermove'&&penTap?.id===e.pointerId&&Math.hypot(e.clientX-penTap.x,e.clientY-penTap.y)>12)penTap=null;
+   else if(name==='pointerup'&&penTap?.id===e.pointerId){const tap=penTap;penTap=null;if(control===tap.target){stop(e);handledTap={target:control,time:performance.now()};control.click();}}
+   else if(name==='pointercancel')penTap=null;
+   return;
+  }
   const directTouch=e.pointerType==='touch'||e.sourceCapabilities?.firesTouchEvents;
   const delayedTouch=!e.pointerType&&e.detail!==0&&lastPointer!=='pen'&&performance.now()-lastBlockedTouch<900;
   if(!(directTouch||delayedTouch)||(!capturing&&performance.now()-lastBlockedTouch>=900))return;
   if(directTouch){lastPointer='touch';lastBlockedTouch=performance.now();}
   stop(e);
-  const target=e.target.closest?.('button');
+  const target=control;
   if(name==='pointerdown'){
    if(touch){touch=null;return;}
-   touch=capturing&&target===pauseButton&&!pad?.active()&&e.width<32&&e.height<32?{id:e.pointerId,x:e.clientX,y:e.clientY,time:performance.now()}:null;
+   touch=capturing&&target&&!pad?.active()&&e.width<32&&e.height<32?{id:e.pointerId,target,x:e.clientX,y:e.clientY,time:performance.now()}:null;
   }else if(name==='pointermove'&&touch?.id===e.pointerId){if(Math.hypot(e.clientX-touch.x,e.clientY-touch.y)>8||e.width>=32||e.height>=32)touch=null;}
-  else if(name==='pointerup'&&touch?.id===e.pointerId){const tap=touch;touch=null;if(target===pauseButton&&performance.now()-tap.time<400&&!pad?.active())pause();}
+  else if(name==='pointerup'&&touch?.id===e.pointerId){const tap=touch;touch=null;if(target===tap.target&&performance.now()-tap.time<650&&!pad?.active()){handledTap={target,time:performance.now()};target.click();}}
   else if(name==='pointercancel')touch=null;
  },true);
  for(const name of ['touchstart','touchmove','touchend','touchcancel'])document.addEventListener(name,e=>{
-  if(capturing||performance.now()-lastBlockedTouch<900){lastPointer='touch';lastBlockedTouch=performance.now();stop(e);}
+  if(capturing||performance.now()-lastBlockedTouch<900){lastPointer='touch';lastBlockedTouch=performance.now();if(!writingControl(e.target))stop(e);}
  },{capture:true,passive:false});
  document.addEventListener('click',e=>{if(!more.contains(e.target))more.open=false;});
  window.addEventListener('beforeunload',e=>{if(textDirty||(pad&&!pad.save())){e.preventDefault();e.returnValue='';}});
