@@ -116,26 +116,30 @@ export function mountWriterInk({status}){
  }
  new ResizeObserver(fitSurface).observe(host.parentElement);
  new ResizeObserver(fitSurface).observe(host);
- // A resting palm must not press a tool. Finger tools require a short, small,
- // completed tap; the pen and keyboard retain ordinary button behaviour.
- for(const name of ['pointerdown','pointermove','pointerup','pointercancel','click'])document.addEventListener(name,e=>{
-  if(!capturing||e.pointerType!=='touch'||!(tools.contains(e.target)||textControls.contains(e.target)))return;
-  e.preventDefault();e.stopImmediatePropagation();
-  const target=e.target.closest('button,summary');
+ // Protect the whole app, not just the ink surface. A palm can land on
+ // headers, menus or links and WebView may synthesize a later mouse click.
+ // Only a deliberate small finger tap on Pause is allowed while writing.
+ let lastBlockedTouch=-Infinity,lastPointer='';
+ const stop=e=>{e.preventDefault();e.stopImmediatePropagation();};
+ for(const name of ['pointerdown','pointermove','pointerup','pointercancel','click','contextmenu','mousedown','mouseup'])document.addEventListener(name,e=>{
+  if(e.pointerType==='pen'||e.pointerType==='mouse')lastPointer=e.pointerType;
+  if(e.pointerType==='pen')return;
+  const directTouch=e.pointerType==='touch'||e.sourceCapabilities?.firesTouchEvents;
+  const delayedTouch=!e.pointerType&&e.detail!==0&&lastPointer!=='pen'&&performance.now()-lastBlockedTouch<900;
+  if(!(directTouch||delayedTouch)||(!capturing&&performance.now()-lastBlockedTouch>=900))return;
+  if(directTouch){lastPointer='touch';lastBlockedTouch=performance.now();}
+  stop(e);
+  const target=e.target.closest?.('button');
   if(name==='pointerdown'){
    if(touch){touch=null;return;}
-   touch=target&&!pad?.active()&&e.width<32&&e.height<32?{id:e.pointerId,target,x:e.clientX,y:e.clientY,time:performance.now()}:null;
+   touch=capturing&&target===pauseButton&&!pad?.active()&&e.width<32&&e.height<32?{id:e.pointerId,x:e.clientX,y:e.clientY,time:performance.now()}:null;
   }else if(name==='pointermove'&&touch?.id===e.pointerId){if(Math.hypot(e.clientX-touch.x,e.clientY-touch.y)>8||e.width>=32||e.height>=32)touch=null;}
-  else if(name==='pointerup'&&touch?.id===e.pointerId){const tap=touch;touch=null;if(target===tap.target&&performance.now()-tap.time<400&&!pad?.active())tap.target.click();}
+  else if(name==='pointerup'&&touch?.id===e.pointerId){const tap=touch;touch=null;if(target===pauseButton&&performance.now()-tap.time<400&&!pad?.active())pause();}
   else if(name==='pointercancel')touch=null;
  },true);
- // Fingers/palms cannot draw. While the pen is enabled, also protect the two
- // reading surfaces from palm scrolling/clicks. Explicit controls remain usable.
- const surface=target=>target.closest?.('#manuscript-scroll,#writer-text,#writer-ink-canvas,#writer-column-edge,#writer-row-edge');
- for(const name of ['pointerdown','pointermove','pointerup','click'])document.addEventListener(name,e=>{
-  if(capturing&&surface(e.target)&&(e.pointerType==='touch'||e.sourceCapabilities?.firesTouchEvents)){e.preventDefault();e.stopImmediatePropagation();}
- },true);
- for(const name of ['touchstart','touchmove'])document.addEventListener(name,e=>{if(capturing&&surface(e.target)){e.preventDefault();e.stopImmediatePropagation();}},{capture:true,passive:false});
+ for(const name of ['touchstart','touchmove','touchend','touchcancel'])document.addEventListener(name,e=>{
+  if(capturing||performance.now()-lastBlockedTouch<900){lastPointer='touch';lastBlockedTouch=performance.now();stop(e);}
+ },{capture:true,passive:false});
  document.addEventListener('click',e=>{if(!more.contains(e.target))more.open=false;});
  window.addEventListener('beforeunload',e=>{if(textDirty||(pad&&!pad.save())){e.preventDefault();e.returnValue='';}});
  refresh();return {setBusy(value){locked=value;tools.classList.toggle('writer-tools-locked',value);if(value)pause();refresh();},open,close,pause,activeStroke:()=>operation||!!pad?.active(),settle,capturing:()=>capturing};

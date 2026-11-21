@@ -1,4 +1,13 @@
-# Story Sidecar Android Reader 0.1.56
+# Story Sidecar Android Reader 0.1.57
+
+## Whole-interface Writer palm protection — Reader 0.1.57
+
+Keep BOOX APK 0.1.17. While Writer handwriting is active, touch contacts are blocked throughout the Reader, including the header, configuration, menus, links and converted-text controls. Previously protection covered selected writing surfaces/tools only. Pen and mouse controls remain available. A short, small finger tap on ✓ pauses writing and restores ordinary finger controls; broad/resting contacts cannot pause. A brief 900 ms quarantine suppresses compatibility mouse clicks left over from blocked touch gestures. Keyboard activation remains available.
+
+This prevents touch-triggered application navigation but cannot intercept Android system navigation or firmware edge gestures. The reported physical BOOX sequence leading to the update page has not been reproduced on hardware; the identified unprotected application controls are now covered. Test with handwriting on the left and your palm on the right: menus should stay closed, pen tools should work, and ✓ should deliberately restore finger navigation. If Android system UI still opens, adjust the BOOX System Navigation bottom gestures separately; Navigation Ball can be positioned away from the palm.
+
+Validation: Writer ink browser suite covers touch contacts on header/mode/library/About/update link/Accept, delayed synthetic mouse clicks, pen menu operation, deliberate Pause, ink persistence and recovery. Conversion and layout suites also pass. Update the Pages site from this ZIP and verify About shows Reader 0.1.57; no APK rebuild is required.
+
 
 ## Writer conversion, step 3 — Reader 0.1.56
 
