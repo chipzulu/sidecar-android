@@ -166,5 +166,5 @@ export function mountWriterInk({status,onInsert}){
  },{capture:true,passive:false});
  document.addEventListener('click',e=>{if(!more.contains(e.target))more.open=false;});
  window.addEventListener('beforeunload',e=>{if(textDirty||(pad&&!pad.save())){e.preventDefault();e.returnValue='';}});
- refresh();return {setBusy(value){locked=value;tools.classList.toggle('writer-tools-locked',value);if(value)pause();refresh();},open,close,pause,activeStroke:()=>operation||!!pad?.active(),settle,capturing:()=>capturing};
+ refresh();return {acceptedText:()=>textState.accepted.map(unit=>unit.text).join('\n\n'),setBusy(value){locked=value;tools.classList.toggle('writer-tools-locked',value);if(value)pause();refresh();},open,close,pause,activeStroke:()=>operation||!!pad?.active(),settle,capturing:()=>capturing};
 }

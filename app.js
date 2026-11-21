@@ -187,7 +187,7 @@ function insertText(text='',at=null){
  const block=(target?.nodeType===3?target.parentElement:target)?.closest('[data-block]')||tappedBlock;
  insertManuscriptDialog(snapshot,model.chapters.flatMap(c=>c.scenes),{text,path:at?.path||block?.dataset.scene,index:Number(block?.dataset.block)||0},scene=>{highlights.sceneEdited(scene);repaginate();message('Inserted and saved on this tablet. Send changes to share the scene with your PC.');});
 }
-function convertedDraft(at){try{insertText('',at);}catch(e){message(e.message,true);}}
+function convertedDraft(at){try{insertText(writer.active()?writerInk.acceptedText():'',at);}catch(e){message(e.message,true);}}
 document.addEventListener('insert-recognized-text',event=>{try{insertText(event.detail.text);}catch(e){message(e.message,true);}});
 $('reader').addEventListener('click',event=>{
  const draft=event.target.closest('[data-working-draft]');if(!draft||busy||rendering)return;

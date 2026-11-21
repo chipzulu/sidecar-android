@@ -1,4 +1,13 @@
-# Story Sidecar Android Reader 0.1.63
+# Story Sidecar Android Reader 0.1.64
+
+## Reader 0.1.64 — accepted Writer text at the chosen manuscript location
+
+In Writer mode, long-press manuscript prose and choose Insert text / working draft. The insertion dialog now contains the accepted Writer text, with the selected location preserved; copying first is unnecessary. Pending, unaccepted conversion text is excluded. Review the text, then choose Insert normally or Insert as working draft. Cancelling does not clear accepted text.
+
+Paste clipboard is also available in the insertion dialog. It pastes plain text at the text-box selection/caret. If browser clipboard access is unavailable, the dialog explains how to use the system Paste command. A delayed clipboard read never overwrites edits made while it was pending.
+
+Validation: Writer conversion browser suite passed, including accepted-text prefill, manuscript menu lock release, clipboard success/denial and delayed-paste protection. APK stays 0.1.20; PC stays 0.1.143. Update the Reader files on GitHub Pages; no new APK is needed.
+
 
 ## Reader 0.1.63 — release Writer input lock for manuscript menus
 

@@ -4,11 +4,26 @@ import {storeAnnotatedScene} from './writing.js';
 import {tabletTextAllowed} from './shared/book-workflow.js';
 export function insertManuscriptDialog(book,scenes,{text='',path,index=0,working=true}={},changed){
  if(!tabletTextAllowed(book))throw Error('Manuscript editing is disabled for this book.');
- const dialog=document.createElement('dialog');dialog.className='working-draft-dialog';dialog.innerHTML='<h2>Insert manuscript text</h2><label>Scene <select data-scene></select></label><p><label>Insert after <select data-position></select></label></p><textarea aria-label="Text to insert"></textarea><p data-status role="status"></p><button data-normal>Insert normally</button><button data-draft>Insert as working draft</button><button data-close>Cancel</button>';
+ const dialog=document.createElement('dialog');dialog.className='working-draft-dialog';dialog.innerHTML='<h2>Insert manuscript text</h2><label>Scene <select data-scene></select></label><p><label>Insert after <select data-position></select></label></p><button data-paste type="button">Paste clipboard</button><textarea aria-label="Text to insert" placeholder="Paste or type text here"></textarea><p data-status role="status"></p><button data-normal>Insert normally</button><button data-draft>Insert as working draft</button><button data-close>Cancel</button>';
  const select=dialog.querySelector('[data-scene]'),position=dialog.querySelector('[data-position]'),field=dialog.querySelector('textarea');let before;
  scenes.forEach((scene,i)=>{const option=document.createElement('option');option.value=i;option.textContent=scene.path;select.append(option);});select.value=Math.max(0,scenes.findIndex(s=>s.path===path));field.value=text;
  function positions(){const scene=scenes[Number(select.value)];before=scene.html;position.replaceChildren();const first=document.createElement('option');first.value=-1;first.textContent='Beginning of scene';position.append(first);[...inlineFragment(scene.html).children].forEach((p,i)=>{const o=document.createElement('option');o.value=i;o.textContent=(i+1)+': '+p.textContent.slice(0,100);position.append(o);});position.value=String(Math.min(index,position.options.length-2));}
  select.onchange=()=>{index=0;positions();};positions();
+ let edits=0;field.addEventListener('input',()=>edits++);
+ const paste=dialog.querySelector('[data-paste]'),message=dialog.querySelector('[data-status]');
+ paste.onclick=async()=>{
+  const revision=edits;paste.disabled=true;
+  try{
+   if(!navigator.clipboard?.readText)throw Error('Clipboard unavailable');
+   const value=await navigator.clipboard.readText();
+   if(!dialog.open)return;
+   if(revision!==edits){message.textContent='Text changed while reading the clipboard. Press Paste clipboard again to insert it.';return;}
+   if(!value){message.textContent='The clipboard contains no text.';return;}
+   const start=field.selectionStart,end=field.selectionEnd;
+   field.setRangeText(value,start,end,'end');edits++;field.focus();message.textContent='Clipboard text pasted. Review before inserting.';
+  }catch{if(dialog.open)message.textContent='Clipboard access is unavailable. Press and hold inside the text box and choose Paste, or use your keyboard’s Paste command.';}
+  finally{paste.disabled=false;}
+ };
  const close=()=>{dialog.close();dialog.remove();};dialog.querySelector('[data-close]').onclick=close;dialog.oncancel=e=>{e.preventDefault();close();};
  for(const [selector,draft] of [['[data-normal]',false],['[data-draft]',true]])dialog.querySelector(selector).onclick=()=>{try{
   if(!field.value.trim())return;const scene=scenes[Number(select.value)];if(scene.html!==before)throw Error('Scene changed. Close and choose an insertion point again.');
