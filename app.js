@@ -1,8 +1,7 @@
 import {insertManuscriptDialog,assimilateManuscriptDraft} from './manuscript-insert.js';
 import {mountWriterInk} from './writer-ink.js';
 import {mountWriterWorkspace} from './writer-workspace.js';
-import {allBlocks,newBlock,anchorIndex,appendDraftBlocks,finishAssimilation} from './draft-blocks.js';
-import {draftDialog,openBooxNotes} from './converted-ui.js';
+import {allBlocks} from './legacy-drafts.js';
 import {tabletTextAllowed} from './shared/book-workflow.js';
 import {publishPeerChanges,reconcilePublished,receivePeerBook} from './peer-send.js';
 import {pressureSensitivity} from './pressure.js';
@@ -130,16 +129,14 @@ function chapterSource(chapter,scenePath){
     if(!scenePath&&heading.title)source.append(element('h1',heading.title,'chapter-title'));
     if(!scenePath&&heading.subtitle)source.append(element('p',heading.subtitle,'chapter-subtitle'));
     const scenes=scenePath?chapter.scenes.filter(scene=>scene.path===scenePath):chapter.scenes;
-    const pending=Object.values(allBlocks(snapshot)).filter(r=>r.state==='pending'&&!r.transaction);
     for(const [n,scene] of scenes.entries()){
       if(n)source.append(element('div','* * *','scene-break'));
       const subtitle=sceneHeadingParts(scene.filename).subtitle;if(subtitle){const h=element('h2',subtitle,'scene-subtitle');h.dataset.scene=scene.path;source.append(h);}
-      const draftRows=pending.filter(r=>r.path===scene.path).map(r=>({...r,index:anchorIndex(scene,r)}));
       const prose=element('div',undefined,'scene');prose.append(inlineFragment(scene.html));colourMarks(prose,sceneNotes(scene.html));
       convertItalicMarkers(prose,'decode');let group=null;
       for(const [blockIndex,block] of [...prose.children].entries()){block.dataset.block=String(blockIndex);const marker=keepMarker(block.textContent);if(marker){if(marker==='start'){group=element('div',undefined,'keep-unit');group.dataset.scene=scene.path;source.append(group);}else group=null;continue;}
         block.dataset.scene=scene.path;if(block.tagName==='BLOCKQUOTE'){block.classList.add('quote-unit');for(const p of block.children){p.dataset.block=String(blockIndex);p.classList.add('quote-line');p.dataset.scene=scene.path;}}
-        (group||source).append(block);appendDraftBlocks(group||source,draftRows,blockIndex);}
+        (group||source).append(block);}
     }
     return source;
 }
@@ -200,28 +197,13 @@ $('reader').addEventListener('click',event=>{
  dialog.querySelector('[data-assimilate]').onclick=()=>{try{assimilateManuscriptDraft(snapshot,scene,draft.dataset.workingDraft);close();highlights.sceneEdited(scene);repaginate();}catch(e){dialog.querySelector('[role=status]').textContent=e.message;}};
  dialog.querySelector('[data-edit]').onclick=()=>{close();writeScene(snapshot,scene,Number(block.dataset.block),()=>{highlights.sceneEdited(scene);repaginate();});};document.body.append(dialog);dialog.showModal();
 },true);
-function showConverted(scene,row){
-  if(!tabletTextAllowed(snapshot)){message('This book is set to annotations only.',true);return;}
-  if(row.transaction){try{finishAssimilation(snapshot,scene,row,storeAnnotatedScene);repaginate();return;}catch(e){message(e.message,true);return;}}
-  draftDialog(snapshot,scene,row,()=>{highlights.sceneEdited(scene);repaginate();});
-}
-$('reader').addEventListener('click',event=>{
- const block=event.target.closest('[data-converted-draft]');if(!block||busy||rendering||!highlights.beforeRender())return;
- const row=allBlocks(snapshot)[block.dataset.convertedDraft],scene=model.chapters.flatMap(c=>c.scenes).find(s=>s.path===row?.path);
- if(scene)showConverted(scene,row);
+// Read-only recovery of text from the removed experimental companion.
+$('about-open').addEventListener('click',()=>{
+ document.getElementById('legacy-draft-recovery')?.remove();if(!snapshot)return;
+ const rows=Object.values(allBlocks(snapshot)).filter(r=>r.text&&r.state==='pending');if(!rows.length)return;
+ const box=document.createElement('details');box.id='legacy-draft-recovery';const title=element('summary','Recover older draft text');box.append(title);
+ const field=document.createElement('textarea');field.readOnly=true;field.setAttribute('aria-label','Older saved draft text');field.value=rows.map(r=>(r.notebook||r.path)+'\n'+r.text).join('\n\n');box.append(field);$('about-dialog').append(box);
 });
-$('reader').addEventListener('keydown',event=>{if(event.target.matches('[data-converted-draft]')&&['Enter',' '].includes(event.key)){event.preventDefault();event.target.click();}});
-$('converted-drafts-open').onclick=()=>{
- if(!snapshot||busy||rendering||!highlights.beforeRender())return;
- const dialog=document.createElement('dialog');dialog.className='converted-draft-dialog';
- const heading=element('h2','BOOX Notes companion');dialog.append(heading);
- dialog.append(element('p','Use Android split screen with Sidecar on the left and BOOX Notes on the right. Convert handwriting in Notes, copy it, then hold a manuscript paragraph and choose Paste converted draft after here.'));
- const open=element('button','Open BOOX Notes');const status=element('p');status.setAttribute('role','status');open.onclick=()=>openBooxNotes(text=>status.textContent=text);dialog.append(open,status);
- const rows=Object.values(allBlocks(snapshot)).filter(r=>r.state==='pending');
- if(!rows.length)dialog.append(element('p','No unassimilated drafts in this book.'));
- for(const row of rows){const scene=model.chapters.flatMap(c=>c.scenes).find(s=>s.path===row.path);const button=element('button',(row.notebook||'Unnamed notebook')+' — '+(scene?.name||'Missing scene')+(scene&&anchorIndex(scene,row)<0?' · insertion point changed':''));button.onclick=()=>{if(!scene){status.textContent='The original scene is missing. Draft text: '+row.text;return;}dialog.close();showConverted(scene,row);};dialog.append(button);}
- const close=element('button','Close');close.onclick=()=>dialog.close();dialog.append(close);dialog.onclose=()=>dialog.remove();document.body.append(dialog);dialog.showModal();
-};
 function editScene(at){
   if(!tabletTextAllowed(snapshot)){message('This book is set to annotations only on the tablet. Existing text drafts are kept.',true);return;}
   if(rendering||busy)return;

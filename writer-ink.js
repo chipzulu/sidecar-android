@@ -41,6 +41,7 @@ export function mountWriterInk({status,onInsert}){
   convertButton.disabled=!pad||locked||operation||!pad.strokeCount();
   accept.disabled=!pad||locked||operation||!textState.pending||textState.pending.stale;
   copy.disabled=operation||!textState.accepted.length;
+  document.getElementById('writer-clear-text').disabled=!pad||locked||operation||(!textState.accepted.length&&!textState.pending);
   document.getElementById('writer-insert').disabled=locked||operation||!textState.accepted.length;
  }
  function choose(tool){if(!pad||locked||operation)return;if(pad.setTool(tool)!==false){capturing=true;refresh();}}
@@ -111,6 +112,11 @@ export function mountWriterInk({status,onInsert}){
   revision=await writeWriterDraft(owner,empty,revision,next);textDirty=false;
   pad.dispose();host.replaceChildren();textState=next;createPad(empty);pad.suspend();renderText();
   conversionStatus.textContent='Accepted and saved on this device. Ready for the next passage.';
+ });
+ document.getElementById('writer-clear-text').onclick=()=>work(async()=>{
+  if(!confirm('Clear all accepted and pending text from the Text Conversion Frame? Handwriting and text already inserted in the manuscript will stay.'))return;
+  const next={accepted:[],pending:null};revision=await writeWriterDraft(owner,pad.copy(),revision,next);
+  textState=next;textDirty=false;renderText();conversionStatus.textContent='Conversion text cleared. Handwriting and manuscript text are unchanged.';
  });
  copy.onclick=async()=>{try{await navigator.clipboard.writeText(textState.accepted.map(unit=>unit.text).join('\n\n'));conversionStatus.textContent='Accepted text copied.';}catch{conversionStatus.textContent='Copy failed. Pause handwriting to select and copy the text.';}};
  document.getElementById('writer-insert').onclick=async()=>{if(!pause()||!await settle())return;try{onInsert?.(textState.accepted.map(unit=>unit.text).join('\n\n'));}catch(e){status(e.message,true);}};

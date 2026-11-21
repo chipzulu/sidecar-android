@@ -1,4 +1,15 @@
-# Story Sidecar Android Reader 0.1.61
+# Story Sidecar Android Reader 0.1.62
+
+## Reader 0.1.62 / APK 0.1.20 — retire BOOX Notes companion; clear conversion text
+
+PC stays 0.1.143. Update the Pages Reader to 0.1.62 and install APK 0.1.20 over the existing app. Sidecar's handwriting recognition, inline working drafts and the native palm/Back protections remain.
+
+Removed the experimental BOOX Notes configuration button, companion dialogs, notebook launcher bridge, companion overlay rendering and creation/assimilation code. Existing companion data is not deleted: pending older text is available read-only under About → Recover older draft text (shown only when there is text), and existing local companion records continue to back up as note files. Recovery never inserts old text into the manuscript automatically. The old modules are no longer packaged or cached; a small legacy-data reader supports preservation only.
+
+The Text Conversion Frame now has Clear text… beside its other controls. Confirm to clear both accepted passages and the pending conversion result. The operation commits the empty text state with the existing ink before clearing the display; cancellation or save failure retains text. Handwriting and manuscript passages already inserted are unchanged. Use the pen to operate controls when the native Writer palm guard is active.
+
+Validation: four browser suites passed (Writer conversion/clear, legacy-data recovery, inline working drafts, handwriting recognition). Clear tests cover cancellation, forced storage failure, successful clearing, retained ink, unchanged inserted manuscript and stored empty text. APK assembly, existing recognition tests and lint passed. Physical-device verification remains needed.
+
 
 ## Working-draft foundation — PC 0.1.143 / Reader 0.1.61
 

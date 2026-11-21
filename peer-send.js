@@ -1,4 +1,4 @@
-import {localBlocks,draftBlockPath,encodeBlock,reconcileBlocks} from './draft-blocks.js';
+import {localBlocks,draftBlockPath,encodeBlock,reconcileBlocks} from './legacy-drafts.js';
 import {tabletTextAllowed} from './shared/book-workflow.js';
 import {annotationPaths,selectedFiles,selectedBase,guardAnnotationSend} from './shared/annotation-transfer.js';
 import {gitBlobSha,checkBackupInventory} from './shared/github-backup.js';
@@ -22,7 +22,6 @@ export async function preparePeerSend(book){
  }
  const blocks=new Map(Object.entries(localBlocks(book)));
  for(const [id,row] of blocks){
-  if(row.transaction)throw Error('Finish the pending converted-draft assimilation before sending or receiving. Open it under Configuration → BOOX Notes / converted drafts.');
   const path=draftBlockPath(id),bytes=new TextEncoder().encode(encodeBlock(row));files.set(path,{path,bytes,sha:await gitBlobSha(bytes)});
  }
  const captured=[...files.values()].map(f=>({...f,size:f.bytes.length}));checkBackupInventory(captured);
