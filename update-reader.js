@@ -1,3 +1,6 @@
+import {eventPanel,nativeEvents} from './input-events.js';
+eventPanel(document.body);
+if(window.SidecarApp){window.SidecarApp.onmessage=e=>{try{nativeEvents(JSON.parse(e.data));}catch{}};window.SidecarApp.postMessage('status');}
 const status=document.getElementById('status');
 const retry=document.getElementById('retry');
 retry.onclick=()=>location.reload();

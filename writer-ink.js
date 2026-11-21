@@ -1,3 +1,4 @@
+import {logEvent} from './input-events.js';
 import {recognizeInk} from './ink-recognition.js';
 import {inkPad} from './ink-pad.js';
 import {readWriterDraft,writeWriterDraft} from './storage.js';
@@ -28,7 +29,10 @@ export function mountWriterInk({status}){
   const link=document.createElement('a');link.href=url;link.download='Story-Sidecar-writing.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),30000);
  });
  action('Retry save',async()=>{await settle();});
+ let nativeLock=null;
  function refresh(){
+  const lock=capturing||operation;
+  if(lock!==nativeLock){nativeLock=lock;logEvent('writer guard '+lock);window.SidecarApp?.postMessage(lock?'writer-touch-lock':'writer-touch-unlock');}
   document.body.classList.toggle('writer-pen-active',capturing);
   document.getElementById('writer-ink-title').textContent=pad&&!capturing?'Paused':'Handwriting';
   pen.setAttribute('aria-pressed',String(capturing&&pad?.tool()==='pen'));eraser.setAttribute('aria-pressed',String(capturing&&pad?.tool()==='eraser'));

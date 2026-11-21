@@ -1,4 +1,17 @@
-# Story Sidecar Android Reader 0.1.58
+# Story Sidecar Android Reader 0.1.59
+
+## Native Writer palm gate and input diagnostics — Reader 0.1.59 / APK 0.1.18
+
+Install APK 0.1.18 over the existing app (do not uninstall), and update the Pages Reader to 0.1.59. Both parts are needed. PC remains 0.1.141.
+
+While Writer pen/eraser capture or conversion is active, the Reader signals a native touch lock. The APK rejects non-stylus touch events in Activity.dispatchTouchEvent before they reach the WebView. Stylus and stylus eraser events are passed through. A blocked touch sequence remains blocked through release even if the lock changes. Use the PEN to tap ✓, Aa or other controls while writing; ✓ releases the native lock and restores finger controls. Browser-only Reader retains its existing deliberate-touch toolbar behaviour. The native pen engine and stroke storage are unchanged. Android system gestures may run before Activity dispatch and are not disabled by this gate; Back remains an escape route.
+
+Recent input events appear in About, the update page, and the native reload confirmation. Copy event log is available on About/update. WEB and APK sections each retain at most 120 entries, across reloads/app restarts. Logs contain timestamps, event/tool types, fixed UI identifiers, guard state, navigation category, Back and activity/window focus changes. No manuscript contents, form values, tokens or full URLs are logged. Native input events are rate-limited; drawing movement is not logged. The native reload confirmation shows native events; About/update combine web and native logs. These diagnostics cannot identify an Android overlay by name, but focus/pause/Back events help distinguish system interruptions from app navigation.
+
+Device test: enter Writer, write with your palm resting on the other panel, then press Aa and ✓ using the pen. After ✓, test finger controls. If an unexpected screen opens, copy the event log there, or open Configuration → About and copy it. Include the Reader/APK versions and whether the pen or finger was used. This is a diagnostic test release, not a claim that system-level palm gestures are resolved.
+
+Validation: Writer ink and conversion browser suites pass, including native-lock signaling and event-log persistence on the update page without token values. APK build, existing recognition unit tests and Android lint are checked separately; physical BOOX behavior remains to be tested.
+
 
 ## Writer toolbar tap regression — Reader 0.1.58
 
