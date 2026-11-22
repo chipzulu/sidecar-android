@@ -165,3 +165,6 @@ body.writer-pen-active #writer-column-edge,body.writer-pen-active #writer-row-ed
 .annotation-menu[open]:not(:modal) { display:flex; flex-wrap:wrap; align-items:center; gap:3px; }
 .annotation-menu:not(:modal) button { display:inline-block; width:auto; text-align:center; }
 .annotation-menu .annotation-menu-drag { cursor:move; touch-action:none; }
+
+#writer-draft-text { width:100%; min-height:160px; box-sizing:border-box; font:inherit; resize:vertical; }
+#writer-draft-actions { display:flex; flex-wrap:wrap; gap:6px; }

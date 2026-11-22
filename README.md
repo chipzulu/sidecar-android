@@ -1,4 +1,15 @@
-# Story Sidecar Android Reader 0.1.65
+# Story Sidecar Android Reader 0.1.66
+
+## Reader 0.1.66 — edit working drafts in the conversion frame
+
+Tap a non-assimilated manuscript block for Assimilate, Edit draft, Close or Delete. Edit draft opens Writer mode and loads the group's text into an editable text box in the Text Conversion Frame. Apply changes replaces that same group, preserving its draft identifier and non-assimilated status. Cancel editing (confirmed) leaves the manuscript unchanged. Delete confirms before removing the whole group and keeps surrounding prose. Existing annotations whose marked text is removed remain in the scene metadata as unattached notes.
+
+Accepted Writer passages remain separate and are restored to view after editing. Converting and accepting handwriting while a draft is open appends the recognized text to that draft. Typed edits and the editing target are saved locally with the Writer state and can be resumed. They are sent to the PC only after Apply changes updates the manuscript scene and Send changes is used. Apply refuses to overwrite a scene changed since editing started. Closing Writer does not apply edits.
+
+This first editor is plain text: unchanged drafts retain formatting; rewriting a draft replaces its internal rich formatting with plain text. Paragraphs and surrounding prose are preserved. A keyboard or the existing handwriting-to-text workflow can edit the text; richer editor tools remain for later.
+
+Validation: Writer-conversion and working-draft browser suites passed. Coverage includes menu labels, editable text, handwriting acceptance into the draft, apply/cancel, stable identity, retained accepted Writer text, blank paragraphs, stale-scene rejection, deletion cancellation and removal without damaging adjacent prose. Native pen input/recognition are mocked in browser tests; verify on BOOX. Reader-only release: APK stays 0.1.20; PC stays 0.1.143.
+
 
 ## Reader 0.1.65 — compact floating manuscript menu
 

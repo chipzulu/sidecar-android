@@ -36,3 +36,33 @@ export function assimilateManuscriptDraft(book,scene,id){
  if(!tabletTextAllowed(book))throw Error('Manuscript editing is disabled for this book.');
  const root=document.createElement('div');root.append(inlineFragment(scene.html));if(!assimilateDraft(root,id))throw Error('This working draft is no longer present.');storeAnnotatedScene(book,scene,annotatedHtml(root,sceneNotes(scene.html)));
 }
+
+export function manuscriptDraft(scene,id){
+ const root=document.createElement('div');root.append(inlineFragment(scene.html));
+ const nodes=[...root.querySelectorAll('[data-working-draft]')].filter(n=>n.dataset.workingDraft===id);
+ if(!nodes.length)throw Error('This working draft is no longer present.');
+ let text='',last=null;for(const node of nodes){const block=node.closest('p');if(last&&last!==block)text+='\n';text+=(node.textContent===''&&node.children.length===1&&node.firstElementChild.tagName==='BR'?'':node.innerHTML).replace(/<br\s*\/?>(?:\n)?/gi,'\n').replace(/<[^>]*>/g,'');last=block;}
+ // Decode text through DOM, preserving explicit line breaks.
+ const decode=document.createElement('textarea');decode.innerHTML=text;
+ return {id,path:scene.path,before:scene.html,text:decode.value};
+}
+export function updateManuscriptDraft(book,scene,edit,text=null){
+ if(!tabletTextAllowed(book))throw Error('Manuscript editing is disabled for this book.');
+ if(!scene||scene.html!==edit.before)throw Error('The scene changed. Your edited text is kept. Reopen the draft before applying.');
+ const root=document.createElement('div');root.append(inlineFragment(scene.html));
+ const nodes=[...root.querySelectorAll('[data-working-draft]')].filter(n=>n.dataset.workingDraft===edit.id);
+ if(!nodes.length)throw Error('This working draft is no longer present.');
+ if(text!==null&&!text.trim())throw Error('Use Delete in the draft menu to remove the block.');
+ if(text!==null&&text===(edit.originalText??edit.text))return;
+ const paragraphs=[...new Set(nodes.map(n=>n.closest('p')))];
+ const wholeParagraphs=paragraphs.every(p=>p&&p.parentElement===root&&[...p.childNodes].every(n=>n.nodeType===3?!n.textContent.trim():n.matches?.('[data-working-draft]')&&n.dataset.workingDraft===edit.id));
+ if(wholeParagraphs){
+  if(text!==null){const fragment=inlineFragment(draftTextHtml(text,true));for(const span of fragment.querySelectorAll('[data-working-draft]'))span.dataset.workingDraft=edit.id;paragraphs[0].before(fragment);}
+  for(const p of paragraphs)p.remove();
+  storeAnnotatedScene(book,scene,annotatedHtml(root,sceneNotes(scene.html)));return;
+ }
+ const first=nodes[0];
+ if(text!==null){const span=document.createElement('span');span.dataset.workingDraft=edit.id;text.replace(/\r\n?/g,'\n').split('\n').forEach((line,i)=>{if(i)span.append(document.createElement('br'));span.append(document.createTextNode(line));});first.before(span);}
+ for(const node of nodes){const p=node.closest('p');node.remove();if(p&&!p.textContent.trim()&&!p.querySelector('[data-working-draft],mark,img'))p.remove();}
+ storeAnnotatedScene(book,scene,annotatedHtml(root,sceneNotes(scene.html)));
+}

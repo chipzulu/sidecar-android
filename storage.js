@@ -97,7 +97,7 @@ export async function writeWriterDraft(book,ink,expectedRevision,textState){
     const text=textState===undefined?(current.result?.text||{accepted:[],pending:null}):textState;
     try{
      meta.put({ink,revision,updatedAt,text},'writer:'+book.id);
-     meta.put({revision,updatedAt,strokes:ink.strokes.length,textUnits:text.accepted.length+(text.pending?1:0)},'writer-info:'+book.id);
+     meta.put({revision,updatedAt,strokes:ink.strokes.length,textUnits:text.accepted.length+(text.pending?1:0)+(text.edit?1:0)},'writer-info:'+book.id);
     }catch(e){reason=e;try{tx.abort();}catch{}}
    };
   };

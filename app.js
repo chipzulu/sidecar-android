@@ -1,4 +1,4 @@
-import {insertManuscriptDialog,assimilateManuscriptDraft} from './manuscript-insert.js';
+import {insertManuscriptDialog,assimilateManuscriptDraft,manuscriptDraft,updateManuscriptDraft} from './manuscript-insert.js';
 import {mountWriterInk} from './writer-ink.js';
 import {mountWriterWorkspace} from './writer-workspace.js';
 import {allBlocks} from './legacy-drafts.js';
@@ -32,7 +32,7 @@ const writer=mountWriterWorkspace({container:document.querySelector('.layout'),p
  canChange:()=>!libraryMode&&!busy&&!credentialBusy&&!rendering&&!writerInk.activeStroke()&&highlights.beforeRender(),beforeChange:()=>writerInk.pause(),
  onChange:()=>{if(dock)setOpen(dock,false);else layout();$('ui-mode').value=writer.active()?'writer':'reader';}
 });
-const writerInk=mountWriterInk({status:message,beforeWriting:()=>highlights.beforeRender()});
+const writerInk=mountWriterInk({status:message,beforeWriting:()=>highlights.beforeRender(),onApplyDraft:edit=>{const scene=model.chapters.flatMap(c=>c.scenes).find(s=>s.path===edit.path);updateManuscriptDraft(snapshot,scene,edit,edit.text);highlights.sceneEdited(scene);repaginate();}});
 $('ui-mode').onchange=async()=>{
  const value=$('ui-mode').value==='writer';
  if(writerTransition||libraryMode||busy||credentialBusy||rendering){$('ui-mode').value=writer.active()?'writer':'reader';return;}
@@ -193,10 +193,20 @@ $('reader').addEventListener('click',event=>{
  const draft=event.target.closest('[data-working-draft]');if(!draft||busy||rendering)return;
  event.stopImmediatePropagation();if(!writerInk.pause()||!highlights.beforeRender())return;
  const block=draft.closest('[data-block]'),scene=model.chapters.flatMap(c=>c.scenes).find(s=>s.path===block?.dataset.scene);if(!scene)return;
- const dialog=document.createElement('dialog');dialog.className='working-draft-dialog';dialog.innerHTML='<h3>Working draft</h3><p>This text is not yet assimilated.</p><button data-assimilate>Assimilate</button><button data-edit>Edit scene</button><button data-close>Close</button><p role="status"></p>';
+ const dialog=document.createElement('dialog');dialog.className='working-draft-dialog';dialog.innerHTML='<h3>Working draft</h3><p>This text is not yet assimilated.</p><button data-assimilate>Assimilate</button><button data-edit>Edit draft</button><button data-close>Close</button><button data-delete>Delete</button><p role="status"></p>';
  const close=()=>{dialog.close();dialog.remove();};dialog.querySelector('[data-close]').onclick=close;dialog.oncancel=e=>{e.preventDefault();close();};
  dialog.querySelector('[data-assimilate]').onclick=()=>{try{assimilateManuscriptDraft(snapshot,scene,draft.dataset.workingDraft);close();highlights.sceneEdited(scene);repaginate();}catch(e){dialog.querySelector('[role=status]').textContent=e.message;}};
- dialog.querySelector('[data-edit]').onclick=()=>{close();writeScene(snapshot,scene,Number(block.dataset.block),()=>{highlights.sceneEdited(scene);repaginate();});};document.body.append(dialog);dialog.showModal();
+ dialog.querySelector('[data-edit]').onclick=async()=>{try{
+  if(!tabletTextAllowed(snapshot))throw Error('Manuscript editing is disabled for this book.');
+  const edit=manuscriptDraft(scene,draft.dataset.workingDraft);edit.originalText=edit.text;
+  if(!writer.active()&&!writer.setActive(true))throw Error('Finish the current action before opening Writer.');
+  await writerInk.open(snapshot);
+  if(await writerInk.editDraft(edit))close();
+ }catch(e){dialog.querySelector('[role=status]').textContent=e.message;}};
+ dialog.querySelector('[data-delete]').onclick=()=>{try{
+  if(!confirm('Delete this entire working draft block?'))return;
+  updateManuscriptDraft(snapshot,scene,manuscriptDraft(scene,draft.dataset.workingDraft));close();highlights.sceneEdited(scene);repaginate();
+ }catch(e){dialog.querySelector('[role=status]').textContent=e.message;}};document.body.append(dialog);dialog.showModal();
 },true);
 // Read-only recovery of text from the removed experimental companion.
 $('about-open').addEventListener('click',()=>{
