@@ -1,4 +1,13 @@
-# Story Sidecar Android Reader 0.1.68
+# Story Sidecar Android Reader 0.1.69
+
+## Reader 0.1.69 — recognition preview inside the text box
+
+After Aa, recognized text appears inside the conversion text box at the remembered insertion/replacement target. The preview uses the same font size and a lighter grey-green colour with a fine dotted underline. Proposed replacements temporarily take the place of selected words in the display; the original accepted text remains saved unchanged until Accept. Re-conversion replaces the proposal rather than adding another preview. The separate preview below the text box is hidden.
+
+The text box uses the proposed layout for correct wrapping and scrolling, while local storage keeps accepted text and the pending proposal separate. A preview below the visible area is brought into view. Accept commits the proposal and clears the handwriting only after the save succeeds. New handwriting makes the proposal stale and restores the original display until conversion is repeated. While a valid proposal is shown, direct text editing, Backspace/Space/New line and Paste back are disabled to prevent edits using misleading offsets; Accept, reconvert, Clear and Cancel editing remain available.
+
+Validation: Writer conversion browser suite passed, including initial insertion preview, replacement in place, same font size, hidden lower preview, re-conversion, stale-preview removal, accepted text/scene unchanged before acceptance, save-failure retention, successful acceptance and the existing clipboard/Paste back flows. Visual preview checked at 1200×1000. Native bridge mocked; check the lighter text on BOOX. Reader-only update: APK stays 0.1.20, PC stays 0.1.143.
+
 
 ## Reader 0.1.68 — one compact conversion toolbar
 

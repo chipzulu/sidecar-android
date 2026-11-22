@@ -1,4 +1,4 @@
-import {writerText,targetFor,changedText,replaceText,acceptText} from './writer-text.js';
+import {writerText,targetFor,changedText,replaceText,acceptText,textPreview} from './writer-text.js';
 import {logEvent} from './input-events.js';
 import {recognizeInk} from './ink-recognition.js';
 import {inkPad} from './ink-pad.js';
@@ -43,7 +43,8 @@ export function mountWriterInk({status,beforeWriting,onApplyDraft,onSelection}){
   convertButton.disabled=!pad||locked||operation||!pad.strokeCount();
   accept.disabled=!pad||locked||operation||!textState.pending||textState.pending.stale;
   for(const id of ['writer-draft-apply','writer-draft-cancel','writer-text-delete','writer-text-enter','writer-text-space'])document.getElementById(id).disabled=locked||operation;
-  draftField.readOnly=locked||operation;
+  draftField.readOnly=locked||operation||!!textPreview(textState);
+  for(const id of ['writer-text-delete','writer-text-space','writer-text-enter','writer-draft-apply'])document.getElementById(id).disabled=locked||operation||!!textPreview(textState);
   document.getElementById('writer-clear-text').hidden=false;
   document.getElementById('writer-clear-text').disabled=!pad||locked||operation||(!writerText(textState)&&!textState.pending);
  }
@@ -84,10 +85,11 @@ export function mountWriterInk({status,beforeWriting,onApplyDraft,onSelection}){
   document.getElementById('writer-draft-edit').hidden=false;accepted.hidden=true;
   document.getElementById('writer-draft-cancel').hidden=!textState.edit;
   document.getElementById('writer-edit-origin').textContent=textState.edit?(textState.edit.kind==='range'?(textState.edit.start===textState.edit.end?'Inserting text':'Editing selection'):'Editing draft'):'New text';
-  if(draftField.value!==writerText(textState))draftField.value=writerText(textState);
+  const display=textPreview(textState)?.text??writerText(textState);
+  if(draftField.value!==display)draftField.value=display;
   paintTarget();
   accepted.replaceChildren(...textState.accepted.map(unit=>{const p=document.createElement('p');p.textContent=unit.text;return p;}));
-  pending.textContent=textState.pending?.text||'';pending.hidden=!textState.pending;
+  pending.textContent=textState.pending?.text||'';pending.hidden=true;
   pending.classList.toggle('stale',!!textState.pending?.stale);renderingText=false;
  }
  function createPad(ink){
@@ -113,7 +115,7 @@ export function mountWriterInk({status,beforeWriting,onApplyDraft,onSelection}){
   if(!text.trim())throw Error('No text recognized. Your handwriting is unchanged.');
   const next={...textState,pending:{id:crypto.randomUUID(),text,stale:false,target:{...targetFor(textState),base:writerText(textState)}}};
   // Keep the result visible on save failure; Accept will retry the atomic save.
-  textState=next;textDirty=true;renderText();
+  textState=next;textDirty=true;renderText();revealPreview();
   revision=await writeWriterDraft(owner,pad.copy(),revision,next);textDirty=false;
   conversionStatus.textContent='Review conversion, then Accept.';
  });}
@@ -139,13 +141,24 @@ export function mountWriterInk({status,beforeWriting,onApplyDraft,onSelection}){
  }
 
  function paintTarget(){
-  const text=writerText(textState),t=textState.pending&&!textState.pending.stale?textState.pending.target||targetFor(textState):targetFor(textState);
-  const mirror=document.querySelector('#writer-text-mirror>div');mirror.replaceChildren(document.createTextNode(text.slice(0,t.start)));
-  const mark=document.createElement('mark');mark.className=t.start===t.end?'writer-caret':'writer-selection';mark.textContent=text.slice(t.start,t.end);mirror.append(mark,document.createTextNode(text.slice(t.end)+'\n'));
+  const text=writerText(textState),preview=textPreview(textState),t=targetFor(textState);
+  const mirror=document.querySelector('#writer-text-mirror>div');
+  if(preview){
+   const proposed=document.createElement('span');proposed.className='writer-proposed';proposed.textContent=preview.insert;proposed.title='Proposed text — Accept to insert';
+   mirror.replaceChildren(document.createTextNode(preview.before),proposed,document.createTextNode(preview.after+'\n'));
+  }else{
+   mirror.replaceChildren(document.createTextNode(text.slice(0,t.start)));
+   const mark=document.createElement('mark');mark.className=t.start===t.end?'writer-caret':'writer-selection';mark.textContent=text.slice(t.start,t.end);mirror.append(mark,document.createTextNode(text.slice(t.end)+'\n'));
+  }
   mirror.style.width=draftField.clientWidth+'px';mirror.style.transform='translateY(-'+draftField.scrollTop+'px)';
-  document.getElementById('writer-text-target').textContent=t.start===t.end?'Insertion point':'Replace selection';
+  document.getElementById('writer-text-target').textContent=preview?'Preview — Accept to insert':t.start===t.end?'Insertion point':'Replace selection';
  }
- function rememberCaret(){if(renderingText||operation||document.activeElement!==draftField)return;textState={...textState,caret:{start:draftField.selectionStart,end:draftField.selectionEnd}};textDirty=true;paintTarget();}
+ function revealPreview(){requestAnimationFrame(()=>{
+  const proposed=document.querySelector('.writer-proposed');if(!proposed)return;
+  const r=proposed.getBoundingClientRect(),box=draftField.getBoundingClientRect();
+  if(r.top<box.top+10||r.bottom>box.bottom-10){draftField.scrollTop+=r.top-box.top-10;paintTarget();}
+ });}
+ function rememberCaret(){if(renderingText||operation||textPreview(textState)||document.activeElement!==draftField)return;textState={...textState,caret:{start:draftField.selectionStart,end:draftField.selectionEnd}};textDirty=true;paintTarget();}
  let textPen=null;
  function penOffset(x,y){
   const mirror=document.querySelector('#writer-text-mirror>div');
@@ -156,6 +169,7 @@ export function mountWriterInk({status,beforeWriting,onApplyDraft,onSelection}){
  }
  draftField.addEventListener('pointerdown',e=>{
   if(!pause())return;
+  if(textPreview(textState))return;
   if(e.pointerType!=='pen')return;
   const at=penOffset(e.clientX,e.clientY);if(at===null)return;e.preventDefault();
   textPen={id:e.pointerId,start:at};try{draftField.setPointerCapture(e.pointerId);}catch{}
@@ -167,16 +181,16 @@ export function mountWriterInk({status,beforeWriting,onApplyDraft,onSelection}){
 
  for(const name of ['select','keyup'])draftField.addEventListener(name,()=>{if(document.activeElement!==draftField)return;rememberCaret();showCopySelection();});
  draftField.addEventListener('pointerup',e=>{if(e.pointerType!=='pen'){rememberCaret();showCopySelection();}});
- function showCopySelection(){const t=targetFor(textState);onSelection?.(writerText(textState).slice(t.start,t.end),draftField.getBoundingClientRect());}
- draftField.addEventListener('input',()=>{if(operation)return;textState=changedText(textState,draftField.value,{start:draftField.selectionStart,end:draftField.selectionEnd});textDirty=true;conversionStatus.textContent=textState.pending?'Text changed — convert again.':'';paintTarget();refresh();void settle();});
+ function showCopySelection(){const preview=textPreview(textState),t=preview?{start:draftField.selectionStart,end:draftField.selectionEnd}:targetFor(textState);onSelection?.((preview?.text??writerText(textState)).slice(t.start,t.end),draftField.getBoundingClientRect());}
+ draftField.addEventListener('input',()=>{if(operation||textPreview(textState))return;textState=changedText(textState,draftField.value,{start:draftField.selectionStart,end:draftField.selectionEnd});textDirty=true;conversionStatus.textContent=textState.pending?'Text changed — convert again.':'';paintTarget();refresh();void settle();});
  draftField.addEventListener('blur',()=>{void settle();});
  draftField.addEventListener('scroll',paintTarget);new ResizeObserver(paintTarget).observe(draftField);
  document.getElementById('writer-text-delete').onclick=()=>editLocal('',true);
  document.getElementById('writer-text-enter').onclick=()=>editLocal('\n');
  document.getElementById('writer-text-space').onclick=()=>editLocal(' ');
- function editLocal(insert,backspace=false){if(!pause())return;textState=replaceText(textState,insert,{backspace});textDirty=true;conversionStatus.textContent=textState.pending?'Text changed — convert again.':'';renderText();refresh();void settle();}
+ function editLocal(insert,backspace=false){if(textPreview(textState)||!pause())return;textState=replaceText(textState,insert,{backspace});textDirty=true;conversionStatus.textContent=textState.pending?'Text changed — convert again.':'';renderText();refresh();void settle();}
  document.getElementById('writer-draft-apply').onclick=async()=>{
-  if(operation||!pause()||!await settle())return;
+  if(textPreview(textState)||operation||!pause()||!await settle())return;
   operation=true;refresh();
   try{if(!textState.edit){await onApplyDraft?.({kind:'new',text:writerText(textState)});return;}await onApplyDraft?.(textState.edit);const next={...textState};delete next.edit;next.caret=null;revision=await writeWriterDraft(owner,pad.copy(),revision,next);textState=next;renderText();refresh();conversionStatus.textContent='Pasted back.';}
   catch(e){status(e.message,true);conversionStatus.textContent=e.message;}finally{operation=false;refresh();}

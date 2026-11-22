@@ -8,3 +8,10 @@ export function acceptText(state){const pending=state.pending;if(!pending||pendi
  if(t.append&&!state.edit)return {...state,accepted:[...state.accepted,{id:pending.id,text:pending.text}],pending:null,caret:null};
  const next=changedText(state,text.slice(0,t.start)+insert+text.slice(t.end),t.append?null:{start:t.start+insert.length,end:t.start+insert.length});return {...next,pending:null};
 }
+
+export function textPreview(state){
+ const text=writerText(state),pending=state.pending;if(!pending||pending.stale)return null;
+ const target=pending.target||{...targetFor(state),base:text};if(target.base!==text)return null;
+ const insert=(target.append&&text?'\n\n':'')+pending.text;
+ return {before:text.slice(0,target.start),insert,after:text.slice(target.end),text:text.slice(0,target.start)+insert+text.slice(target.end)};
+}

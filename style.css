@@ -191,3 +191,5 @@ body.writer-pen-active #writer-column-edge,body.writer-pen-active #writer-row-ed
 .selection-copy-popup {position:fixed;z-index:1400;padding:3px;background:#faf7eb;border:1px solid #879d88;border-radius:5px;box-shadow:0 2px 8px #0002;}
 .selection-copy-popup[hidden] {display:none;}
 .selection-copy-popup button {margin:0;padding:5px 13px;}
+
+.writer-proposed {color:#6b7c6d;font:inherit;text-decoration:underline dotted #9ca99d;text-underline-offset:3px;}
