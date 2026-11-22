@@ -1,3 +1,4 @@
+import {mountSelectionCopy} from './selection-copy.js';
 import {captureManuscriptTarget,pasteManuscriptTarget} from './manuscript-target.js';
 import {insertManuscriptDialog,assimilateManuscriptDraft,manuscriptDraft,updateManuscriptDraft} from './manuscript-insert.js';
 import {mountWriterInk} from './writer-ink.js';
@@ -33,12 +34,13 @@ const writer=mountWriterWorkspace({container:document.querySelector('.layout'),p
  canChange:()=>!libraryMode&&!busy&&!credentialBusy&&!rendering&&!writerInk.activeStroke()&&highlights.beforeRender(),beforeChange:()=>writerInk.pause(),
  onChange:()=>{if(dock)setOpen(dock,false);else layout();$('ui-mode').value=writer.active()?'writer':'reader';}
 });
-const writerInk=mountWriterInk({status:message,beforeWriting:()=>highlights.beforeRender(),onApplyDraft:async edit=>{
+const writerInk=mountWriterInk({status:message,onSelection:(text,rect)=>selectionCopy.show(text,rect),beforeWriting:()=>highlights.beforeRender(),onApplyDraft:async edit=>{
  if(edit.kind==='new'){await choosePasteDestination(edit.text);return;}
  const scene=model.chapters.flatMap(c=>c.scenes).find(s=>s.path===edit.path);
  if(edit.kind==='range')pasteManuscriptTarget(snapshot,scene,edit,edit.text);else updateManuscriptDraft(snapshot,scene,edit,edit.text);
  highlights.sceneEdited(scene);repaginate();
 }});
+const selectionCopy=mountSelectionCopy({reader:$('reader'),status:message});
 $('ui-mode').onchange=async()=>{
  const value=$('ui-mode').value==='writer';
  if(writerTransition||libraryMode||busy||credentialBusy||rendering){$('ui-mode').value=writer.active()?'writer':'reader';return;}

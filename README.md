@@ -1,4 +1,15 @@
-# Story Sidecar Android Reader 0.1.67
+# Story Sidecar Android Reader 0.1.68
+
+## Reader 0.1.68 — one compact conversion toolbar
+
+The conversion frame now has one toolbar above the text: Accept, ⌫ (Backspace), ␣ (Space), ↵ (New line), Clear and Paste back. Cancel editing appears only when editing manuscript text. The separate bottom toolbar, Append and permanent Copy accepted text button are removed. Origin, target and feedback share a compact information line; existing pending conversion previews remain visible when needed.
+
+Opening a new draft-edit session places the caret at the end of the draft and scrolls the local text box to it. Selection still defines the handwriting replacement target. Backspace deletes selected text or the previous character; Space replaces selected text or inserts at the caret. Accept remains disabled without a valid pending conversion. Clear works on both local writing and manuscript editing without modifying the manuscript until Paste back.
+
+Selecting text in the manuscript or conversion frame offers a small Copy popup. Copy copies the selected words only, without changing the remembered replacement target. Popup display does not pause resumed handwriting. Clipboard access failures produce a message so the system Copy command can be used.
+
+Validation: Writer-conversion browser regression passed, including single-toolbar layout, removed controls, end caret, disabled Accept, Space/Backspace and selected-only Copy in both panes with the replacement target retained. Writer workspace and annotation-flow regressions also passed (the old layout test now expects the conversion textarea introduced in 0.1.66); visual layout checked at 1200×1000. Native input is mocked in browser tests: verify the pen/clipboard interaction on BOOX. Reader update only; APK stays 0.1.20, PC stays 0.1.143.
+
 
 ## Reader 0.1.67 — handwriting revisions at a remembered text position
 

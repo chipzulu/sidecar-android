@@ -183,3 +183,11 @@ body.writer-pen-active #writer-column-edge,body.writer-pen-active #writer-row-ed
 ::highlight(paste-destination){background:#91b49b;color:#122d1a;}
 
 #writer-text-controls {position:sticky;top:-12px;background:#faf8f0;z-index:2;padding:4px 0;}
+
+#writer-text-controls {gap:4px;flex-wrap:wrap;top:-12px;}
+#writer-text-controls button {padding:5px 9px;min-height:34px;font-size:14px;margin:0;}
+.writer-text-info {display:flex;flex-wrap:wrap;gap:4px 10px;font-size:12px;line-height:1.35;color:#49614e;margin:4px 0 7px;}
+.writer-text-info #writer-conversion-status,.writer-text-info #writer-text-target {font-size:inherit;margin:0;}
+.selection-copy-popup {position:fixed;z-index:1400;padding:3px;background:#faf7eb;border:1px solid #879d88;border-radius:5px;box-shadow:0 2px 8px #0002;}
+.selection-copy-popup[hidden] {display:none;}
+.selection-copy-popup button {margin:0;padding:5px 13px;}
