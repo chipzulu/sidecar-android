@@ -1,4 +1,15 @@
-# Story Sidecar Android Reader 0.1.66
+# Story Sidecar Android Reader 0.1.67
+
+## Reader 0.1.67 — handwriting revisions at a remembered text position
+
+The conversion frame is now an editable local text surface for ordinary Writer text as well as manuscript drafts. Tap with the pen to place a caret; drag to mark text for replacement. The caret/selection stays visible when you return to handwriting. With no chosen position, recognized text appends at the end (as a new passage). Append resets that default. Delete removes selected text, or backspaces at a caret; Enter inserts a line break. Clear text and Copy accepted text remain available; neither changes the manuscript. Pen selection is implemented in Sidecar and the text field uses inputmode=none to avoid requesting the system handwriting keyboard.
+
+Aa produces a preview with its remembered replacement target. Accept replaces the selection or inserts at the caret and clears the accepted handwriting. A changed text/ink state makes the preview stale, so recognition must be repeated. Draft editing remains plain text in this first editor; existing rich formatting inside rewritten text is not preserved.
+
+Paste back replaces the originating non-assimilated draft while retaining its identity, or the exact manuscript selection that initiated editing. To edit selected ordinary prose, select it, long-press/right-click within it, then choose Edit. With an insertion point, Insert → Write here opens an empty Writer edit tied to that point. Existing whole-scene Edit without a selection remains available. For local writing without an origin, Paste back asks you to tap a manuscript position; tap elsewhere to reposition, then ✓ to insert or × to cancel. No manuscript write happens until Paste back/confirmation. Stale scene contents block replacement rather than silently overwriting newer work.
+
+Validation: Writer integration, working-draft and annotation-flow browser suites passed. Coverage includes pen selection, persistent target, recognized replacement, Delete/Enter/default append, selected manuscript Paste back, repeated occurrences, fresh insertion confirmation/cancellation, local save failures, stale text/scene rejection, accepted text recovery and existing annotations. Native pen/recognition are mocked; physical BOOX verification remains required. Update Reader files on GitHub Pages. APK stays 0.1.20; PC stays 0.1.143.
+
 
 ## Reader 0.1.66 — edit working drafts in the conversion frame
 

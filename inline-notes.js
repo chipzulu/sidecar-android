@@ -25,7 +25,7 @@ export function annotatedHtml(root,notes){
 }
 // Project raw prose to reading offsets once at attachment time. Keep markers
 // and paired italic delimiters occupy no space in the paginated reading view.
-function textMap(roots,raw){
+export function textMap(roots,raw){
   const nodes=[];let source='';
   for(const root of roots){
     const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);

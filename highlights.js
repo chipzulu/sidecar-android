@@ -499,6 +499,7 @@ export function mountHighlights({reader,viewport,status,onWriting,onEditScene,on
   function showMenu(x,y,at=null,noteId=null,minimal=false){
     // Hand off pen ownership before making the manuscript modal. Otherwise
     // Writer's palm guard can block the very controls needed to dismiss it.
+    if(at){const selection=getSelection();if(selection?.rangeCount&&!selection.isCollapsed){const selected=selection.getRangeAt(0);const block=n=>(n.nodeType===3?n.parentElement:n).closest?.('p[data-block]');if(block(selected.startContainer)?.dataset.scene===at.path&&block(selected.endContainer)?.dataset.scene===at.path)at={...at,selection:selected.cloneRange()};}}
     if(beforeMenu?.()===false)return;
     if(menu.open)menu.close();menuPress=false;menu.replaceChildren();
     const add=(label,action,keep=false)=>{const b=document.createElement('button');b.textContent=label;b.type='button';b.onclick=()=>{if(!keep)menu.close();try{action();palette?.refresh();}catch(e){status(e.message,true);}};menu.append(b);};

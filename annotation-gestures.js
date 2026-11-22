@@ -12,7 +12,7 @@ export function annotationGestures(reader,{menu,select,cancel}){
    if(a===node.length){a=Math.min(r.startOffset,node.length)-1;while(a>=0&&/\s/.test(node.data[a]))a--;}
    if(a<0)return null;b=a+1;
   }else{if(/\s/.test(node.data[a])&&a>0)a--;while(a>0&&!/\s/.test(node.data[a-1]))a--;b=a+1;while(b<node.length&&!/\s/.test(node.data[b]))b++;}
-  const range=document.createRange();range.setStart(node,a);range.setEnd(node,b);return {range,path:block.dataset.scene};
+  const range=document.createRange();range.setStart(node,a);range.setEnd(node,b);return {range,caret:r.cloneRange(),path:block.dataset.scene};
  }
  function joined(a,b){if(!a||!b||a.path!==b.path)return null;const earlier=a.range.compareBoundaryPoints(Range.START_TO_START,b.range)<=0;const first=earlier?a:b,last=earlier?b:a;const range=document.createRange();range.setStart(first.range.startContainer,first.range.startOffset);range.setEnd(last.range.endContainer,last.range.endOffset);return {range,path:a.path};}
  function reset(){clearTimeout(timer);down=null;CSS.highlights?.delete('annotation-drag');}

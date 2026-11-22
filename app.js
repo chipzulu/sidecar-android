@@ -1,3 +1,4 @@
+import {captureManuscriptTarget,pasteManuscriptTarget} from './manuscript-target.js';
 import {insertManuscriptDialog,assimilateManuscriptDraft,manuscriptDraft,updateManuscriptDraft} from './manuscript-insert.js';
 import {mountWriterInk} from './writer-ink.js';
 import {mountWriterWorkspace} from './writer-workspace.js';
@@ -23,7 +24,7 @@ const $=id=>document.getElementById(id);
 let libraryMode=true,libraryView,menuBook=null,configBook=null;
 let snapshot=null,model=null,index=-1,coverUrl='',busy=false,credentialBusy=false,client=null,clientKey='',abort=null,disposeCards=()=>{},selectedScene=null,renderRevision=0,rendering=false, replacing=false;
 function message(text,error=false){$('updates-status').textContent=text;if(libraryMode){$('library-error').textContent=text;$('library-error').classList.toggle('error',error);}$('status').textContent=text;$('status').classList.toggle('error',error);}
-const highlights=mountHighlights({reader:$('reader'),viewport:$('manuscript-scroll'),status:message,beforeMenu:()=>writerInk.pause(),canEditScene:()=>tabletTextAllowed(snapshot),onEditScene:at=>editScene(at),onConvertedDraft:at=>convertedDraft(at),onWriting:()=>{if(!writerInk.pause())return false;if(dock)setOpen(dock,false);}});
+const highlights=mountHighlights({reader:$('reader'),viewport:$('manuscript-scroll'),status:message,beforeMenu:()=>writerInk.pause(),canEditScene:()=>tabletTextAllowed(snapshot),onEditScene:at=>{if(at?.selection)void editManuscriptSelection(at);else editScene(at);},onConvertedDraft:at=>convertedDraft(at),onWriting:()=>{if(!writerInk.pause())return false;if(dock)setOpen(dock,false);}});
 function preference(key,value){try{if(value===undefined)return localStorage.getItem('sidecar-reader:'+key);localStorage.setItem('sidecar-reader:'+key,value);}catch{/* Reading remains usable without preferences. */}}
 function remember(){if(snapshot&&!libraryMode&&!rendering&&!replacing)localStorage.setItem(workKey(snapshot,'position'),JSON.stringify({scope:index===-2?'novel':selectedScene?'scene':index===-1?'cover':'chapter',chapter:model.chapters[index]?.key??null,scene:selectedScene,y:$('manuscript-scroll').scrollTop}));}
 let pageWidth=Math.max(280,Number(preference('page-width'))||740),pageLines=Math.max(15,Math.min(60,Number(preference('page-lines'))||28)),cardMode=preference('card-layout')||'none',dock='';
@@ -32,7 +33,12 @@ const writer=mountWriterWorkspace({container:document.querySelector('.layout'),p
  canChange:()=>!libraryMode&&!busy&&!credentialBusy&&!rendering&&!writerInk.activeStroke()&&highlights.beforeRender(),beforeChange:()=>writerInk.pause(),
  onChange:()=>{if(dock)setOpen(dock,false);else layout();$('ui-mode').value=writer.active()?'writer':'reader';}
 });
-const writerInk=mountWriterInk({status:message,beforeWriting:()=>highlights.beforeRender(),onApplyDraft:edit=>{const scene=model.chapters.flatMap(c=>c.scenes).find(s=>s.path===edit.path);updateManuscriptDraft(snapshot,scene,edit,edit.text);highlights.sceneEdited(scene);repaginate();}});
+const writerInk=mountWriterInk({status:message,beforeWriting:()=>highlights.beforeRender(),onApplyDraft:async edit=>{
+ if(edit.kind==='new'){await choosePasteDestination(edit.text);return;}
+ const scene=model.chapters.flatMap(c=>c.scenes).find(s=>s.path===edit.path);
+ if(edit.kind==='range')pasteManuscriptTarget(snapshot,scene,edit,edit.text);else updateManuscriptDraft(snapshot,scene,edit,edit.text);
+ highlights.sceneEdited(scene);repaginate();
+}});
 $('ui-mode').onchange=async()=>{
  const value=$('ui-mode').value==='writer';
  if(writerTransition||libraryMode||busy||credentialBusy||rendering){$('ui-mode').value=writer.active()?'writer':'reader';return;}
@@ -185,12 +191,45 @@ function insertText(text='',at=null){
  if(!snapshot||busy||rendering||!highlights.beforeRender())return;
  const target=at?.range?.startContainer;
  const block=(target?.nodeType===3?target.parentElement:target)?.closest('[data-block]')||tappedBlock;
- insertManuscriptDialog(snapshot,model.chapters.flatMap(c=>c.scenes),{text,path:at?.path||block?.dataset.scene,index:Number(block?.dataset.block)||0},scene=>{highlights.sceneEdited(scene);repaginate();message('Inserted and saved on this tablet. Send changes to share the scene with your PC.');});
+ insertManuscriptDialog(snapshot,model.chapters.flatMap(c=>c.scenes),{text,path:at?.path||block?.dataset.scene,index:Number(block?.dataset.block)||0,onWriter:at?()=>editManuscriptSelection({...at,selection:null}):null},scene=>{highlights.sceneEdited(scene);repaginate();message('Inserted and saved on this tablet. Send changes to share the scene with your PC.');});
 }
+async function editManuscriptSelection(at){try{
+ const scene=model.chapters.flatMap(c=>c.scenes).find(s=>s.path===at.path);if(!scene)return;
+ const range=at.selection||at.caret||at.range;
+ const roots=[...$('reader').querySelectorAll('p[data-block]')].filter(p=>p.dataset.scene===at.path);
+ const edit=captureManuscriptTarget(scene,roots,range,!at.selection);
+ if(!tabletTextAllowed(snapshot))throw Error('Manuscript editing is disabled for this book.');
+ if(!writer.active()&&!writer.setActive(true))return;
+ await writerInk.open(snapshot);await writerInk.editDraft(edit);
+}catch(e){message(e.message,true);}}
 function convertedDraft(at){try{insertText(writer.active()?writerInk.acceptedText():'',at);}catch(e){message(e.message,true);}}
+// Paste-back without an origin: tap a caret, then explicitly confirm it.
+let cancelPasteDestination=null;
+async function choosePasteDestination(text){
+ cancelPasteDestination?.();
+ const destinationBook=snapshot.id;
+ if(!text.trim())throw Error('Write some text before choosing a destination.');
+ if(!tabletTextAllowed(snapshot))throw Error('Manuscript editing is disabled for this book.');
+ if(!highlights.beforeRender())return;
+ const box=document.createElement('aside');box.className='paste-destination';box.innerHTML='<span>Tap the manuscript to place the insertion point.</span><button disabled aria-label="Confirm insertion">✓</button><button aria-label="Cancel insertion">×</button>';document.body.append(box);
+ let target=null;const label=box.querySelector('span'),ok=box.querySelector('button');
+ const cleanup=()=>{cancelPasteDestination=null;box.remove();$('reader').removeEventListener('pointerdown',pick,true);CSS.highlights?.delete('paste-destination');};
+ const pick=e=>{const p=e.target.closest('p[data-block]');if(!p||e.pointerType==='touch'&&e.width>30)return;e.preventDefault();e.stopImmediatePropagation();
+  const range=document.caretRangeFromPoint(e.clientX,e.clientY);if(!range||!p.contains(range.startContainer))return;
+  try{const scene=model.chapters.flatMap(c=>c.scenes).find(s=>s.path===p.dataset.scene);target=captureManuscriptTarget(scene,[...$('reader').querySelectorAll('p[data-block]')].filter(n=>n.dataset.scene===scene.path),range,true);
+   const marker=range.cloneRange();if(marker.startContainer.nodeType===3&&marker.startOffset<marker.startContainer.length)marker.setEnd(marker.startContainer,marker.startOffset+1);else if(marker.startOffset>0)marker.setStart(marker.startContainer,marker.startOffset-1);
+   if(window.Highlight)CSS.highlights.set('paste-destination',new Highlight(marker));label.textContent='Insert here? Tap another position to move it.';ok.disabled=false;
+  }catch(error){label.textContent=error.message;target=null;ok.disabled=true;}
+ };
+ cancelPasteDestination=cleanup;
+ $('reader').addEventListener('pointerdown',pick,true);
+ box.querySelector('[aria-label="Cancel insertion"]').onclick=cleanup;
+ ok.onclick=()=>{try{if(snapshot.id!==destinationBook)throw Error('The book changed. Cancel and choose a new destination.');const scene=model.chapters.flatMap(c=>c.scenes).find(s=>s.path===target.path);pasteManuscriptTarget(snapshot,scene,target,text);cleanup();highlights.sceneEdited(scene);repaginate();message('Inserted and saved.');}catch(e){label.textContent=e.message;}};
+}
+
 document.addEventListener('insert-recognized-text',event=>{try{insertText(event.detail.text);}catch(e){message(e.message,true);}});
 $('reader').addEventListener('click',event=>{
- const draft=event.target.closest('[data-working-draft]');if(!draft||busy||rendering)return;
+ const draft=event.target.closest('[data-working-draft]');if(!draft||busy||rendering||cancelPasteDestination)return;
  event.stopImmediatePropagation();if(!writerInk.pause()||!highlights.beforeRender())return;
  const block=draft.closest('[data-block]'),scene=model.chapters.flatMap(c=>c.scenes).find(s=>s.path===block?.dataset.scene);if(!scene)return;
  const dialog=document.createElement('dialog');dialog.className='working-draft-dialog';dialog.innerHTML='<h3>Working draft</h3><p>This text is not yet assimilated.</p><button data-assimilate>Assimilate</button><button data-edit>Edit draft</button><button data-close>Close</button><button data-delete>Delete</button><p role="status"></p>';

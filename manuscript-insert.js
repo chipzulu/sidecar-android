@@ -2,7 +2,7 @@ import {draftTextHtml,assimilateDraft} from './shared/working-draft.js';
 import {inlineFragment,annotatedHtml,sceneNotes} from './inline-notes.js';
 import {storeAnnotatedScene} from './writing.js';
 import {tabletTextAllowed} from './shared/book-workflow.js';
-export function insertManuscriptDialog(book,scenes,{text='',path,index=0,working=true}={},changed){
+export function insertManuscriptDialog(book,scenes,{text='',path,index=0,working=true,onWriter}={},changed){
  if(!tabletTextAllowed(book))throw Error('Manuscript editing is disabled for this book.');
  const dialog=document.createElement('dialog');dialog.className='working-draft-dialog';dialog.innerHTML='<h2>Insert manuscript text</h2><label>Scene <select data-scene></select></label><p><label>Insert after <select data-position></select></label></p><button data-paste type="button">Paste clipboard</button><textarea aria-label="Text to insert" placeholder="Paste or type text here"></textarea><p data-status role="status"></p><button data-normal>Insert normally</button><button data-draft>Insert as working draft</button><button data-close>Cancel</button>';
  const select=dialog.querySelector('[data-scene]'),position=dialog.querySelector('[data-position]'),field=dialog.querySelector('textarea');let before;
@@ -30,6 +30,7 @@ export function insertManuscriptDialog(book,scenes,{text='',path,index=0,working
   const root=document.createElement('div');root.append(inlineFragment(scene.html));const inserted=inlineFragment(draftTextHtml(field.value,draft));const at=Number(position.value);if(at<0)root.prepend(inserted);else root.children[at].after(inserted);
   storeAnnotatedScene(book,scene,annotatedHtml(root,sceneNotes(scene.html)));close();changed(scene);
  }catch(e){dialog.querySelector('[data-status]').textContent=e.message;}};
+ if(onWriter){const b=document.createElement('button');b.textContent='Write here';b.onclick=()=>{close();onWriter();};dialog.append(b);}
  document.body.append(dialog);dialog.showModal();
 }
 export function assimilateManuscriptDraft(book,scene,id){

@@ -1,3 +1,4 @@
+import {writerText,targetFor,changedText,replaceText,acceptText} from './writer-text.js';
 import {logEvent} from './input-events.js';
 import {recognizeInk} from './ink-recognition.js';
 import {inkPad} from './ink-pad.js';
@@ -30,7 +31,7 @@ export function mountWriterInk({status,beforeWriting,onApplyDraft}){
   const link=document.createElement('a');link.href=url;link.download='Story-Sidecar-writing.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),30000);
  });
  action('Retry save',async()=>{await settle();});
- let nativeLock=null;
+ let nativeLock=null,renderingText=false;
  function refresh(){
   const lock=capturing||operation;
   if(lock!==nativeLock){nativeLock=lock;logEvent('writer guard '+lock);window.SidecarApp?.postMessage(lock?'writer-touch-lock':'writer-touch-unlock');}
@@ -41,11 +42,11 @@ export function mountWriterInk({status,beforeWriting,onApplyDraft}){
   for(const b of tools.querySelectorAll('button'))b.disabled=!pad||locked||operation;
   convertButton.disabled=!pad||locked||operation||!pad.strokeCount();
   accept.disabled=!pad||locked||operation||!textState.pending||textState.pending.stale;
-  copy.disabled=operation||!(textState.edit?.text||textState.accepted.length);
-  for(const id of ['writer-draft-apply','writer-draft-cancel'])document.getElementById(id).disabled=locked||operation;
+  copy.disabled=operation||!writerText(textState);
+  for(const id of ['writer-draft-apply','writer-draft-cancel','writer-text-delete','writer-text-enter','writer-text-append'])document.getElementById(id).disabled=locked||operation;
   draftField.readOnly=locked||operation;
-  document.getElementById('writer-clear-text').hidden=!!textState.edit;
-  document.getElementById('writer-clear-text').disabled=!pad||locked||operation||(!textState.accepted.length&&!textState.pending);
+  document.getElementById('writer-clear-text').hidden=false;
+  document.getElementById('writer-clear-text').disabled=!pad||locked||operation||(!writerText(textState)&&!textState.pending);
  }
  function choose(tool){if(!pad||locked||operation)return;if(beforeWriting?.()===false)return;if(pad.setTool(tool)!==false){capturing=true;refresh();}}
  function pause(){if(operation)return false;if(!pad)return true;if(!pad.suspend()){status('Finish the pen stroke before changing the workspace.');return false;}capturing=false;refresh();return true;}
@@ -79,12 +80,16 @@ export function mountWriterInk({status,beforeWriting,onApplyDraft}){
   })();try{return await saveTask;}finally{saveTask=null;}
  }
  function renderText(){
+  renderingText=true;
   const accepted=document.getElementById('writer-accepted'),pending=document.getElementById('writer-pending');
-  document.getElementById('writer-draft-edit').hidden=!textState.edit;accepted.hidden=!!textState.edit;
-  if(draftField.value!==(textState.edit?.text||''))draftField.value=textState.edit?.text||'';
+  document.getElementById('writer-draft-edit').hidden=false;accepted.hidden=true;
+  document.getElementById('writer-draft-cancel').hidden=!textState.edit;
+  document.getElementById('writer-edit-origin').textContent=textState.edit?(textState.edit.kind==='range'?(textState.edit.start===textState.edit.end?'Manuscript insertion point':'Manuscript selection'):'Manuscript draft'):'Local writing';
+  if(draftField.value!==writerText(textState))draftField.value=writerText(textState);
+  paintTarget();
   accepted.replaceChildren(...textState.accepted.map(unit=>{const p=document.createElement('p');p.textContent=unit.text;return p;}));
   pending.textContent=textState.pending?.text||'';pending.hidden=!textState.pending;
-  pending.classList.toggle('stale',!!textState.pending?.stale);
+  pending.classList.toggle('stale',!!textState.pending?.stale);renderingText=false;
  }
  function createPad(ink){
   pad=inkPad(host,ink,async value=>{revision=await writeWriterDraft(owner,value,revision,structuredClone(textState));},undefined,{
@@ -107,7 +112,7 @@ export function mountWriterInk({status,beforeWriting,onApplyDraft}){
   conversionStatus.textContent='Converting on this BOOX…';
   const text=await recognizeInk(pad.copy(),stage=>{conversionStatus.textContent=stage+'…';});
   if(!text.trim())throw Error('No text recognized. Your handwriting is unchanged.');
-  const next={...textState,pending:{id:crypto.randomUUID(),text,stale:false}};
+  const next={...textState,pending:{id:crypto.randomUUID(),text,stale:false,target:{...targetFor(textState),base:writerText(textState)}}};
   // Keep the result visible on save failure; Accept will retry the atomic save.
   textState=next;textDirty=true;renderText();
   revision=await writeWriterDraft(owner,pad.copy(),revision,next);textDirty=false;
@@ -115,7 +120,7 @@ export function mountWriterInk({status,beforeWriting,onApplyDraft}){
  });}
  accept.onclick=()=>work(async()=>{
   if(!textState.pending||textState.pending.stale)return;
-  const next=textState.edit?{...textState,edit:{...textState.edit,text:textState.edit.text+(textState.edit.text?'\n\n':'')+textState.pending.text},pending:null}:{...textState,accepted:[...textState.accepted,{id:textState.pending.id,text:textState.pending.text}],pending:null};
+  const next=acceptText(textState);
   const empty={version:1,width:800,height:pad.copy().height,strokes:[]};
   // Both text and empty ink are committed together. Never clear first.
   revision=await writeWriterDraft(owner,empty,revision,next);textDirty=false;
@@ -124,28 +129,62 @@ export function mountWriterInk({status,beforeWriting,onApplyDraft}){
  });
  document.getElementById('writer-clear-text').onclick=()=>work(async()=>{
   if(!confirm('Clear all accepted and pending text from the Text Conversion Frame? Handwriting and text already inserted in the manuscript will stay.'))return;
-  const next={accepted:[],pending:null};revision=await writeWriterDraft(owner,pad.copy(),revision,next);
+  const next={...changedText(textState,'',null),pending:null};revision=await writeWriterDraft(owner,pad.copy(),revision,next);
   textState=next;textDirty=false;renderText();conversionStatus.textContent='Conversion text cleared. Handwriting and manuscript text are unchanged.';
  });
- copy.onclick=async()=>{try{await navigator.clipboard.writeText(textState.edit?.text??textState.accepted.map(unit=>unit.text).join('\n\n'));conversionStatus.textContent='Accepted text copied.';}catch{conversionStatus.textContent='Copy failed. Pause handwriting to select and copy the text.';}};
+ copy.onclick=async()=>{try{await navigator.clipboard.writeText(writerText(textState));conversionStatus.textContent='Accepted text copied.';}catch{conversionStatus.textContent='Copy failed. Pause handwriting to select and copy the text.';}};
  async function editDraft(edit){
   if(!pad||!pause()||!await settle())return false;
   if(textState.edit&&textState.edit.id!==edit.id)throw Error('Apply or cancel the draft already open in the conversion frame first.');
-  if(!textState.edit){const next={...textState,edit};revision=await writeWriterDraft(owner,pad.copy(),revision,next);textState=next;}
-  renderText();refresh();draftField.focus({preventScroll:true});return true;
+  if(!textState.edit){const next={...textState,edit,caret:null,pending:textState.pending?{...textState.pending,stale:true}:null};revision=await writeWriterDraft(owner,pad.copy(),revision,next);textState=next;}
+  renderText();refresh();return true;
  }
- draftField.addEventListener('pointerdown',()=>pause());
- draftField.addEventListener('input',()=>{if(!textState.edit)return;textState={...textState,edit:{...textState.edit,text:draftField.value}};textDirty=true;void settle();});
+
+ function paintTarget(){
+  const text=writerText(textState),t=textState.pending&&!textState.pending.stale?textState.pending.target||targetFor(textState):targetFor(textState);
+  const mirror=document.querySelector('#writer-text-mirror>div');mirror.replaceChildren(document.createTextNode(text.slice(0,t.start)));
+  const mark=document.createElement('mark');mark.className=t.start===t.end?'writer-caret':'writer-selection';mark.textContent=text.slice(t.start,t.end);mirror.append(mark,document.createTextNode(text.slice(t.end)+'\n'));
+  mirror.style.width=draftField.clientWidth+'px';mirror.style.transform='translateY(-'+draftField.scrollTop+'px)';
+  document.getElementById('writer-text-target').textContent=t.append?'Append at end':t.start===t.end?'Insert at marked caret':'Replace marked text';
+ }
+ function rememberCaret(){if(renderingText||operation||document.activeElement!==draftField)return;textState={...textState,caret:{start:draftField.selectionStart,end:draftField.selectionEnd}};textDirty=true;paintTarget();}
+ let textPen=null;
+ function penOffset(x,y){
+  const mirror=document.querySelector('#writer-text-mirror>div');
+  draftField.style.pointerEvents='none';const overlay=document.getElementById('writer-text-mirror');overlay.style.pointerEvents='auto';
+  let range;try{range=document.caretRangeFromPoint(x,y);}finally{draftField.style.pointerEvents='';overlay.style.pointerEvents='';}
+  if(!range||!mirror.contains(range.startContainer))return null;
+  const before=document.createRange();before.selectNodeContents(mirror);before.setEnd(range.startContainer,range.startOffset);return Math.min(writerText(textState).length,before.toString().length);
+ }
+ draftField.addEventListener('pointerdown',e=>{
+  if(!pause())return;
+  if(e.pointerType!=='pen')return;
+  const at=penOffset(e.clientX,e.clientY);if(at===null)return;e.preventDefault();
+  textPen={id:e.pointerId,start:at};try{draftField.setPointerCapture(e.pointerId);}catch{}
+  textState={...textState,caret:{start:at,end:at}};textDirty=true;paintTarget();
+ });
+ draftField.addEventListener('pointermove',e=>{if(textPen?.id!==e.pointerId)return;const at=penOffset(e.clientX,e.clientY);if(at===null)return;e.preventDefault();textState={...textState,caret:{start:Math.min(at,textPen.start),end:Math.max(at,textPen.start)}};textDirty=true;paintTarget();});
+ draftField.addEventListener('pointerup',e=>{if(textPen?.id!==e.pointerId)return;e.preventDefault();textPen=null;void settle();});
+ draftField.addEventListener('pointercancel',()=>{textPen=null;});
+
+ for(const name of ['select','keyup'])draftField.addEventListener(name,rememberCaret);
+ draftField.addEventListener('input',()=>{if(operation)return;textState=changedText(textState,draftField.value,{start:draftField.selectionStart,end:draftField.selectionEnd});textDirty=true;paintTarget();refresh();void settle();});
  draftField.addEventListener('blur',()=>{void settle();});
+ draftField.addEventListener('scroll',paintTarget);new ResizeObserver(paintTarget).observe(draftField);
+ document.getElementById('writer-text-delete').onclick=()=>editLocal('',true);
+ document.getElementById('writer-text-enter').onclick=()=>editLocal('\n');
+ document.getElementById('writer-text-append').onclick=()=>{if(!pause())return;textState={...textState,caret:null};textDirty=true;paintTarget();void settle();};
+ function editLocal(insert,backspace=false){if(!pause())return;textState=replaceText(textState,insert,{backspace});textDirty=true;renderText();refresh();void settle();}
  document.getElementById('writer-draft-apply').onclick=async()=>{
-  if(!pause()||!await settle()||!textState.edit)return;
-  try{await onApplyDraft?.(textState.edit);const next={...textState};delete next.edit;revision=await writeWriterDraft(owner,pad.copy(),revision,next);textState=next;renderText();refresh();conversionStatus.textContent='Draft updated in the manuscript. It remains non-assimilated.';}
-  catch(e){status(e.message,true);conversionStatus.textContent=e.message;}
+  if(operation||!pause()||!await settle())return;
+  operation=true;refresh();
+  try{if(!textState.edit){await onApplyDraft?.({kind:'new',text:writerText(textState)});return;}await onApplyDraft?.(textState.edit);const next={...textState};delete next.edit;next.caret=null;revision=await writeWriterDraft(owner,pad.copy(),revision,next);textState=next;renderText();refresh();conversionStatus.textContent='Draft updated in the manuscript. It remains non-assimilated.';}
+  catch(e){status(e.message,true);conversionStatus.textContent=e.message;}finally{operation=false;refresh();}
  };
  document.getElementById('writer-draft-cancel').onclick=async()=>{
   if(!pause()||!await settle()||!textState.edit)return;
   if(!confirm('Cancel draft editing? The manuscript block will remain unchanged.'))return;
-  try{const next={...textState};delete next.edit;revision=await writeWriterDraft(owner,pad.copy(),revision,next);textState=next;renderText();refresh();}catch(e){status(e.message,true);}
+  try{const next={...textState};delete next.edit;next.caret=null;revision=await writeWriterDraft(owner,pad.copy(),revision,next);textState=next;renderText();refresh();}catch(e){status(e.message,true);}
  };
  function fitSurface(){
   clearTimeout(fitTimer);if(!pad||operation)return;
@@ -193,5 +232,5 @@ export function mountWriterInk({status,beforeWriting,onApplyDraft}){
  },{capture:true,passive:false});
  document.addEventListener('click',e=>{if(!more.contains(e.target))more.open=false;});
  window.addEventListener('beforeunload',e=>{if(textDirty||(pad&&!pad.save())){e.preventDefault();e.returnValue='';}});
- refresh();return {editDraft,acceptedText:()=>textState.accepted.map(unit=>unit.text).join('\n\n'),setBusy(value){locked=value;tools.classList.toggle('writer-tools-locked',value);if(value)pause();refresh();},open,close,pause,activeStroke:()=>operation||!!pad?.active(),settle,capturing:()=>capturing};
+ refresh();return {editDraft,acceptedText:()=>writerText(textState),setBusy(value){locked=value;tools.classList.toggle('writer-tools-locked',value);if(value)pause();refresh();},open,close,pause,activeStroke:()=>operation||!!pad?.active(),settle,capturing:()=>capturing};
 }
