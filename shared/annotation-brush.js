@@ -2,6 +2,49 @@ import {validInk} from './annotation-ink.js';
 import {markerPairs} from './italic-markers.js';
 const colors = {honey:'#d6ac39', sage:'#8bb378', rose:'#d38d93'};
 export const noteFilename = id => 'Highlight ' + id + '.md';
+// A blank handwriting frame is a note too: the author can see and delete it.
+// A plain highlight has neither a body nor an ink frame.
+export function hasAnnotationNote(note) {
+  return Boolean(note && !note.noteDeleted && (note.body?.trim() || note.ink));
+}
+
+export function selectedProsePieces(range) {
+  const root = range.commonAncestorContainer;
+  const pieces = [];
+  function visit(node) {
+    if (!range.intersectsNode(node) || node.parentElement?.closest('[data-sidecar-chrome],.ink-note,.keep-marker,.page-heading,.chapter-title,.chapter-subtitle,.scene-subtitle,.scene-break')) return;
+    const start = node === range.startContainer ? range.startOffset : 0;
+    const end = node === range.endContainer ? range.endOffset : node.length;
+    if (end > start) pieces.push({node, start, end});
+  }
+  if (root.nodeType === Node.TEXT_NODE) visit(root);
+  else {
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    for (let node; node = walker.nextNode();) visit(node);
+  }
+  return pieces;
+}
+
+// Follow the actual inline marks. Notes and highlights may be nested, and
+// one annotation can have several marks across paragraphs or page fragments.
+export function annotationTargets(node, selection, lookup) {
+  function idsAt(part) {
+    const ids = [];
+    let el = part?.nodeType === Node.TEXT_NODE ? part.parentElement : part;
+    for (let mark = el?.closest('mark[data-annotation]'); mark; mark = mark.parentElement?.closest('mark[data-annotation]')) {
+      ids.push(mark.dataset.annotation);
+    }
+    return ids;
+  }
+  const pieces = selection ? selectedProsePieces(selection) : [];
+  let ids = idsAt(selection ? pieces[0]?.node : node);
+  for (let i = 1; ids.length && i < pieces.length; i++) {
+    const next = idsAt(pieces[i].node);
+    ids = ids.filter(id => next.includes(id));
+  }
+  const records = ids.map(lookup).filter(Boolean);
+  return {highlight: records.find(note => note.anchorKind !== 'point'), note: records.find(hasAnnotationNote)};
+}
 export const isHighlightFile = name => /^Highlight [a-f0-9-]{36}\.md$/.test(name);
 export function encodeNote({body, ...metadata}) {
   return '<!-- sidecar-highlight ' + JSON.stringify(metadata).replaceAll('<','\\u003c').replaceAll('>','\\u003e') + ' -->\n' + body;
@@ -63,11 +106,13 @@ function stream(roots) {
 }
 export function selectionAnchor(path,roots,range) {
   const {text,parts}=stream(roots);
-  const selected=parts.filter(({node})=>range.intersectsNode(node));
+  const selected=parts.filter(({node,offset,length})=>range.intersectsNode(node)
+    && !(range.startContainer===node && range.startOffset>=offset+length)
+    && !(range.endContainer===node && range.endOffset<=offset));
   if(!selected.length)return;
   const first=selected[0],last=selected.at(-1);
-  const start=first.start+(first.node===range.startContainer?range.startOffset:0);
-  const end=last.start+(last.node===range.endContainer?range.endOffset:last.node.length);
+  const start=first.start+(first.node===range.startContainer?Math.max(0,range.startOffset-first.offset):0);
+  const end=last.start+(last.node===range.endContainer?Math.min(last.length,range.endOffset-last.offset):last.length);
   const quote=text.slice(start,end);
   if(!quote.trim())return;
   return {path,start,end,quote,fingerprint:fingerprint(text),before:text.slice(Math.max(0,start-48),start),after:text.slice(end,end+48)};

@@ -4,7 +4,7 @@ import {resolveAnnotationConflict} from './annotation-conflict.js';
 import {workKey} from './storage.js';
 import {notePalette} from './note-palette.js';
 import {positionWritingNote,finishWritingPosition,resetWritingPosition} from './writing-position.js';
-import {annotationGestures} from './annotation-gestures.js';
+import {annotationGestures,targetAtCaret} from './annotation-gestures.js';
 import {inkSvg} from './shared/annotation-ink.js';
 
 import {inkPad} from './ink-pad.js';
@@ -12,12 +12,13 @@ import {inkPad} from './ink-pad.js';
 import {attach,unwrap,inlineFragment,sceneNotes,annotatedHtml} from './inline-notes.js';
 
 import {storeAnnotatedScene} from './writing.js';
+import {selectedReadingText} from './manuscript-target.js';
 
-import {decodeNote,encodeNote,isHighlightFile,noteFilename,selectionAnchor} from './shared/annotation-brush.js';
+import {annotationTargets,hasAnnotationNote,decodeNote,encodeNote,isHighlightFile,noteFilename,selectionAnchor} from './shared/annotation-brush.js';
 
 
 
-export function mountHighlights({reader,viewport,status,onWriting,onEditScene,onKeyboardInput,beforeMenu,canEditScene=()=>true}){
+export function mountHighlights({reader,viewport,status,onWriting,onEditScene,onKeyboardInput,onQuickEdit,onDraftAction,beforeMenu,canEditScene=()=>true}){
 
   const $=id=>document.getElementById(id);
 
@@ -141,7 +142,7 @@ export function mountHighlights({reader,viewport,status,onWriting,onEditScene,on
       const current=pad,ink=current?.snapshot();if(!ink)return;
       current.suspend();
       showRecognition(ink).finally(()=>{if(pad===current&&box.isConnected)current.resume();});
-    },tool:()=>pad?.tool(),setTool:value=>pad?.setTool(value),undo:()=>pad?.undo(),moreSpace:()=>pad?.more(),accept:()=>{if(closePad())repaint();},more:(x,y)=>showMenu(x,y,null,note.id,true),onError:status});
+    },tool:()=>pad?.tool(),setTool:value=>pad?.setTool(value),undo:()=>pad?.undo(),moreSpace:()=>pad?.more(),accept:()=>{if(closePad())repaint();},more:(x,y)=>showMenu(x,y,null,note.id),onError:status});
   }
   // Palm contacts on surrounding prose must not finish or switch the active note.
   for(const type of ['pointerdown','click','contextmenu'])reader.addEventListener(type,e=>{
@@ -182,7 +183,7 @@ export function mountHighlights({reader,viewport,status,onWriting,onEditScene,on
 
   reader.addEventListener('pointermove',event=>{
 
-    const mark=event.target.closest('mark[data-annotation]'),note=rows[mark?.dataset.annotation]?.note;
+    const {note}=annotationTargets(event.target,null,id=>rows[id]?.note);
 
     tip.hidden=!annotationsVisible||!note||event.pointerType==='touch'||!tools.hidden;
 
@@ -229,7 +230,7 @@ export function mountHighlights({reader,viewport,status,onWriting,onEditScene,on
 
     scenes=new Map(model.chapters.flatMap(c=>c.scenes.map(s=>[s.path,s])));
 
-    book=snapshot;stopPicking();lastCreated=null;active=null;rows=JSON.parse(localStorage.getItem(key())||'{}');
+    book=snapshot;stopPicking();active=null;rows=JSON.parse(localStorage.getItem(key())||'{}');
 
     const updates=new Map();
 
@@ -316,6 +317,7 @@ export function mountHighlights({reader,viewport,status,onWriting,onEditScene,on
 
     }
 
+    if(note.anchorKind==='point' && note.noteDeleted)unwrap([root],note.id);
     for(const mark of root.querySelectorAll('mark[data-annotation="'+note.id+'"]'))mark.dataset.anchorKind=note.anchorKind||'highlight';
     note.unattached=!root.querySelector('mark[data-annotation="'+note.id+'"]');
 
@@ -355,6 +357,7 @@ export function mountHighlights({reader,viewport,status,onWriting,onEditScene,on
 
     }
 
+    if(next.anchorKind==='point' && next.noteDeleted)unwrap(roots(next.path),next.id);
     for(const m of reader.querySelectorAll('mark[data-annotation="'+next.id+'"]')){m.dataset.color=next.color;m.dataset.anchorKind=next.anchorKind||'highlight';}
 
     persist({...rows,[note.id]:{...old,inline:true,note:next,dirty:true}});
@@ -365,7 +368,9 @@ export function mountHighlights({reader,viewport,status,onWriting,onEditScene,on
 
     if(!closePad())return;
 
-    $('discard-unattached').hidden=!note.unattached;
+    $('discard-unattached').hidden=!note.unattached || hasAnnotationNote(note);
+    $('delete-annotation-note').hidden=!hasAnnotationNote(note);
+    $('remove-annotation-highlight').hidden=note.unattached || note.anchorKind==='point';
 
     inkPreview.replaceChildren();
 
@@ -387,7 +392,13 @@ export function mountHighlights({reader,viewport,status,onWriting,onEditScene,on
 
   function change(){
 
-    try{save({...rows[active].note,body:body.value,color:color.value});repaint();$('highlight-message').textContent='Saved on this tablet';return true;}
+    try{
+      const note=rows[active].note;
+      save({...note,body:body.value,color:color.value,noteDeleted:body.value.trim()?false:note.noteDeleted});
+      $('delete-annotation-note').hidden=!hasAnnotationNote(rows[active].note);
+      $('discard-unattached').hidden=!note.unattached || hasAnnotationNote(rows[active].note);
+      repaint();$('highlight-message').textContent='Saved on this tablet';return true;
+    }
 
     catch(e){$('highlight-message').textContent='Save failed. Copy the note before closing. '+e.message;return false;}
 
@@ -404,10 +415,11 @@ export function mountHighlights({reader,viewport,status,onWriting,onEditScene,on
     if(!closePad())return;
 
     active=null;$('highlight-fields').hidden=true;const box=$('highlight-list');box.hidden=false;box.replaceChildren();
+    $('handwrite-note').hidden=true;
 
-    for(const {note} of Object.values(rows).filter(row=>!row.discarded&&!row.note?.noteDeleted)){const button=document.createElement('button');button.textContent=(note.unattached?'Unattached · ':'')+note.quote;button.onclick=()=>open(note);box.append(button);}
+    for(const {note} of Object.values(rows).filter(row=>!row.discarded&&row.note&&(row.note.anchorKind!=='point'||hasAnnotationNote(row.note)))){const button=document.createElement('button');button.textContent=(note.unattached?'Unattached · ':'')+note.quote;button.onclick=()=>open(note);box.append(button);}
 
-    $('highlight-message').textContent=box.childElementCount?'Choose a highlight':'Select words in one scene to highlight them.';
+    $('highlight-message').textContent=box.childElementCount?'Choose a note or highlight.':'No saved annotations.';
 
     dialog.showModal();
 
@@ -461,78 +473,105 @@ export function mountHighlights({reader,viewport,status,onWriting,onEditScene,on
 
     const note={...(reattach?rows[reattach].note:{id:crypto.randomUUID(),body:'',color:'honey'}),...anchor};
 
-    try{save(note,true);lastCreated=note.id;stopPicking();getSelection().removeAllRanges();if(write)openWriting(rows[note.id].note);else repaint();return rows[note.id].note;}
+    try{save(note,true);stopPicking();getSelection().removeAllRanges();if(write)openWriting(rows[note.id].note);else repaint();return rows[note.id].note;}
 
     catch(e){hint.textContent='Could not save highlight: '+e.message;status(e.message,true);}
 
   }
 
   const menu=document.createElement('dialog');menu.className='annotation-menu';document.body.append(menu);
-  let lastCreated=null,menuPress=false;
+  let menuPress=false,activeCaret=null;
   const gestures=annotationGestures(reader,{
     menu:(x,y,at)=>showMenu(x,y+28,at),
     enabled:()=>tools.hidden && !pad
   });
-  function undoNote(id){
-    if(id===editingId&&pad){pad.undo();return;}
-    const n=rows[id]?.note;
-    if(n?.ink?.strokes.length){save({...n,ink:{...n.ink,strokes:n.ink.strokes.slice(0,-1),...(n.ink.strokeWidths?{strokeWidths:n.ink.strokeWidths.slice(0,-1)}:{})}});repaint();return;}
-    if(lastCreated){
-      const row=rows[lastCreated],note=row?.note,scene=note&&scenes.get(note.path);if(!scene)return;
-      const root=document.createElement('div');root.append(inlineFragment(scene.html));unwrap([root],note.id);
-      storeAnnotatedScene(book,scene,annotatedHtml(root,sceneNotes(scene.html).filter(n=>n.id!==note.id)));
-      unwrap(roots(note.path),note.id);persist({...rows,[note.id]:{...row,discarded:true,note:{...note,unattached:true}}});lastCreated=null;repaint();
-    }
+  function deleteNote(id){
+    if(!hasAnnotationNote(rows[id]?.note) || !confirm('Delete this note? Its text and handwriting will be removed. The manuscript and highlight will stay.'))return false;
+    if(!closePad())return false;
+    const note=rows[id].note;
+    save({...note,anchorKind:note.unattached?'point':note.anchorKind,ink:undefined,body:'',noteDeleted:true});repaint();return true;
   }
+  function removeHighlight(id){
+    const n=rows[id].note;
+    save({...n,anchorKind:'point',noteDeleted:!hasAnnotationNote(n)});repaint();
+  }
+  $('delete-annotation-note').onclick=()=>{try{if(deleteNote(active))dialog.close();}catch(e){$('highlight-message').textContent=e.message;}};
+  $('remove-annotation-highlight').onclick=()=>{try{removeHighlight(active);dialog.close();}catch(e){$('highlight-message').textContent=e.message;}};
   const caret=document.createElement('i');caret.className='manuscript-target-caret';caret.hidden=true;document.body.append(caret);
-  function clearTarget(){caret.hidden=true;CSS.highlights?.delete('manuscript-target');}
+  function clearTarget(){activeCaret=null;caret.hidden=true;CSS.highlights?.delete('manuscript-target');}
+  function paintCaret(){
+    if(!activeCaret?.startContainer.isConnected){caret.hidden=true;return;}
+    const node=activeCaret.startContainer;
+    const p=(node.nodeType===Node.TEXT_NODE?node.parentElement:node).closest('p[data-block]');
+    if(!p || !reader.contains(p)){caret.hidden=true;return;}
+    let box=activeCaret.getBoundingClientRect(),left=box.left;
+    if(!box.height){box=p.getBoundingClientRect();left=box.left+(parseFloat(getComputedStyle(p).textIndent)||0);}
+    const view=viewport.getBoundingClientRect();
+    caret.hidden=box.bottom<=view.top||box.top>=view.bottom;
+    Object.assign(caret.style,{left:left+'px',top:box.top+'px',height:box.height+'px'});
+  }
   menu.addEventListener('close',()=>{if(!menu.open)clearTarget();});
-  viewport.addEventListener('scroll',()=>{if(menu.open&&!caret.hidden)menu.close();});
-  function showMenu(x,y,at=null,noteId=null,minimal=false){
+  viewport.addEventListener('scroll',()=>{if(activeCaret)paintCaret();},{passive:true});
+  function showMenu(x,y,at=null,noteId=null){
     // Hand off pen ownership before making the manuscript modal. Otherwise
     // Writer's palm guard can block the very controls needed to dismiss it.
     if(beforeMenu?.()===false)return;
     if(menu.open)menu.close();menuPress=false;menu.replaceChildren();
-    const add=(label,action,keep=false)=>{const b=document.createElement('button');b.textContent=label;b.type='button';b.onclick=()=>{if(!keep)menu.close();try{action();palette?.refresh();}catch(e){status(e.message,true);}};menu.append(b);};
+    menu.setAttribute('aria-label',noteId?'Note actions':at?.selection?'Selected passage':'Manuscript caret');
+    const add=(label,action,keep=false,icon=null)=>{
+      const b=document.createElement('button');b.textContent=icon||label;b.type='button';
+      if(icon){b.setAttribute('aria-label',label);b.title=label;}
+      b.onclick=async()=>{if(!keep)menu.close();try{await action();palette?.refresh();}catch(e){status(e.message,true);}};
+      menu.append(b);return b;
+    };
     if(noteId){
-      if(!minimal)add('Pen',()=>{if(editingId!==noteId)openWriting(rows[noteId].note);pad?.setTool('pen');});
-      if(!minimal)add('Eraser',()=>{if(editingId!==noteId)openWriting(rows[noteId].note);pad?.setTool('eraser');});
-      if(!minimal)add('Undo',()=>undoNote(noteId));
       if(editingId===noteId)add('Cancel changes',()=>{
         const original=structuredClone(editStart);
         if(!closePad())return;
         save(original);repaint();
       });
-      add('Delete note',()=>{
-        if(!confirm('Delete the handwriting and typed note? The prose and any highlight will stay.'))return;
-        if(!closePad())return;
-        save({...rows[noteId].note,ink:undefined,body:'',noteDeleted:true});repaint();
-      });
-      if(!minimal)add('More space',()=>{if(editingId!==noteId)openWriting(rows[noteId].note);pad?.more();});
+      if(hasAnnotationNote(rows[noteId]?.note))add('Delete Note',()=>deleteNote(noteId));
     }else if(at){
-      const node=at.range.startContainer,mark=(node.nodeType===3?node.parentElement:node).closest('mark[data-annotation]');
-      const id=mark?.dataset.annotation,existing=id&&rows[id]?.note;
       const chosen=at.selection;
-      if(canEditScene())add('Edit',()=>onEditScene?.(at));
-      add('Add Note',()=>{
-        if(!chosen && existing){openWriting(existing);return;}
+      const element=at.caret?.startContainer;
+      const draft=!chosen && (at.hit?.closest('[data-working-draft]')||(element?.nodeType===Node.TEXT_NODE?element.parentElement:element)?.closest('[data-working-draft]'));
+      const hit=at.hit?.closest('mark[data-annotation]')||at.range.startContainer;
+      const {highlight,note}=annotationsVisible?annotationTargets(hit,chosen,id=>rows[id]?.note):{};
+      if(canEditScene()){
+        if(draft)add('Edit Draft',()=>onDraftAction(at.path,draft.dataset.workingDraft,'edit'));
+        else add('Edit',()=>onEditScene(at));
+        add('Keyboard Input',()=>onKeyboardInput(at));
+        for(const [label,command,icon] of [['Space','space','␣'],['New line','newline','↵'],['Backspace','backspace','⌫']]){
+          add(label,()=>{
+            const pos=menu.getBoundingClientRect();
+            const next=onQuickEdit(at,command);
+            showMenu(pos.left,pos.top,next);
+          },true,icon);
+        }
+      }
+      if(note){
+        add('Open Note',()=>note.ink?openWriting(note):open(note));
+        add('Delete Note',()=>deleteNote(note.id));
+      }else if(chosen || highlight || !at.range.collapsed)add('Add Note',()=>{
+        if(highlight){openWriting(highlight);return;}
         const anchor=selectionAnchor(at.path,roots(at.path),chosen||at.range);
         if(anchor)apply({...anchor,anchorKind:chosen?'highlight':'point'});
       });
-      if(canEditScene())add('Keyboard Input',()=>onKeyboardInput(at));
-      if(chosen)add('Copy',()=>navigator.clipboard.writeText(chosen.toString())
+      if(chosen)add('Copy',()=>navigator.clipboard.writeText(selectedReadingText(roots(at.path),chosen))
         .then(()=>status('Selection copied.'),()=>status('Could not copy the selection.',true)));
-      if(!chosen && existing && existing.anchorKind!=='point')add('Remove highlight',()=>{
-        save({...existing,anchorKind:'point'});repaint();
+      if(highlight)add('Remove Highlight',()=>removeHighlight(highlight.id));
+      else if(chosen||at.word)add('Highlight',()=>{
+        const anchor=selectionAnchor(at.path,roots(at.path),chosen||at.word);
+        if(anchor){annotationsVisible=true;layer.checked=true;setLayer();apply(anchor,false);}
       });
-      else add('Highlight',()=>{
-        const anchor=selectionAnchor(at.path,roots(at.path),chosen||at.word||at.range);
-        if(anchor)apply(anchor,false);
-      });
+      if(draft && canEditScene()){
+        add('Assimilate',()=>onDraftAction(at.path,draft.dataset.workingDraft,'assimilate'));
+        add('Delete Draft',()=>onDraftAction(at.path,draft.dataset.workingDraft,'delete'));
+      }
     }
     if(!menu.childElementCount)return;
     const handle=document.createElement('button');handle.type='button';handle.className='annotation-menu-drag';handle.textContent='⠿';handle.setAttribute('aria-label','Move manuscript menu');
-    const close=document.createElement('button');close.type='button';close.textContent='×';close.setAttribute('aria-label','Close manuscript menu');close.onclick=()=>{gestures.reset();menu.close();};
+    const close=document.createElement('button');close.type='button';close.textContent='Close';close.onclick=()=>{gestures.reset();menu.close();};
     menu.prepend(handle);menu.append(close);
     let drag=null;
     handle.onpointerdown=e=>{if(e.button!==0)return;e.preventDefault();const r=menu.getBoundingClientRect();drag={id:e.pointerId,x:e.clientX-r.x,y:e.clientY-r.y};handle.setPointerCapture(e.pointerId);};
@@ -542,11 +581,20 @@ export function mountHighlights({reader,viewport,status,onWriting,onEditScene,on
     if(noteId)menu.showModal();else menu.show();const r=menu.getBoundingClientRect();menu.style.left=Math.max(6,Math.min(x,innerWidth-r.width-6))+'px';menu.style.top=Math.max(6,Math.min(y,innerHeight-r.height-6))+'px';
     clearTarget();
     if(at?.selection && window.Highlight)CSS.highlights.set('manuscript-target',new Highlight(at.selection));
-    else if(at?.caret){
-      const box=at.caret.getBoundingClientRect();
-      Object.assign(caret.style,{left:box.left+'px',top:box.top+'px',height:box.height+'px'});
-      caret.hidden=false;
-    }
+    else if(at?.caret){activeCaret=at.caret;paintCaret();}
+  }
+  document.addEventListener('pointerdown',e=>{
+    if(!menu.open)return;
+    const r=menu.getBoundingClientRect();
+    if(!menu.contains(e.target)||e.target===menu&&(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom))menu.close();
+  },true);
+  viewport.addEventListener('wheel',()=>{if(menu.open)menu.close();},{passive:true});
+  function selectionMenu(range){
+    const start=range.cloneRange(),end=range.cloneRange();start.collapse(true);end.collapse(false);
+    const at=targetAtCaret(start),other=targetAtCaret(end);
+    if(!at||at.path!==other?.path||pad||!tools.hidden)return;
+    const rect=end.getBoundingClientRect();getSelection().removeAllRanges();
+    showMenu(rect.left,rect.bottom+6,{...at,selection:range});
   }
   menu.addEventListener('pointerdown',()=>{menuPress=true;});
   menu.addEventListener('click',e=>{if(e.detail>0&&!menuPress){e.preventDefault();e.stopImmediatePropagation();}menuPress=false;},true);
@@ -614,7 +662,7 @@ export function mountHighlights({reader,viewport,status,onWriting,onEditScene,on
 
   },true);
 
-  return {load,sceneEdited,prepareSend(){if(!closePad())throw Error('Finish the current pen stroke before sending.');mergeInk();},beforeRender:()=>{gestures.reset();if(menu.open)menu.close();if(!closePad())return false;resetWritingPosition(viewport);return true;},repaint,async send(inbox){
+  return {load,sceneEdited,selectionMenu,prepareSend(){if(!closePad())throw Error('Finish the current pen stroke before sending.');mergeInk();},beforeRender:()=>{gestures.reset();if(menu.open)menu.close();if(!closePad())return false;resetWritingPosition(viewport);return true;},repaint,async send(inbox){
 
     if(!closePad())throw Error('Save the handwriting before sending.');
 

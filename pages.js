@@ -1,6 +1,16 @@
 // Measured pagination. Split only DOM text ranges, preserving emphasis and bytes of text.
 function textPoint(root,offset){const walk=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);let node,last;while(node=walk.nextNode()){last=node;if(offset<=node.length)return[node,offset];offset-=node.length;}return last?[last,last.length]:[root,0];}
-function part(node,start,end){const result=node.cloneNode(false),range=document.createRange();if(start===0)range.setStart(node,0);else range.setStart(...textPoint(node,start));if(end===node.textContent.length)range.setEnd(node,node.childNodes.length);else range.setEnd(...textPoint(node,end));result.append(range.cloneContents());return result;}
+function part(node,start,end){
+  const result=node.cloneNode(false),range=document.createRange();
+  if(start===0)range.setStart(node,0);else range.setStart(...textPoint(node,start));
+  if(end===node.textContent.length)range.setEnd(node,node.childNodes.length);else range.setEnd(...textPoint(node,end));
+  let content=range.cloneContents();
+  const common=range.commonAncestorContainer;
+  for(let parent=common.nodeType===Node.TEXT_NODE?common.parentElement:common;parent&&parent!==node;parent=parent.parentElement){
+    const wrapper=parent.cloneNode(false);wrapper.append(content);content=wrapper;
+  }
+  result.append(content);return result;
+}
 export function paginate(source,host,{lines=28,title='',startPage=0}={}){
   host.replaceChildren();const lineHeight=parseFloat(getComputedStyle(host).lineHeight);const height=lineHeight*lines;
   let body,pageNumber=startPage;

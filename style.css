@@ -196,3 +196,6 @@ body.writer-pen-active #writer-column-edge,body.writer-pen-active #writer-row-ed
 
 .manuscript-target-caret{position:fixed;width:2px;background:currentColor;pointer-events:none;z-index:8}
 ::highlight(manuscript-target){background:#a7bbaa;color:inherit}
+
+.annotation-menu[open]:not(:modal){width:max-content;max-height:calc(100dvh - 12px);overflow:auto}
+.scene p[data-paragraph]{white-space:pre-wrap}

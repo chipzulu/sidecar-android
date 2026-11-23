@@ -1,5 +1,7 @@
 import {mountSelectionCopy} from './selection-copy.js';
 import {captureManuscriptTarget,pasteManuscriptTarget} from './manuscript-target.js';
+import {readingCaret} from './manuscript-position.js';
+import {targetAtCaret} from './annotation-gestures.js';
 import {insertManuscriptDialog,assimilateManuscriptDraft,manuscriptDraft,updateManuscriptDraft} from './manuscript-insert.js';
 import {mountWriterInk} from './writer-ink.js';
 import {mountWriterWorkspace} from './writer-workspace.js';
@@ -18,14 +20,14 @@ import {fitLayout} from './layout.js';
 import {paginate} from './pages.js';
 import {mountCards} from './cards.js';
 import {mountCredentials} from './credentials-ui.js';
-import {readDraft, writeScene, storeAnnotatedScene} from './writing.js';
+import {readDraft} from './writing.js';
 import {mountHighlights} from './highlights.js';
 try{await libraryReady;}catch(error){document.getElementById("status").textContent=error.message;throw error;}
 const $=id=>document.getElementById(id);
 let libraryMode=true,libraryView,menuBook=null,configBook=null;
 let snapshot=null,model=null,index=-1,coverUrl='',busy=false,credentialBusy=false,client=null,clientKey='',abort=null,disposeCards=()=>{},selectedScene=null,renderRevision=0,rendering=false, replacing=false;
 function message(text,error=false){$('updates-status').textContent=text;if(libraryMode){$('library-error').textContent=text;$('library-error').classList.toggle('error',error);}$('status').textContent=text;$('status').classList.toggle('error',error);}
-const highlights=mountHighlights({reader:$('reader'),viewport:$('manuscript-scroll'),status:message,beforeMenu:()=>writerInk.pause(),canEditScene:()=>tabletTextAllowed(snapshot),onEditScene:editManuscriptSelection,onKeyboardInput:keyboardInput,onWriting:()=>{if(!writerInk.pause())return false;if(dock)setOpen(dock,false);}});
+const highlights=mountHighlights({reader:$('reader'),viewport:$('manuscript-scroll'),status:message,beforeMenu:()=>writerInk.pause(),canEditScene:()=>tabletTextAllowed(snapshot),onEditScene:editManuscriptSelection,onKeyboardInput:keyboardInput,onQuickEdit:quickEdit,onDraftAction:draftAction,onWriting:()=>{if(!writerInk.pause())return false;if(dock)setOpen(dock,false);}});
 function preference(key,value){try{if(value===undefined)return localStorage.getItem('sidecar-reader:'+key);localStorage.setItem('sidecar-reader:'+key,value);}catch{/* Reading remains usable without preferences. */}}
 function remember(){if(snapshot&&!libraryMode&&!rendering&&!replacing)localStorage.setItem(workKey(snapshot,'position'),JSON.stringify({scope:index===-2?'novel':selectedScene?'scene':index===-1?'cover':'chapter',chapter:model.chapters[index]?.key??null,scene:selectedScene,y:$('manuscript-scroll').scrollTop}));}
 let pageWidth=Math.max(280,Number(preference('page-width'))||740),pageLines=Math.max(15,Math.min(60,Number(preference('page-lines'))||28)),cardMode=preference('card-layout')||'none',dock='';
@@ -40,7 +42,7 @@ const writerInk=mountWriterInk({status:message,onSelection:(text,rect)=>selectio
  if(edit.kind==='range')pasteManuscriptTarget(snapshot,scene,edit,edit.text);else updateManuscriptDraft(snapshot,scene,edit,edit.text);
  highlights.sceneEdited(scene);repaginate();
 }});
-const selectionCopy=mountSelectionCopy({reader:$('reader'),status:message});
+const selectionCopy=mountSelectionCopy({reader:$('reader'),onManuscriptSelection:highlights.selectionMenu,status:message});
 $('ui-mode').onchange=async()=>{
  const value=$('ui-mode').value==='writer';
  if(writerTransition||libraryMode||busy||credentialBusy||rendering){$('ui-mode').value=writer.active()?'writer':'reader';return;}
@@ -141,6 +143,7 @@ function chapterSource(chapter,scenePath){
       if(n)source.append(element('div','* * *','scene-break'));
       const subtitle=sceneHeadingParts(scene.filename).subtitle;if(subtitle){const h=element('h2',subtitle,'scene-subtitle');h.dataset.scene=scene.path;source.append(h);}
       const prose=element('div',undefined,'scene');prose.append(inlineFragment(scene.html));colourMarks(prose,sceneNotes(scene.html));
+      [...prose.querySelectorAll('p')].forEach((p,i)=>p.dataset.paragraph=String(i));
       convertItalicMarkers(prose,'decode');let group=null;
       for(const [blockIndex,block] of [...prose.children].entries()){block.dataset.block=String(blockIndex);const marker=keepMarker(block.textContent);if(marker){if(marker==='start'){group=element('div',undefined,'keep-unit');group.dataset.scene=scene.path;source.append(group);}else group=null;continue;}
         block.dataset.scene=scene.path;if(block.tagName==='BLOCKQUOTE'){block.classList.add('quote-unit');for(const p of block.children){p.dataset.block=String(blockIndex);p.classList.add('quote-line');p.dataset.scene=scene.path;}}
@@ -157,6 +160,9 @@ function pageStatus(){
 }
 async function render(which,scenePath=null,scroll=true,preserve=false){
   if(!highlights.beforeRender())return;
+  // This render already uses the latest width. A second render from opening
+  // the book would discard a caret or menu the reader has just placed.
+  clearTimeout(layoutTimer);
   if((which!==index||scenePath!==selectedScene)&&!document.getElementById("highlight-tools").hidden)document.getElementById("highlight-cancel").click();
   const revision=++renderRevision,scroller=$('manuscript-scroll'),fraction=scroller.scrollTop/Math.max(1,scroller.scrollHeight-scroller.clientHeight);
   index=which===-2?-2:Math.max(-1,Math.min(model.chapters.length-1,which));selectedScene=index>=0&&model.chapters[index].scenes.some(s=>s.path===scenePath)?scenePath:null;
@@ -197,17 +203,52 @@ function insertText(text='',at=null){
 }
 async function editManuscriptSelection(at){try{
  const scene=model.chapters.flatMap(c=>c.scenes).find(s=>s.path===at.path);if(!scene)return;
- const range=at.selection||at.caret||at.range;
- const roots=[...$('reader').querySelectorAll('p[data-block]')].filter(p=>p.dataset.scene===at.path);
- const edit=captureManuscriptTarget(scene,roots,range,!at.selection);
+ const edit=captureTarget(scene,at);
  if(!tabletTextAllowed(snapshot))throw Error('Manuscript editing is disabled for this book.');
  if(!writer.active()&&!writer.setActive(true))return;
  await writerInk.open(snapshot);await writerInk.editDraft(edit);
 }catch(e){message(e.message,true);}}
+function captureTarget(scene,at){
+ const roots=[...$('reader').querySelectorAll('p[data-block]')].filter(p=>p.dataset.scene===scene.path);
+ const range=at.selection||at.caret||at.range;
+ if(!range?.startContainer.isConnected)throw Error('Tap the manuscript to place the caret again.');
+ return captureManuscriptTarget(scene,roots,range,!at.selection);
+}
+function quickEdit(at,command){
+ if(busy||rendering||!snapshot)throw Error('Wait for the manuscript to finish loading.');
+ const chapter=model.chapters.find(ch=>ch.scenes.some(s=>s.path===at.path));
+ const scene=chapter?.scenes.find(s=>s.path===at.path);
+ if(!scene)throw Error('Open the scene again before editing it.');
+ const target=captureTarget(scene,at);
+ const rect=at.range.getBoundingClientRect(),hosts=[...$('reader').querySelectorAll('.chapter-pages')];
+ const host=hosts.find(node=>node.dataset.chapter===chapter.key);
+ const position=pasteManuscriptTarget(snapshot,scene,target,command==='space'?' ':command==='newline'?'\n':'',command);
+ if(scene.html===target.before)return at;
+ highlights.sceneEdited(scene);
+ // Keep quick edits local to this chapter, including in the Entire Novel view.
+ const startPage=hosts.slice(0,hosts.indexOf(host)).reduce((n,h)=>n+h.childElementCount,0);
+ const oldCount=host.childElementCount;
+ const count=paginate(chapterSource(chapter,selectedScene),host,{lines:pageLines,title:chapter.name,startPage});
+ if(count!==oldCount){
+  let page=startPage+count;
+  for(const later of hosts.slice(hosts.indexOf(host)+1))for(const heading of later.querySelectorAll('.page-heading')){
+   heading.textContent=heading.textContent.replace(/\d+$/,String(++page));
+  }
+ }
+ highlights.repaint();
+ const roots=[...host.querySelectorAll('p[data-block]')].filter(p=>p.dataset.scene===scene.path);
+ const next=readingCaret(roots,position);
+ if(!next)throw Error('Edit saved. Tap the page to place the caret again.');
+ const nextRect=next.getBoundingClientRect(),p=(next.startContainer.parentElement?.closest('p')||next.startContainer);
+ const scroller=$('manuscript-scroll'),area=scroller.getBoundingClientRect();
+ const top=nextRect.height?nextRect.top:p.getBoundingClientRect().top;
+ if(rect.height || top<area.top || top>area.bottom)scroller.scrollTop+=top-Math.max(area.top+4,Math.min(area.bottom-30,rect.height?rect.top:area.top+30));
+ pageStatus();remember();
+ return targetAtCaret(next);
+}
 function keyboardInput(at){
  const scene=model.chapters.flatMap(c=>c.scenes).find(s=>s.path===at.path);
- const roots=[...$('reader').querySelectorAll('p[data-block]')].filter(p=>p.dataset.scene===at.path);
- const target=captureManuscriptTarget(scene,roots,at.selection||at.caret,!at.selection);
+ const target=captureTarget(scene,at);
  const dialog=document.createElement('dialog');dialog.className='working-draft-dialog';
  dialog.innerHTML='<label>Keyboard Input<textarea rows="5"></textarea></label><button>Save</button><button>Cancel</button><p role="status"></p>';
  const field=dialog.querySelector('textarea');field.value=target.text;
@@ -227,7 +268,7 @@ async function choosePasteDestination(text){
  if(!text.trim())throw Error('Write some text before choosing a destination.');
  if(!tabletTextAllowed(snapshot))throw Error('Manuscript editing is disabled for this book.');
  if(!highlights.beforeRender())return;
- const box=document.createElement('aside');box.className='paste-destination';box.innerHTML='<span>Tap the manuscript to place the insertion point.</span><button disabled aria-label="Confirm insertion">✓</button><button aria-label="Cancel insertion">×</button>';document.body.append(box);
+ const box=document.createElement('aside');box.className='paste-destination';box.innerHTML='<span>Tap the manuscript to place the insertion point.</span><button disabled aria-label="Confirm insertion">✓</button><button aria-label="Cancel insertion">Cancel</button>';document.body.append(box);
  let target=null;const label=box.querySelector('span'),ok=box.querySelector('button');
  const cleanup=()=>{cancelPasteDestination=null;box.remove();$('reader').removeEventListener('pointerdown',pick,true);CSS.highlights?.delete('paste-destination');};
  const pick=e=>{const p=e.target.closest('p[data-block]');if(!p||e.pointerType==='touch'&&e.width>30)return;e.preventDefault();e.stopImmediatePropagation();
@@ -244,25 +285,22 @@ async function choosePasteDestination(text){
 }
 
 document.addEventListener('insert-recognized-text',event=>{try{insertText(event.detail.text);}catch(e){message(e.message,true);}});
-$('reader').addEventListener('click',event=>{
- const draft=event.target.closest('[data-working-draft]');if(!draft||busy||rendering||cancelPasteDestination)return;
- event.stopImmediatePropagation();if(!writerInk.pause()||!highlights.beforeRender())return;
- const block=draft.closest('[data-block]'),scene=model.chapters.flatMap(c=>c.scenes).find(s=>s.path===block?.dataset.scene);if(!scene)return;
- const dialog=document.createElement('dialog');dialog.className='working-draft-dialog';dialog.innerHTML='<h3>Working draft</h3><p>This text is not yet assimilated.</p><button data-assimilate>Assimilate</button><button data-edit>Edit draft</button><button data-close>Close</button><button data-delete>Delete</button><p role="status"></p>';
- const close=()=>{dialog.close();dialog.remove();};dialog.querySelector('[data-close]').onclick=close;dialog.oncancel=e=>{e.preventDefault();close();};
- dialog.querySelector('[data-assimilate]').onclick=()=>{try{assimilateManuscriptDraft(snapshot,scene,draft.dataset.workingDraft);close();highlights.sceneEdited(scene);repaginate();}catch(e){dialog.querySelector('[role=status]').textContent=e.message;}};
- dialog.querySelector('[data-edit]').onclick=async()=>{try{
-  if(!tabletTextAllowed(snapshot))throw Error('Manuscript editing is disabled for this book.');
-  const edit=manuscriptDraft(scene,draft.dataset.workingDraft);edit.originalText=edit.text;
+async function draftAction(path,id,kind){
+ if(busy||rendering||!tabletTextAllowed(snapshot))throw Error('This book is unavailable for editing.');
+ const scene=model.chapters.flatMap(c=>c.scenes).find(s=>s.path===path);
+ if(!scene)throw Error('Reopen this scene to edit the draft.');
+ const edit=manuscriptDraft(scene,id);
+ if(kind==='edit'){
+  edit.originalText=edit.text;
   if(!writer.active()&&!writer.setActive(true))throw Error('Finish the current action before opening Writer.');
-  await writerInk.open(snapshot);
-  if(await writerInk.editDraft(edit))close();
- }catch(e){dialog.querySelector('[role=status]').textContent=e.message;}};
- dialog.querySelector('[data-delete]').onclick=()=>{try{
-  if(!confirm('Delete this entire working draft block?'))return;
-  updateManuscriptDraft(snapshot,scene,manuscriptDraft(scene,draft.dataset.workingDraft));close();highlights.sceneEdited(scene);repaginate();
- }catch(e){dialog.querySelector('[role=status]').textContent=e.message;}};document.body.append(dialog);dialog.showModal();
-},true);
+  await writerInk.open(snapshot);await writerInk.editDraft(edit);return;
+ }
+ if(kind==='delete'){
+  if(!confirm('Delete this entire working draft from the manuscript?'))return;
+  updateManuscriptDraft(snapshot,scene,edit);
+ }else assimilateManuscriptDraft(snapshot,scene,id);
+ highlights.sceneEdited(scene);await repaginate();
+}
 // Read-only recovery of text from the removed experimental companion.
 $('about-open').addEventListener('click',()=>{
  document.getElementById('legacy-draft-recovery')?.remove();if(!snapshot)return;
@@ -270,24 +308,6 @@ $('about-open').addEventListener('click',()=>{
  const box=document.createElement('details');box.id='legacy-draft-recovery';const title=element('summary','Recover older draft text');box.append(title);
  const field=document.createElement('textarea');field.readOnly=true;field.setAttribute('aria-label','Older saved draft text');field.value=rows.map(r=>(r.notebook||r.path)+'\n'+r.text).join('\n\n');box.append(field);$('about-dialog').append(box);
 });
-function editScene(at){
-  if(!tabletTextAllowed(snapshot)){message('This book is set to annotations only on the tablet. Existing text drafts are kept.',true);return;}
-  if(rendering||busy)return;
-  const viewport=$('manuscript-scroll').getBoundingClientRect();
-  const visible=node=>node.getBoundingClientRect().bottom>viewport.top&&node.getBoundingClientRect().top<viewport.bottom;
-  const blocks=[...$('reader').querySelectorAll('[data-block]')];
-  const targeted=at?.range?.startContainer;
-  const anchor=(targeted?.nodeType===Node.TEXT_NODE?targeted.parentElement:targeted)?.closest('[data-block]')||(tappedBlock?.isConnected&&visible(tappedBlock)?tappedBlock:blocks.find(visible)||blocks[0]);
-  const path=at?.path||anchor?.dataset.scene||selectedScene;
-  const scene=model.chapters.flatMap(chapter=>chapter.scenes).find(item=>item.path===path);
-  if(!scene)return;
-  writeScene(snapshot,scene,Number(anchor?.dataset.block)||0,async block=>{
-    highlights.sceneEdited(scene);
-    await render(index,selectedScene,false,true);
-    const nodes=[...$('reader').querySelectorAll('[data-block]')].filter(node=>node.dataset.scene===path);
-    (nodes.find(node=>Number(node.dataset.block)===block)||nodes.at(-1))?.scrollIntoView({block:'nearest'});
-  });
-};
 function step(direction){
   if(index===-2){const pages=[...$('reader').querySelectorAll('.reading-page')],scroller=$('manuscript-scroll'),top=scroller.getBoundingClientRect().top;const current=Math.max(0,pages.findIndex(page=>page.getBoundingClientRect().bottom>top+1));const target=pages[Math.max(0,Math.min(pages.length-1,current+direction))];if(target)scroller.scrollTop+=target.getBoundingClientRect().top-top;pageStatus();return;}
   if(selectedScene){const all=model.chapters.flatMap((c,n)=>c.scenes.map(s=>({path:s.path,chapter:n}))),current=all.findIndex(s=>s.path===selectedScene),next=all[current+direction];if(next)navigate(next.chapter,next.path);return;}

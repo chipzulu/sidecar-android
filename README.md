@@ -1,4 +1,21 @@
-# Story Sidecar Android Reader 0.1.70
+# Story Sidecar Android Reader 0.1.71
+
+## Reader 0.1.71 — manuscript menus
+
+Tap to place a caret, or swipe across words with the pen and lift. Space (␣), New line (↵), and Backspace (⌫) edit at the caret or replace the selected text. The new caret and menu stay available for the next correction. New line starts a paragraph. Backspace at the start of a paragraph joins it to the previous one within the scene.
+
+| Passage | Annotation actions |
+| --- | --- |
+| Plain words | Highlight, Add Note |
+| Highlight only | Remove Highlight, Add Note |
+| Highlight with a note | Remove Highlight, Open Note, Delete Note |
+| Note without colour | Highlight, Open Note, Delete Note |
+
+Removing a highlight keeps any note. Deleting a note keeps any highlight. Annotation-only books offer the annotation and selection actions. Close and tapping outside dismiss the menu. The BOOX pen continues to use the existing APK.
+
+Tapping a working draft also offers Edit Draft, Assimilate and Delete Draft. Space and Backspace keep the draft editable in place.
+
+## Reader 0.1.70 — manuscript caret and selection
 
 Tap manuscript prose to place the caret, or drag the pen across words and lift to select them. Choose Edit for Writer, Keyboard Input for typing, Add Note, Highlight, or Close. Finger swipes scroll.
 

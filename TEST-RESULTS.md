@@ -1,4 +1,12 @@
-# Reader 0.1.3 verification — 5 November 2026
+# Reader 0.1.71 verification
+
+Chrome tests exercised tapping a manuscript caret, swiping with simulated pen input in both directions, editing a selection, and repeating Space, New line and Backspace. The saved book reopened with the expected text and highlights.
+
+The checks covered empty paragraphs, a Unicode character composed of multiple code points, soft line breaks, and formatting on a paragraph spanning several pages in Entire Novel view. Note deletion, cancellation, highlight removal, draft assimilation and annotation-only permissions were also exercised. A simulated BOOX session retained all 24 handwritten strokes after accepting and reopening a note.
+
+Physical pen handling on this release still needs a BOOX test.
+
+## Reader 0.1.3 verification — 5 November 2026
 
 - Ten unit tests passed, including four encryption tests: Unicode round-trip,
   distinct random salt/IV/ciphertext, wrong passphrase/repository rejection,
