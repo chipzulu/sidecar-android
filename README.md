@@ -1,4 +1,7 @@
-# Story Sidecar Android Reader 0.1.69
+# Story Sidecar Android Reader 0.1.70
+
+Tap manuscript prose to place the caret, or drag the pen across words and lift to select them. Choose Edit for Writer, Keyboard Input for typing, Add Note, Highlight, or Close. Finger swipes scroll.
+
 
 ## Reader 0.1.69 — recognition preview inside the text box
 

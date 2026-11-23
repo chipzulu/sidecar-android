@@ -193,3 +193,6 @@ body.writer-pen-active #writer-column-edge,body.writer-pen-active #writer-row-ed
 .selection-copy-popup button {margin:0;padding:5px 13px;}
 
 .writer-proposed {color:#6b7c6d;font:inherit;text-decoration:underline dotted #9ca99d;text-underline-offset:3px;}
+
+.manuscript-target-caret{position:fixed;width:2px;background:currentColor;pointer-events:none;z-index:8}
+::highlight(manuscript-target){background:#a7bbaa;color:inherit}

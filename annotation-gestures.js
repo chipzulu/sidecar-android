@@ -1,6 +1,6 @@
 // Pen gestures on prose only. Ink pads keep their native input adapter.
-export function annotationGestures(reader,{menu,select,cancel}){
- let mode=null,down=null,timer=0,suppress=0;
+export function annotationGestures(reader,{menu,enabled}){
+ let down=null,suppress=0;
  function wordAt(x,y,point=false){
   const r=document.caretRangeFromPoint(x,y),node=r?.startContainer;
   if(node?.nodeType!==Node.TEXT_NODE)return null;
@@ -15,36 +15,46 @@ export function annotationGestures(reader,{menu,select,cancel}){
   const range=document.createRange();range.setStart(node,a);range.setEnd(node,b);return {range,caret:r.cloneRange(),path:block.dataset.scene};
  }
  function joined(a,b){if(!a||!b||a.path!==b.path)return null;const earlier=a.range.compareBoundaryPoints(Range.START_TO_START,b.range)<=0;const first=earlier?a:b,last=earlier?b:a;const range=document.createRange();range.setStart(first.range.startContainer,first.range.startOffset);range.setEnd(last.range.endContainer,last.range.endOffset);return {range,path:a.path};}
- function reset(){clearTimeout(timer);down=null;CSS.highlights?.delete('annotation-drag');}
- function setMode(value){reset();mode=value;reader.classList.toggle('annotation-highlighting',!!mode);}
- document.addEventListener('pointerdown',e=>{suppress=0;if(mode&&!e.target.closest('p[data-block]')){setMode(null);cancel();}},true);
+ function reset(){down=null;CSS.highlights?.delete('annotation-drag');}
+ function prose(e){return enabled() && !e.target.closest('.ink-note,button,input,textarea,select,[data-working-draft]');}
+ reader.addEventListener('pointerover',e=>{
+  if(!down)reader.classList.toggle('annotation-highlighting',e.pointerType==='pen');
+ });
  reader.addEventListener('pointerdown',e=>{
-  if(e.button!==0||e.target.closest('.ink-note,button,input,textarea,select'))return;
+  if(!e.isPrimary || e.button!==0 || !prose(e))return;
+  suppress=0;
   const word=wordAt(e.clientX,e.clientY);if(!word)return;
-  down={x:e.clientX,y:e.clientY,word,id:e.pointerId,moved:false};
-  if(mode||e.pointerType==='pen')e.preventDefault();
-  if(mode){reader.setPointerCapture(e.pointerId);return;}
-  timer=setTimeout(()=>{
-   if(!down)return;const at=wordAt(down.x,down.y,true);suppress=performance.now()+700;
-   menu(down.x,down.y,at);reset();
-  },600);
+  down={id:e.pointerId,x:e.clientX,y:e.clientY,word,moved:false};
+  if(e.pointerType!=='touch'){e.preventDefault();reader.setPointerCapture(e.pointerId);}
  });
  reader.addEventListener('pointermove',e=>{
-  if(!down||down.id!==e.pointerId)return;
-  if(Math.hypot(e.clientX-down.x,e.clientY-down.y)>7){down.moved=true;clearTimeout(timer);}
-  if(!mode)return;e.preventDefault();const span=joined(down.word,wordAt(e.clientX,e.clientY));
-  if(span&&window.Highlight)CSS.highlights?.set('annotation-drag',new Highlight(span.range));
+  if(down?.id!==e.pointerId)return;
+  if(Math.hypot(e.clientX-down.x,e.clientY-down.y)>5)down.moved=true;
+  if(!down.moved || e.pointerType==='touch')return;
+  const span=joined(down.word,wordAt(e.clientX,e.clientY));
+  if(span && window.Highlight)CSS.highlights?.set('annotation-drag',new Highlight(span.range));
  });
  reader.addEventListener('pointerup',e=>{
-  if(!down||down.id!==e.pointerId)return;clearTimeout(timer);
-  if(mode){
-   e.preventDefault();suppress=performance.now()+500;
-   const span=down.moved&&joined(down.word,wordAt(e.clientX,e.clientY)),write=mode==='note';setMode(null);
-   if(span)select(span,write);else cancel();
-  }reset();
+  if(down?.id!==e.pointerId)return;
+  const start=down;reset();
+  if(start.moved && e.pointerType==='touch')return;
+  const at=wordAt(e.clientX,e.clientY,true);
+  if(!at || at.path!==start.word.path)return;
+  at.word=start.word.range;
+  if(start.moved){
+   const span=joined(start.word,wordAt(e.clientX,e.clientY));if(!span)return;
+   at.selection=span.range;
+  }
+  suppress=performance.now()+650;
+  menu(e.clientX,e.clientY,at);
  });
- reader.addEventListener('pointercancel',reset);
- reader.addEventListener('click',e=>{if(performance.now()<suppress){e.preventDefault();e.stopImmediatePropagation();}},true);
- reader.addEventListener('contextmenu',e=>{if(e.target.closest('.ink-note'))return;e.preventDefault();const at=wordAt(e.clientX,e.clientY,true);if(at){menu(e.clientX,e.clientY,at);reset();}});
- return {setMode,pointAt:(x,y)=>wordAt(x,y,true)};
+ reader.addEventListener('pointercancel',e=>{if(down?.id===e.pointerId)reset();});
+ reader.addEventListener('click',e=>{if(performance.now()<suppress && prose(e)){e.preventDefault();e.stopImmediatePropagation();}},true);
+ reader.addEventListener('contextmenu',e=>{
+  if(!prose(e))return;
+  e.preventDefault();if(down)return;
+  const at=wordAt(e.clientX,e.clientY,true);
+  if(at){at.word=wordAt(e.clientX,e.clientY).range;menu(e.clientX,e.clientY,at);}
+ });
+ return {reset};
 }

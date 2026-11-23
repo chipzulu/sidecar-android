@@ -17,7 +17,7 @@ import {decodeNote,encodeNote,isHighlightFile,noteFilename,selectionAnchor} from
 
 
 
-export function mountHighlights({reader,viewport,status,onWriting,onEditScene,onConvertedDraft,beforeMenu,canEditScene=()=>true}){
+export function mountHighlights({reader,viewport,status,onWriting,onEditScene,onKeyboardInput,beforeMenu,canEditScene=()=>true}){
 
   const $=id=>document.getElementById(id);
 
@@ -201,14 +201,6 @@ export function mountHighlights({reader,viewport,status,onWriting,onEditScene,on
   reader.addEventListener('pointerleave',()=>tip.hidden=true);
 
   viewport.addEventListener('scroll',()=>tip.hidden=true,{passive:true});
-
-  reader.addEventListener('click',event=>{
-
-    const note=rows[event.target.closest('mark[data-annotation]')?.dataset.annotation]?.note;
-
-    if(annotationsVisible&&note&&tools.hidden&&getSelection().isCollapsed){tip.hidden=true;openWriting(note);}
-
-  });
 
   function key(){return workKey(book,'highlights');}
 
@@ -479,11 +471,7 @@ export function mountHighlights({reader,viewport,status,onWriting,onEditScene,on
   let lastCreated=null,menuPress=false;
   const gestures=annotationGestures(reader,{
     menu:(x,y,at)=>showMenu(x,y+28,at),
-    select:({path,range},write)=>{
-      status('');const anchor=selectionAnchor(path,roots(path),range),note=anchor&&apply(anchor,write);
-      if(note&&!write){const mark=reader.querySelector('mark[data-annotation="'+note.id+'"]');if(mark){const range=document.createRange();range.selectNodeContents(mark);showMenu(menu.offsetLeft,menu.offsetTop,{path,range});}}
-    },
-    cancel:()=>status('Reading mode')
+    enabled:()=>tools.hidden && !pad
   });
   function undoNote(id){
     if(id===editingId&&pad){pad.undo();return;}
@@ -496,10 +484,13 @@ export function mountHighlights({reader,viewport,status,onWriting,onEditScene,on
       unwrap(roots(note.path),note.id);persist({...rows,[note.id]:{...row,discarded:true,note:{...note,unattached:true}}});lastCreated=null;repaint();
     }
   }
+  const caret=document.createElement('i');caret.className='manuscript-target-caret';caret.hidden=true;document.body.append(caret);
+  function clearTarget(){caret.hidden=true;CSS.highlights?.delete('manuscript-target');}
+  menu.addEventListener('close',()=>{if(!menu.open)clearTarget();});
+  viewport.addEventListener('scroll',()=>{if(menu.open&&!caret.hidden)menu.close();});
   function showMenu(x,y,at=null,noteId=null,minimal=false){
     // Hand off pen ownership before making the manuscript modal. Otherwise
     // Writer's palm guard can block the very controls needed to dismiss it.
-    if(at){const selection=getSelection();if(selection?.rangeCount&&!selection.isCollapsed){const selected=selection.getRangeAt(0);const block=n=>(n.nodeType===3?n.parentElement:n).closest?.('p[data-block]');if(block(selected.startContainer)?.dataset.scene===at.path&&block(selected.endContainer)?.dataset.scene===at.path)at={...at,selection:selected.cloneRange()};}}
     if(beforeMenu?.()===false)return;
     if(menu.open)menu.close();menuPress=false;menu.replaceChildren();
     const add=(label,action,keep=false)=>{const b=document.createElement('button');b.textContent=label;b.type='button';b.onclick=()=>{if(!keep)menu.close();try{action();palette?.refresh();}catch(e){status(e.message,true);}};menu.append(b);};
@@ -521,21 +512,27 @@ export function mountHighlights({reader,viewport,status,onWriting,onEditScene,on
     }else if(at){
       const node=at.range.startContainer,mark=(node.nodeType===3?node.parentElement:node).closest('mark[data-annotation]');
       const id=mark?.dataset.annotation,existing=id&&rows[id]?.note;
-      if(canEditScene()&&onConvertedDraft)add('Insert',()=>{if(closePad()){repaint();onConvertedDraft(at);}});
-      if(canEditScene())add('Edit',()=>{if(closePad()){repaint();onEditScene?.(at);}});
-      if(existing&&existing.anchorKind!=='point')add('Remove highlight',()=>{
-        if(!closePad())return;save({...rows[id].note,anchorKind:'point'});repaint();
-        showMenu(menu.offsetLeft,menu.offsetTop,at);
-      },true);
-      else add('Highlight',()=>{if(!closePad())return;stopPicking();gestures.setMode('highlight');status('Draw across the words to highlight. Then choose Note to annotate them.');},true);
-      add('Note',()=>{
-        if(existing){openWriting(rows[id].note);return;}
-        const anchor=selectionAnchor(at.path,roots(at.path),at.range);if(anchor)apply({...anchor,anchorKind:'point'});
+      const chosen=at.selection;
+      if(canEditScene())add('Edit',()=>onEditScene?.(at));
+      add('Add Note',()=>{
+        if(!chosen && existing){openWriting(existing);return;}
+        const anchor=selectionAnchor(at.path,roots(at.path),chosen||at.range);
+        if(anchor)apply({...anchor,anchorKind:chosen?'highlight':'point'});
+      });
+      if(canEditScene())add('Keyboard Input',()=>onKeyboardInput(at));
+      if(chosen)add('Copy',()=>navigator.clipboard.writeText(chosen.toString())
+        .then(()=>status('Selection copied.'),()=>status('Could not copy the selection.',true)));
+      if(!chosen && existing && existing.anchorKind!=='point')add('Remove highlight',()=>{
+        save({...existing,anchorKind:'point'});repaint();
+      });
+      else add('Highlight',()=>{
+        const anchor=selectionAnchor(at.path,roots(at.path),chosen||at.word||at.range);
+        if(anchor)apply(anchor,false);
       });
     }
     if(!menu.childElementCount)return;
     const handle=document.createElement('button');handle.type='button';handle.className='annotation-menu-drag';handle.textContent='⠿';handle.setAttribute('aria-label','Move manuscript menu');
-    const close=document.createElement('button');close.type='button';close.textContent='×';close.setAttribute('aria-label','Close manuscript menu');close.onclick=()=>{gestures.setMode(null);menu.close();};
+    const close=document.createElement('button');close.type='button';close.textContent='×';close.setAttribute('aria-label','Close manuscript menu');close.onclick=()=>{gestures.reset();menu.close();};
     menu.prepend(handle);menu.append(close);
     let drag=null;
     handle.onpointerdown=e=>{if(e.button!==0)return;e.preventDefault();const r=menu.getBoundingClientRect();drag={id:e.pointerId,x:e.clientX-r.x,y:e.clientY-r.y};handle.setPointerCapture(e.pointerId);};
@@ -543,10 +540,17 @@ export function mountHighlights({reader,viewport,status,onWriting,onEditScene,on
     handle.onpointerup=handle.onpointercancel=()=>{drag=null;};
     handle.onkeydown=e=>{const delta={ArrowLeft:[-16,0],ArrowRight:[16,0],ArrowUp:[0,-16],ArrowDown:[0,16]}[e.key];if(!delta)return;e.preventDefault();menu.style.left=Math.max(6,Math.min(menu.offsetLeft+delta[0],innerWidth-menu.offsetWidth-6))+'px';menu.style.top=Math.max(6,Math.min(menu.offsetTop+delta[1],innerHeight-menu.offsetHeight-6))+'px';};
     if(noteId)menu.showModal();else menu.show();const r=menu.getBoundingClientRect();menu.style.left=Math.max(6,Math.min(x,innerWidth-r.width-6))+'px';menu.style.top=Math.max(6,Math.min(y,innerHeight-r.height-6))+'px';
+    clearTarget();
+    if(at?.selection && window.Highlight)CSS.highlights.set('manuscript-target',new Highlight(at.selection));
+    else if(at?.caret){
+      const box=at.caret.getBoundingClientRect();
+      Object.assign(caret.style,{left:box.left+'px',top:box.top+'px',height:box.height+'px'});
+      caret.hidden=false;
+    }
   }
   menu.addEventListener('pointerdown',()=>{menuPress=true;});
   menu.addEventListener('click',e=>{if(e.detail>0&&!menuPress){e.preventDefault();e.stopImmediatePropagation();}menuPress=false;},true);
-  menu.addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();gestures.setMode(null);menu.close();}});
+  menu.addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();gestures.reset();menu.close();}});
   reader.addEventListener('contextmenu',e=>{
     if(e.target.closest('.note-collapse')){e.preventDefault();return;}const box=e.target.closest('.ink-note');if(!box)return;e.preventDefault();if(window.SidecarNativePen&&box.classList.contains('editing')&&e.target.closest('svg'))return;showMenu(e.clientX,e.clientY,null,box.dataset.note);
   });
@@ -610,7 +614,7 @@ export function mountHighlights({reader,viewport,status,onWriting,onEditScene,on
 
   },true);
 
-  return {load,sceneEdited,prepareSend(){if(!closePad())throw Error('Finish the current pen stroke before sending.');mergeInk();},beforeRender:()=>{gestures.setMode(null);if(menu.open)menu.close();if(!closePad())return false;resetWritingPosition(viewport);return true;},repaint,async send(inbox){
+  return {load,sceneEdited,prepareSend(){if(!closePad())throw Error('Finish the current pen stroke before sending.');mergeInk();},beforeRender:()=>{gestures.reset();if(menu.open)menu.close();if(!closePad())return false;resetWritingPosition(viewport);return true;},repaint,async send(inbox){
 
     if(!closePad())throw Error('Save the handwriting before sending.');
 
