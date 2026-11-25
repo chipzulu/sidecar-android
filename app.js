@@ -33,6 +33,8 @@ function remember(){if(snapshot&&!libraryMode&&!rendering&&!replacing)localStora
 let pageWidth=Math.max(280,Number(preference('page-width'))||740),pageLines=Math.max(15,Math.min(60,Number(preference('page-lines'))||28)),cardMode=preference('card-layout')||'none',dock='';
 let layoutTimer,lastPageWidth=0,writerAnchor=null,writerTransition=false;
 const writer=mountWriterWorkspace({container:document.querySelector('.layout'),preference,
+ canSwitch:()=>!busy&&!credentialBusy&&!writerTransition&&!writerInk.activeStroke()&&!document.querySelector('dialog[open],.ink-note.editing,.paste-destination'),
+ parkPen:()=>writerInk.park(),resumePen:tool=>writerInk.resume(tool),
  canChange:()=>!libraryMode&&!busy&&!credentialBusy&&!rendering&&!writerInk.activeStroke()&&highlights.beforeRender(),beforeChange:()=>writerInk.pause(),
  onChange:()=>{if(dock)setOpen(dock,false);else layout();$('ui-mode').value=writer.active()?'writer':'reader';}
 });
@@ -206,7 +208,7 @@ async function editManuscriptSelection(at){try{
  const edit=captureTarget(scene,at);
  if(!tabletTextAllowed(snapshot))throw Error('Manuscript editing is disabled for this book.');
  if(!writer.active()&&!writer.setActive(true))return;
- await writerInk.open(snapshot);await writerInk.editDraft(edit);
+ writer.showManuscript(false);await writerInk.open(snapshot);await writerInk.editDraft(edit);
 }catch(e){message(e.message,true);}}
 function captureTarget(scene,at){
  const roots=[...$('reader').querySelectorAll('p[data-block]')].filter(p=>p.dataset.scene===scene.path);
@@ -268,6 +270,7 @@ async function choosePasteDestination(text){
  if(!text.trim())throw Error('Write some text before choosing a destination.');
  if(!tabletTextAllowed(snapshot))throw Error('Manuscript editing is disabled for this book.');
  if(!highlights.beforeRender())return;
+ writer.showManuscript(true);
  const box=document.createElement('aside');box.className='paste-destination';box.innerHTML='<span>Tap the manuscript to place the insertion point.</span><button disabled aria-label="Confirm insertion">✓</button><button aria-label="Cancel insertion">Cancel</button>';document.body.append(box);
  let target=null;const label=box.querySelector('span'),ok=box.querySelector('button');
  const cleanup=()=>{cancelPasteDestination=null;box.remove();$('reader').removeEventListener('pointerdown',pick,true);CSS.highlights?.delete('paste-destination');};
@@ -293,7 +296,7 @@ async function draftAction(path,id,kind){
  if(kind==='edit'){
   edit.originalText=edit.text;
   if(!writer.active()&&!writer.setActive(true))throw Error('Finish the current action before opening Writer.');
-  await writerInk.open(snapshot);await writerInk.editDraft(edit);return;
+  writer.showManuscript(false);await writerInk.open(snapshot);await writerInk.editDraft(edit);return;
  }
  if(kind==='delete'){
   if(!confirm('Delete this entire working draft from the manuscript?'))return;
@@ -315,6 +318,7 @@ function step(direction){
   }
 async function openBook(value,resume=true){
   if(!await writerInk.close())throw Error('Finish saving the writing draft before changing books.');
+  writer.showManuscript(false);
   reconcilePublished(value);
   if(!highlights.beforeRender())throw Error('Save the handwriting before switching books.');
   if(client && clientKey!==JSON.stringify([value.repository,value.branch]))lockGitHub();

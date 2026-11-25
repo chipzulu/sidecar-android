@@ -67,7 +67,7 @@ export function adaptiveInkInput(svg, callbacks, {tool='pen',browserFactory=brow
     for(const el of document.querySelectorAll('button,input,textarea,select,a,[role="button"],[role="separator"],summary,.writer-more[open],.writer-more[open]>div,#writer-ink-canvas>[role="status"],dialog[open],header,.note-palette,#right-panel:not([hidden]),#connection:not([hidden]),#updates-panel:not([hidden])')){
       const bounds=visiblePenRect(el,[left,top,right,bottom]);if(bounds)exclude.push(bounds);
     }
-    const enabled=!capacityBlocked&&!document.hidden&&!document.querySelector('dialog[open],.note-palette.dragging,.writer-resizing')&&(visualViewport?.scale||1)===1&&right>left&&bottom>top&&callbacks.remaining()>0;
+    const enabled=!capacityBlocked&&!document.hidden&&!svg.closest('#writer-workspace')?.closest('.writer-show-manuscript')&&!document.querySelector('dialog[open],.note-palette.dragging,.writer-resizing')&&(visualViewport?.scale||1)===1&&right>left&&bottom>top&&callbacks.remaining()>0;
     const next={saveReceipts:!!callbacks.isSaved,viewportWidth:innerWidth,rect:[r.left,r.top,r.right,r.bottom],limit:[left,top,right,bottom],exclude,pressurePoints:!erasing&&!!callbacks.pressure?.(),width:(callbacks.width?.()??2.5)*r.width/800,color:'#31483b',tool,eraseRadius:18,liveErase:erasing&&!!callbacks.progress,enabled};
     const encoded=JSON.stringify(next);
     if(encoded===last)return;

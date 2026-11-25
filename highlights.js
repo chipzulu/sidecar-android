@@ -14,7 +14,7 @@ import {attach,unwrap,inlineFragment,sceneNotes,annotatedHtml} from './inline-no
 import {storeAnnotatedScene} from './writing.js';
 import {selectedReadingText} from './manuscript-target.js';
 
-import {annotationTargets,hasAnnotationNote,decodeNote,encodeNote,isHighlightFile,noteFilename,selectionAnchor} from './shared/annotation-brush.js';
+import {annotationTargets,hasAnnotationNote,touchesWorkingDraft,decodeNote,encodeNote,isHighlightFile,noteFilename,selectionAnchor} from './shared/annotation-brush.js';
 
 
 
@@ -536,6 +536,7 @@ export function mountHighlights({reader,viewport,status,onWriting,onEditScene,on
       const element=at.caret?.startContainer;
       const draft=!chosen && (at.hit?.closest('[data-working-draft]')||(element?.nodeType===Node.TEXT_NODE?element.parentElement:element)?.closest('[data-working-draft]'));
       const hit=at.hit?.closest('mark[data-annotation]')||at.range.startContainer;
+      const allowMark=!draft&&!touchesWorkingDraft(chosen||at.range);
       const {highlight,note}=annotationsVisible?annotationTargets(hit,chosen,id=>rows[id]?.note):{};
       if(canEditScene()){
         if(draft)add('Edit Draft',()=>onDraftAction(at.path,draft.dataset.workingDraft,'edit'));
@@ -552,7 +553,7 @@ export function mountHighlights({reader,viewport,status,onWriting,onEditScene,on
       if(note){
         add('Open Note',()=>note.ink?openWriting(note):open(note));
         add('Delete Note',()=>deleteNote(note.id));
-      }else if(chosen || highlight || !at.range.collapsed)add('Add Note',()=>{
+      }else if(allowMark && (chosen || highlight || !at.range.collapsed))add('Add Note',()=>{
         if(highlight){openWriting(highlight);return;}
         const anchor=selectionAnchor(at.path,roots(at.path),chosen||at.range);
         if(anchor)apply({...anchor,anchorKind:chosen?'highlight':'point'});
@@ -560,7 +561,7 @@ export function mountHighlights({reader,viewport,status,onWriting,onEditScene,on
       if(chosen)add('Copy',()=>navigator.clipboard.writeText(selectedReadingText(roots(at.path),chosen))
         .then(()=>status('Selection copied.'),()=>status('Could not copy the selection.',true)));
       if(highlight)add('Remove Highlight',()=>removeHighlight(highlight.id));
-      else if(chosen||at.word)add('Highlight',()=>{
+      else if(allowMark&&(chosen||at.word))add('Highlight',()=>{
         const anchor=selectionAnchor(at.path,roots(at.path),chosen||at.word);
         if(anchor){annotationsVisible=true;layer.checked=true;setLayer();apply(anchor,false);}
       });

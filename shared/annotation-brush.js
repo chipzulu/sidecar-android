@@ -104,7 +104,14 @@ function stream(roots) {
   }
   return {text,parts};
 }
+export function touchesWorkingDraft(range) {
+  const node=range.commonAncestorContainer;
+  const el=node.nodeType===Node.TEXT_NODE?node.parentElement:node;
+  if(el.closest?.('[data-working-draft]'))return true;
+  return [...el.querySelectorAll('[data-working-draft]')].some(span=>range.intersectsNode(span));
+}
 export function selectionAnchor(path,roots,range) {
+  if(touchesWorkingDraft(range))return;
   const {text,parts}=stream(roots);
   const selected=parts.filter(({node,offset,length})=>range.intersectsNode(node)
     && !(range.startContainer===node && range.startOffset>=offset+length)

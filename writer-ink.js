@@ -246,5 +246,6 @@ export function mountWriterInk({status,beforeWriting,onApplyDraft,onSelection}){
  },{capture:true,passive:false});
  document.addEventListener('click',e=>{if(!more.contains(e.target))more.open=false;});
  window.addEventListener('beforeunload',e=>{if(textDirty||(pad&&!pad.save())){e.preventDefault();e.returnValue='';}});
- refresh();return {editDraft,acceptedText:()=>writerText(textState),setBusy(value){locked=value;tools.classList.toggle('writer-tools-locked',value);if(value)pause();refresh();},open,close,pause,activeStroke:()=>operation||!!pad?.active(),settle,capturing:()=>capturing};
+ function park(){const tool=capturing&&pad?.tool();return tool&&pause()?tool:null;}
+ refresh();return {editDraft,park,resume:choose,acceptedText:()=>writerText(textState),setBusy(value){locked=value;tools.classList.toggle('writer-tools-locked',value);if(value)pause();refresh();},open,close,pause,activeStroke:()=>operation||!!pad?.active(),settle,capturing:()=>capturing};
 }

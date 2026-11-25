@@ -103,6 +103,9 @@ body.library-mode #width-handle,body.library-mode #width-feedback{display:none!i
 /* Writer workspace, step 1: independent layout, no ink or editing surfaces. */
 .layout.writer-mode #manuscript-scroll{transform:none;--writing-shift:0px}
 .layout.writer-mode .card-column{display:none!important}
+.layout.writer-single:not(.writer-show-manuscript) #manuscript-scroll,
+.layout.writer-show-manuscript #writer-workspace{visibility:hidden;pointer-events:none}
+#writer-switch{position:absolute;top:0;bottom:0;margin:0;padding:2px;z-index:4;writing-mode:vertical-rl;touch-action:none;user-select:none;border:0;border-radius:0;background:#e2e5da;color:#354c40;font:600 14px system-ui;letter-spacing:.04em}
 #writer-workspace{position:absolute;top:0;bottom:0;min-width:0;display:flex;flex-direction:column;border:1px solid #bcb7a8;background:#f7f4eb;overflow:hidden}
 .writer-toolbar{flex:none;display:flex;flex-wrap:wrap;align-items:center;gap:7px;padding:8px 10px;border-bottom:1px solid #cbc5b6;font-size:13px}
 .writer-toolbar strong{flex:1;min-width:100px}.writer-toolbar small{display:block;font-size:11px;font-weight:400;color:#6a665b}
