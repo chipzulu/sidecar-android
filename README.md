@@ -1,6 +1,6 @@
-# Story Sidecar Android Reader 0.1.72
+# Story Sidecar Android Reader 0.1.73
 
-In Writer mode below 800 CSS pixels, tap the edge strip to switch panels. Hold it for a moment to peek at the manuscript, then lift to resume handwriting. The strip follows the Writer side setting. While writing, use the pen on the strip. A tap parks the pen for scrolling and a return tap restores your tool. Working drafts can be annotated after assimilation.
+Writer keeps your chosen manuscript page width. If that page, its 32 px of surrounding space, the 28 px divider and a 280 px handwriting panel fit, both panels stay visible. Otherwise, tap the edge strip to switch panels. Hold it for a moment to peek at the manuscript, then lift to resume handwriting. The strip follows the Writer side setting. While writing, use the pen on the strip. A tap parks the pen for scrolling and a return tap restores your tool. Working drafts can be annotated after assimilation.
 
 ## Reader 0.1.71 — manuscript menus
 

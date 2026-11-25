@@ -33,6 +33,7 @@ function remember(){if(snapshot&&!libraryMode&&!rendering&&!replacing)localStora
 let pageWidth=Math.max(280,Number(preference('page-width'))||740),pageLines=Math.max(15,Math.min(60,Number(preference('page-lines'))||28)),cardMode=preference('card-layout')||'none',dock='';
 let layoutTimer,lastPageWidth=0,writerAnchor=null,writerTransition=false;
 const writer=mountWriterWorkspace({container:document.querySelector('.layout'),preference,
+ preferredPageWidth:()=>pageWidth,
  canSwitch:()=>!busy&&!credentialBusy&&!writerTransition&&!writerInk.activeStroke()&&!document.querySelector('dialog[open],.ink-note.editing,.paste-destination'),
  parkPen:()=>writerInk.park(),resumePen:tool=>writerInk.resume(tool),
  canChange:()=>!libraryMode&&!busy&&!credentialBusy&&!rendering&&!writerInk.activeStroke()&&highlights.beforeRender(),beforeChange:()=>writerInk.pause(),

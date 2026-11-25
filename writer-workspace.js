@@ -7,7 +7,7 @@ export function splitSize(size,share,min){
 }
 
 // Layout remains independent of the writer ink lifecycle.
-export function mountWriterWorkspace({container,preference,canChange,beforeChange,onChange,canSwitch=()=>true,parkPen=()=>null,resumePen=()=>{}}){
+export function mountWriterWorkspace({container,preference,preferredPageWidth,canChange,beforeChange,onChange,canSwitch=()=>true,parkPen=()=>null,resumePen=()=>{}}){
  let active=false,pointer=null;
  const number=(key,fallback)=>{const n=Number(preference(key));return Number.isFinite(n)&&n>0&&n<1?n:fallback;};
  const state={side:preference('writer-side')==='left'?'left':'right',top:preference('writer-top')==='text'?'text':'ink',column:number('writer-column',.5),row:number('writer-row',.6)};
@@ -64,18 +64,23 @@ export function mountWriterWorkspace({container,preference,canChange,beforeChang
   ink.style.top=(inkTop?0:size.second+GAP)+'px';text.style.top=(inkTop?size.first+GAP:0)+'px';row.style.top=(inkTop?size.first:size.second)+'px';
   aria(row,size,'Handwriting height');
  }
- function measure(){const size=splitSize(container.clientWidth,state.column,280),inkLeft=state.side==='left';
-  const compact=active&&container.clientWidth<800;
+ function measure(){const available=container.clientWidth,inkLeft=state.side==='left';
+  const manuscriptMin=preferredPageWidth()+32,writerMin=280;
+  const compact=active&&available<manuscriptMin+GAP+writerMin;
   if(compact!==narrow){finishPress();if(!compact)showManuscript(false);narrow=compact;}
   paintPane();
   if(narrow){
    const rail=Math.max(44,Math.round(container.clientWidth*.05)),width=Math.max(1,container.clientWidth-rail),left=inkLeft?rail:0;
    strip.style.width=rail+'px';strip.style.left=(inkLeft?0:width)+'px';
    panel.style.width=width+'px';panel.style.left=left+'px';arrangeRows();
-   return {width,left};
+   // Keep Reader's full page area underneath the edge strip while peeking.
+   const readingWidth=Math.min(available,Math.max(width,manuscriptMin));
+   return {width:readingWidth,left:inkLeft?available-readingWidth:0};
   }
+  const usable=available-GAP,first=clamp(usable*state.column,manuscriptMin,usable-writerMin);
+  const size={first,second:usable-first,usable,minimum:writerMin};
   panel.style.width=size.second+'px';panel.style.left=(inkLeft?0:size.first+GAP)+'px';edge.style.left=(inkLeft?size.second:size.first)+'px';
-  aria(edge,size,'Manuscript width');arrangeRows();
+  aria(edge,size,'Manuscript width');edge.setAttribute('aria-valuemin',String(Math.round(manuscriptMin/usable*100)));arrangeRows();
   return {width:size.first,left:inkLeft?size.second+GAP:0};
  }
  function change(fn){if(!canChange()||beforeChange()===false)return false;fn();remember();onChange();return true;}
@@ -85,7 +90,8 @@ export function mountWriterWorkspace({container,preference,canChange,beforeChang
  function move(axis,position){const box=(axis==='column'?container:frames).getBoundingClientRect(),size=splitSize(axis==='column'?box.width:box.height,state[axis],axis==='column'?280:100);
   const from=position-(axis==='column'?box.left:box.top)-GAP/2;
   const normal=axis==='column'?state.side==='right':state.top==='ink';
-  state[axis]=clamp(normal?from:size.usable-from,size.minimum,size.usable-size.minimum)/size.usable;
+  const minimum=axis==='column'?preferredPageWidth()+32:size.minimum;
+  state[axis]=clamp(normal?from:size.usable-from,minimum,size.usable-size.minimum)/size.usable;
   measure();onChange();
  }
  for(const [handle,axis] of [[edge,'column'],[row,'row']]){
