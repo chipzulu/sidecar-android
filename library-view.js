@@ -3,9 +3,12 @@ import {listBooks,readBook,workKey} from './storage.js';
 import {coffeeBook,coffeeOrder,coffeeFirst,mountCoffee} from './shared/coffee-book.js';
 export function mountLibrary({open,add,error,options}){
  const $=id=>document.getElementById(id);let books=[],index=0,revision=0,urls=[],opening=false;
- let launch=true,anchor=null;
+ let launch=true,anchor=null,revealOnReturn=false;
  const tiles=()=>coffeeOrder([...books,{id:'add',title:'Add a book'}],anchor);
- const coffee=mountCoffee(reset=>{if(reset){const target=anchor||books[0]?.id||'add';index=Math.max(0,tiles().findIndex(b=>b.id===target));}void draw();});
+ const coffee=mountCoffee(reset=>{if(reset){const target=anchor||books[0]?.id||'add';index=Math.max(0,tiles().findIndex(b=>b.id===target));}void draw();},()=>{
+   revealOnReturn=$('library').hidden;
+   select(tiles().findIndex(book=>book===coffeeBook));
+ });
  function revoke(){for(const url of urls)URL.revokeObjectURL(url);urls=[];}
  function select(n){index=Math.max(0,Math.min(tiles().length-1,n));void draw();}
  async function draw(){
@@ -46,5 +49,5 @@ export function mountLibrary({open,add,error,options}){
  $('library-add').onclick=()=>{select(tiles().length-1);add();};
  $('library').addEventListener('keydown',e=>{if(e.target.closest('input,select,textarea'))return;if(e.key==='ArrowLeft'||e.key==='ArrowRight'){e.preventDefault();select(index+(e.key==='ArrowRight'?1:-1));$('library-track').querySelector('.selected')?.focus({preventScroll:true});}});
  let start=null;const track=$('library-track');track.addEventListener('pointerdown',e=>{suppress=false;start={x:e.clientX,y:e.clientY};});track.addEventListener('pointerup',e=>{if(!start)return;const dx=e.clientX-start.x,dy=e.clientY-start.y;start=null;if(Math.abs(dx)>65&&Math.abs(dx)>Math.abs(dy)){suppress=true;select(index+(dx<0?1:-1));}});track.addEventListener('pointercancel',()=>{start=null;});let suppress=false;track.addEventListener('click',e=>{if(suppress){suppress=false;e.preventDefault();e.stopImmediatePropagation();}},true);
- return {async refresh(preferred){const selected=launch?(coffeeFirst()?coffeeBook.id:preferred):preferred||tiles()[index]?.id;launch=false;if(preferred)anchor=preferred;books=(await listBooks()).sort((a,b)=>a.createdAt.localeCompare(b.createdAt)||a.id.localeCompare(b.id));if(!books.some(b=>b.id===anchor))anchor=books[0]?.id||'add';const found=tiles().findIndex(b=>b.id===selected);index=found>=0?found:Math.max(0,tiles().findIndex(b=>b.id===anchor));await draw();},dispose(){revision++;revoke();}};
+ return {async refresh(preferred){const selected=revealOnReturn?coffeeBook.id:launch?(coffeeFirst()?coffeeBook.id:preferred):preferred||tiles()[index]?.id;launch=false;revealOnReturn=false;if(preferred)anchor=preferred;books=(await listBooks()).sort((a,b)=>a.createdAt.localeCompare(b.createdAt)||a.id.localeCompare(b.id));if(!books.some(b=>b.id===anchor))anchor=books[0]?.id||'add';const found=tiles().findIndex(b=>b.id===selected);index=found>=0?found:Math.max(0,tiles().findIndex(b=>b.id===anchor));await draw();},dispose(){revision++;revoke();}};
 }

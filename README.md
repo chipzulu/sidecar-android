@@ -1,6 +1,6 @@
-# Story Sidecar Android Reader 0.1.74
+# Story Sidecar Android Reader 0.1.75
 
-The library includes *A Cup for the Author*. Choose **Maybe later** to put it beside your book, or **I’ve supported Sidecar** for a quiet year on this device. Optional salty humour lives in Shelf settings. The payment link awaits the author’s Ko-fi setup.
+The library includes *A Cup for the Author*. Choose **Maybe later** to put it beside your book, or **I’ve supported Sidecar** for a quiet year on this device. Open the coffee book to enable salty humour. About can reset the coffee timer and remembers whether to show the event log. The payment link awaits the author’s Ko-fi setup.
 
 Writer keeps your chosen manuscript page width. If that page, its 32 px of surrounding space, the 28 px divider and a 280 px handwriting panel fit, both panels stay visible. Otherwise, tap the edge strip to switch panels. Hold it for a moment to peek at the manuscript, then lift to resume handwriting. The strip follows the Writer side setting. While writing, use the pen on the strip. A tap parks the pen for scrolling and a return tap restores your tool. Working drafts can be annotated after assimilation.
 

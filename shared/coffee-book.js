@@ -13,7 +13,7 @@ export function coffeeOrder(books, anchor) {
 }
 export function coffeeFirst() {return !read().later && !(Date.now() < (read().until || 0));}
 
-export function mountCoffee(redraw) {
+export function mountCoffee(redraw, reveal) {
   const dialog = document.getElementById('coffee-dialog');
   const humour = document.getElementById('coffee-humour');
   let line = '';
@@ -34,6 +34,11 @@ export function mountCoffee(redraw) {
     line=lines[next];
     return line;
   }
+  document.getElementById('coffee-reset').onclick=()=>{
+    save({until:0,later:false});
+    reveal();
+    document.getElementById('coffee-reset-status').textContent='A Cup for the Author is back in the centre of your shelf.';
+  };
   humour.checked=!!read().salty;
   humour.onchange=()=>{save({salty:humour.checked});redraw(false);};
   document.getElementById('coffee-later').onclick=()=>{save({later:true});dialog.close();redraw(true);};

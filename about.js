@@ -12,6 +12,7 @@ if(bridge){
 }
 eventPanel(dialog);
 $('about-open').onclick=()=>{
+ $('coffee-reset-status').textContent='';
  logEvent('About opened');
  const d=window.sidecarInkDiagnostic;
  $('about-ink-diagnostic').textContent=d?`Last ${d.tool} session: ${d.begun} started, ${d.received} received, ${d.accepted} accepted, ${d.rejected} rejected. ${d.last}. Saved note: ${window.sidecarInkSavedCount??'not confirmed'} strokes.`:'No native handwriting session in this Reader window yet.';
