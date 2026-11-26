@@ -202,3 +202,5 @@ body.writer-pen-active #writer-column-edge,body.writer-pen-active #writer-row-ed
 
 .annotation-menu[open]:not(:modal){width:max-content;max-height:calc(100dvh - 12px);overflow:auto}
 .scene p[data-paragraph]{white-space:pre-wrap}
+
+.coffee-settings{font:14px system-ui;text-align:left;margin:1rem auto;max-width:26rem}.coffee-settings summary{cursor:pointer}.coffee-settings label{display:block;margin:.6em 0}.coffee-settings input{display:inline;width:auto}.coffee-settings small{display:block}.coffee-face{position:relative}.coffee-face img{height:100%;width:100%;object-fit:contain}.coffee-slip{position:absolute;bottom:15%;left:0;right:0;background:#fff6da;color:#272218;padding:.4em;font:clamp(11px,1.25vw,16px)/1.2 Georgia,serif;text-align:center;box-shadow:0 1px 3px #0004}.coffee-face.shelf-cover{padding:0}
