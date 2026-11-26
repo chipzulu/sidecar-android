@@ -1,7 +1,7 @@
 import {lines} from './coffee-lines.js';
 
 export const coffeeBook = {id:'sidecar:coffee', title:'A Cup for the Author'};
-const paymentUrl = ''; // Set the author's public Ko-fi URL before enabling payments.
+const paymentUrl = 'https://ko-fi.com/cphelweg';
 const key = 'sidecar-coffee-v1';
 const read = () => JSON.parse(localStorage.getItem(key) || '{}');
 const save = changes => localStorage.setItem(key, JSON.stringify({...read(), ...changes}));
