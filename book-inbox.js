@@ -4,6 +4,43 @@ import {importExchangeBook,exchangeEntry} from './storage.js';
 import {blobSha} from './api.js';
 import {bookModel} from './model.js';
 
+let outbound=null;
+export function sendPairedReturn(bytes,title,progress){
+ if(outbound)throw Error('A return is already being sent.');
+ const bridge=window.SidecarBookInbox,job=crypto.randomUUID();
+ return new Promise((resolve,reject)=>{
+   const item={job,bytes,progress,resolve,reject};
+   item.renew=()=>{
+     clearTimeout(item.timer);
+     item.timer=setTimeout(()=>{
+       if(outbound!==item)return;
+       outbound=null;bridge.postMessage(JSON.stringify({op:'cancel-return'}));
+       reject(Error('PC did not confirm receipt. Keep Desktop Sidecar open on the same Wi-Fi and try again. Your edits are saved.'));
+     },55000);
+   };
+   outbound=item;item.renew();
+   bridge.postMessage(JSON.stringify({op:'queue',job,title,size:bytes.length}));
+ });
+}
+function handleReturn(bridge,m){
+ if(!m.type.startsWith('return-'))return false;
+ const item=outbound;
+ if(!item)return true;
+ if(m.type==='return-queued'){item.progress('Waiting for '+m.name+'… Keep the Reader open.');}
+ else if(m.type==='return-error'){clearTimeout(item.timer);outbound=null;item.reject(Error(m.message));}
+ else if(item.job===m.job&&m.type==='return-chunk'){
+   item.renew();const chunk=item.bytes.subarray(m.offset,m.offset+131072);
+   if(m.offset===0)item.count=new ReceivedFileCount();
+   item.count.push(chunk);
+   let binary='';for(let i=0;i<chunk.length;i+=8192)binary+=String.fromCharCode(...chunk.subarray(i,i+8192));
+   bridge.postMessage(JSON.stringify({id:m.id,seq:m.seq,result:btoa(binary)}));
+   item.progress('Sending '+item.count.files+' files · '+(m.offset+chunk.length).toLocaleString()+' / '+item.bytes.length.toLocaleString()+' bytes');
+ }else if(item.job===m.job&&m.type==='return-delivered'){
+   clearTimeout(item.timer);outbound=null;item.resolve('Received on PC. Choose Review tablet changes in Desktop Sidecar.');
+ }
+ return true;
+}
+
 export function enableBookInbox({unavailable,added,notice}){
  const bridge=window.SidecarBookInbox;
  if(!bridge)return;
@@ -37,6 +74,7 @@ export function enableBookInbox({unavailable,added,notice}){
  }
  bridge.onmessage=async event=>{
    const m=JSON.parse(event.data);
+   if(handleReturn(bridge,m))return;
    if(m.type==='end'){
      if(current?.id===m.id){
        if(current.accepted&&!current.complete)show(current.title+' · Transfer interrupted after '+current.count.files+' files.',true);

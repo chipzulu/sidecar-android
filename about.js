@@ -4,7 +4,7 @@ const dialog=$('about-dialog'),bridge=window.SidecarApp;
 if(bridge){
  bridge.onmessage=event=>{try{
   const info=JSON.parse(event.data);
-  if(info.type!=='status')return;nativeEvents(info);
+  if(info.type!=='status')return;nativeEvents(info);window.pairedReturns=info.pairedReturns===true;window.dispatchEvent(new Event('paired-return-capability'));
   $('paired-devices').hidden=info.pairing!==true;
   $('about-native-status').textContent=info.status;
   $('about-apk').hidden=false;$('about-apk').textContent='BOOX app '+info.version;

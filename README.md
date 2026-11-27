@@ -1,12 +1,14 @@
-# Story Sidecar Android Reader 0.1.83
+# Story Sidecar Android Reader 0.1.84
 
-Wi-Fi transfer progress: Desktop 0.1.170 shows the number of files sent to each tablet. Reader 0.1.83 shows the number received and the byte count, followed by library confirmation. BOOX APK 0.1.25 works with this release.
+Paired Wi-Fi returns: Keep Desktop 0.1.172 open. In Reader 0.1.84 with BOOX APK 0.1.27, finish your edit, then tap Updates → Send changes to paired PC. The Library book menu has the same action. The selected paired PC receives the changes for review. Click the review notice there. Cancelling review keeps the delivery available, including after restarting Desktop. Save return file remains available for USB.
 
-Wi-Fi book delivery: Install APK 0.1.25 and keep Reader 0.1.83 open. On Desktop 0.1.169 select a book on the shelf → Send to tablet…. Select your BOOX devices and send. Accept Add book on each tablet. Repeat deliveries preserve the existing shelf copy and edits. Tablet updates can still be returned via USB.
+Wi-Fi transfer progress: Desktop 0.1.170 shows the number of files sent to each tablet. Reader 0.1.84 shows the number received and the byte count, followed by library confirmation. BOOX APK 0.1.25 works with this release.
+
+Wi-Fi book delivery: Install APK 0.1.25 and keep Reader 0.1.84 open. On Desktop 0.1.169 select a book on the shelf → Send to tablet…. Select your BOOX devices and send. Accept Add book on each tablet. Repeat deliveries preserve the existing shelf copy and edits. Tablet updates can still be returned via USB.
 
 Wi-Fi pairing: In Library → Paired devices choose Show pairing QR. On Windows use the top tab bar → Paired devices → Scan tablet. Confirm the PC name on the tablet. Pair manually is available on both devices. Each device remembers its own list and selection.
 
-USB import: On PC select Export → Save book for tablet. Copy the .sidecar-book file into BOOX Download. In Library select Import book. In the BOOX wrapper install APK 0.1.21 for the file picker. Files are verified before the library is changed. An identical package opens your existing copy; a different revision never replaces local work. To return saved edits, open Updates → Send changes to PC. Install APK 0.1.22 for saving in BOOX Download. Copy the .sidecar-return file via USB. In the original PC project use Export → Receive tablet changes.
+USB import: On PC select Export → Save book for tablet. Copy the .sidecar-book file into BOOX Download. In Library select Import book. In the BOOX wrapper install APK 0.1.21 for the file picker. Files are verified before the library is changed. An identical package opens your existing copy; a different revision never replaces local work. To return saved edits, open Updates → Save return file…. Install APK 0.1.22 for saving in BOOX Download. Copy the .sidecar-return file via USB. In the original PC project use Export → Receive tablet changes.
 
 The Reader toolbar carries the turquoise Story Sidecar icon. About includes the author’s copyright notice.
 

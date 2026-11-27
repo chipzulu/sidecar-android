@@ -10,7 +10,7 @@ import {tabletTextAllowed} from './shared/book-workflow.js';
 import {publishPeerChanges,reconcilePublished,receivePeerBook} from './peer-send.js';
 import {pressureSensitivity} from './pressure.js';
 import {mountLibrary} from './library-view.js';
-import {enableBookInbox} from './book-inbox.js';
+import {enableBookInbox,sendPairedReturn} from './book-inbox.js';
 import {saveReturnFile} from './save-return.js';
 import {zipFiles} from './shared/stored-zip.js';
 import {collectTabletFiles} from './peer-send.js';
@@ -342,7 +342,7 @@ async function openBook(value,resume=true){
   document.title=model.title+' · Sidecar Reader';$('repository').value=value.repository;$('branch').value=value.branch;
   credentials.refresh();$('fresh-copy').hidden=false;
   $('connection-toggle').hidden=false;
-  $('return-book').hidden=!value.exchangeId;
+  $('return-book').hidden=!value.exchangeId;showReturnActions();
   for(const id of ['send-highlights','receive-updates','fresh-copy'])$(id).hidden=!!value.exchangeId;
   $('updates-panel').querySelector('.hint').hidden=!!value.exchangeId;
   $('book-status').textContent=value.exchangeId?model.title+' · Imported book · '+value.files.length+' files':`${model.title} · ${value.repository} (${value.branch}) · Offline copy downloaded ${new Date(value.downloadedAt).toLocaleString()} · ${value.commit.slice(0,8)} · ${value.files.length} files`;
@@ -477,7 +477,7 @@ async function reconcileBook(){
   }catch(error){message(error.message,true);}
   finally{checking=false;if(checkAgain){checkAgain=false;void reconcileBook();}}
 }
-async function returnToPC(id){
+async function returnToPC(id,wifi=false){
  if(busy||credentialBusy||writerTransition)return;
  if(!highlights.beforeRender())return;
  busy=true;
@@ -494,11 +494,18 @@ async function returnToPC(id){
    }
    const bytes=await packReturn(book,capture.files.filter(f=>touched.has(f.path)),zipFiles);
    const name=book.title.replace(/[<>:"/\\|?*]/g,'_').slice(0,90)+' - tablet changes.sidecar-return';
-   const status=await saveReturnFile(name,bytes);
+   const status=wifi?await sendPairedReturn(bytes,book.title,text=>message(text)):await saveReturnFile(name,bytes);
    message(status);if(!libraryMode)$('updates-status').textContent=status;
  }catch(e){message(e.message,true);}
  finally{busy=false;controls();if(!libraryMode&&writer.active())await writerInk.open(snapshot);}
 }
+function showReturnActions(){
+ $('wifi-return-book').hidden=!snapshot?.exchangeId||!window.pairedReturns;
+ $('wifi-return-book-menu').hidden=menuBook?.connection?.type!=='file'||!window.pairedReturns;
+}
+window.addEventListener('paired-return-capability',showReturnActions);
+$('wifi-return-book').onclick=()=>returnToPC(snapshot?.id,true);
+$('wifi-return-book-menu').onclick=()=>{$('book-menu').close();returnToPC(menuBook?.id,true);};
 $('return-book').onclick=()=>returnToPC(snapshot?.id);
 $('return-book-menu').onclick=()=>{$('book-menu').close();returnToPC(menuBook?.id);};
 $('exchange-import').onclick=()=>$('exchange-file').click();
@@ -516,7 +523,7 @@ $('exchange-file').onchange=async e=>{
    message(result.duplicate?'Already imported. Opened your existing copy.':'Book imported and available offline.');
  }catch(err){message(err.message,true);}finally{busy=false;controls();}
 };
-libraryView=mountLibrary({open:async id=>{if(busy||credentialBusy||!highlights.beforeRender())return;remember();await openBook(await selectBook(id));},add:()=>{void openSettings();},options:row=>{if(busy||credentialBusy)return;menuBook=row;$('return-book-menu').hidden=row.connection.type!=='file';for(const key of ['book-settings','book-check','book-refresh'])$(key).hidden=row.connection.type==='file';$('book-menu-title').textContent=row.title;$('book-menu').showModal();},error:text=>{$('library-error').textContent=text;}});
+libraryView=mountLibrary({open:async id=>{if(busy||credentialBusy||!highlights.beforeRender())return;remember();await openBook(await selectBook(id));},add:()=>{void openSettings();},options:row=>{if(busy||credentialBusy)return;menuBook=row;showReturnActions();$('return-book-menu').hidden=row.connection.type!=='file';for(const key of ['book-settings','book-check','book-refresh'])$(key).hidden=row.connection.type==='file';$('book-menu-title').textContent=row.title;$('book-menu').showModal();},error:text=>{$('library-error').textContent=text;}});
 async function showLibrary(){
  if(writerTransition||busy||credentialBusy||!highlights.beforeRender()||!await writerInk.close())return;
  remember();clearTimeout(scrollTimer);$('updates-panel').hidden=true;libraryMode=true;document.body.classList.add('library-mode');$('library').hidden=false;$('library-toggle').hidden=true;
