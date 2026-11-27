@@ -10,7 +10,9 @@ import {tabletTextAllowed} from './shared/book-workflow.js';
 import {publishPeerChanges,reconcilePublished,receivePeerBook} from './peer-send.js';
 import {pressureSensitivity} from './pressure.js';
 import {mountLibrary} from './library-view.js';
-import {readerClient,repositoryName} from './api.js';
+import {unpackBook} from './shared/book-exchange.js';
+import {importExchangeBook} from './storage.js';
+import {blobSha,readerClient,repositoryName} from './api.js';
 import {bookModel,chapterHeadingParts,sceneHeadingParts} from './model.js';
 import {readBook,saveBook,bookIdentity,readBookIdentity,removeBook,clearBookWork,workKey,libraryReady,lastConnection,listConnections,findBook,markBookSent,selectBook,relinkBook,recordRemoteCheck,clearWriterDraft} from './storage.js';
 import {inlineFragment,sceneNotes,colourMarks} from './inline-notes.js';
@@ -333,7 +335,8 @@ async function openBook(value,resume=true){
   if(model.cover){const type=/\.png$/i.test(model.cover.path)?'image/png':'image/jpeg';coverUrl=URL.createObjectURL(new Blob([model.cover.bytes],{type}));}
   document.title=model.title+' · Sidecar Reader';$('repository').value=value.repository;$('branch').value=value.branch;
   credentials.refresh();$('fresh-copy').hidden=false;
-  $('book-status').textContent=`${model.title} · ${value.repository} (${value.branch}) · Offline copy downloaded ${new Date(value.downloadedAt).toLocaleString()} · ${value.commit.slice(0,8)} · ${value.files.length} files`;
+  $('connection-toggle').hidden=!!value.exchangeId;
+  $('book-status').textContent=value.exchangeId?model.title+' · Imported book · '+value.files.length+' files':`${model.title} · ${value.repository} (${value.branch}) · Offline copy downloaded ${new Date(value.downloadedAt).toLocaleString()} · ${value.commit.slice(0,8)} · ${value.files.length} files`;
   $('outline').replaceChildren();const cover=element('button','Cover');cover.dataset.scope='cover';cover.onclick=()=>navigate(-1);const entire=element('button','Entire Novel');entire.dataset.scope='novel';entire.onclick=()=>navigate(-2);$('outline').append(cover,entire);
   model.chapters.forEach((chapter,n)=>{const details=element('details'),summary=element('summary',chapter.name),children=element('div'),all=element('button','Read chapter');all.dataset.scope=`chapter:${chapter.key}`;all.onclick=()=>navigate(n);children.append(all);
     for(const scene of chapter.scenes){const button=element('button',scene.name);button.dataset.scope=scene.path;button.onclick=()=>navigate(n,scene.path);children.append(button);}details.append(summary,children);$('outline').append(details);});
@@ -350,7 +353,7 @@ $('previous').onclick=()=>step(-1);$('next').onclick=()=>step(1);
 let scrollTimer;$('manuscript-scroll').addEventListener('scroll',()=>{clearTimeout(scrollTimer);scrollTimer=setTimeout(()=>{remember();pageStatus();},100);},{passive:true});addEventListener('pagehide',remember);
 function textSize(value){const size=['18','21','24','28'].includes(value)?value:'21';document.documentElement.style.setProperty('--reading-size',size+'px');$('size').value=size;preference('size',size);}
 textSize(preference('size'));$('size').onchange=()=>{textSize($('size').value);repaginate();};
-function controls(){writerInk.setBusy(busy||credentialBusy);for(const id of ['ui-mode','repository','branch','token','download','send-highlights','remember-token','save-token','replace-token','cancel-token','forget-saved-token','remove-book','fresh-copy','receive-updates','book-settings','book-refresh','book-check','save-connection','library-toggle','library-add','book-menu-open','saved-connections'])$(id).disabled=busy||credentialBusy||writerTransition;$('cancel').hidden=!busy||!abort;$('progress').hidden=!busy;$('updates-cancel').hidden=!busy||!abort;}
+function controls(){writerInk.setBusy(busy||credentialBusy);for(const id of ['ui-mode','repository','branch','token','download','send-highlights','remember-token','save-token','replace-token','cancel-token','forget-saved-token','remove-book','fresh-copy','receive-updates','book-settings','book-refresh','book-check','save-connection','library-toggle','exchange-import','library-add','book-menu-open','saved-connections'])$(id).disabled=busy||credentialBusy||writerTransition;$('cancel').hidden=!busy||!abort;$('progress').hidden=!busy;$('updates-cancel').hidden=!busy||!abort;}
 function lockGitHub(){client=null;clientKey='';$('token').value='';}
 const rescued=await lastConnection();if(rescued){$('repository').value=rescued.repository;$('branch').value=rescued.branch;}
 const profiles=await listConnections();const choices=$('saved-connections');for(const c of profiles)choices.add(new Option(c.repository+' · '+c.branch,c.key));choices.hidden=!profiles.length;choices.onchange=()=>{const c=profiles.find(c=>c.key===choices.value);if(c){$('repository').value=c.repository;$('branch').value=c.branch;credentials.refresh();}};
@@ -465,7 +468,22 @@ async function reconcileBook(){
   }catch(error){message(error.message,true);}
   finally{checking=false;if(checkAgain){checkAgain=false;void reconcileBook();}}
 }
-libraryView=mountLibrary({open:async id=>{if(busy||credentialBusy||!highlights.beforeRender())return;remember();await openBook(await selectBook(id));},add:()=>{void openSettings();},options:row=>{if(busy||credentialBusy)return;menuBook=row;$('book-menu-title').textContent=row.title;$('book-menu').showModal();},error:text=>{$('library-error').textContent=text;}});
+$('exchange-import').onclick=()=>$('exchange-file').click();
+$('exchange-file').onchange=async e=>{
+ const file=e.target.files[0];e.target.value='';
+ if(!file||busy||credentialBusy)return;
+ busy=true;controls();message('Checking the book file…');
+ try{
+   const copy=await unpackBook(file);
+   for(const f of copy.files)f.sha=await blobSha(f.bytes);
+   copy.title=bookModel(copy).title;
+   const result=await importExchangeBook(copy);
+   await libraryView.refresh(result.book.id);
+   await openBook(result.book);
+   message(result.duplicate?'Already imported. Opened your existing copy.':'Book imported and available offline.');
+ }catch(err){message(err.message,true);}finally{busy=false;controls();}
+};
+libraryView=mountLibrary({open:async id=>{if(busy||credentialBusy||!highlights.beforeRender())return;remember();await openBook(await selectBook(id));},add:()=>{void openSettings();},options:row=>{if(busy||credentialBusy)return;menuBook=row;for(const key of ['book-settings','book-check','book-refresh'])$(key).hidden=row.connection.type==='file';$('book-menu-title').textContent=row.title;$('book-menu').showModal();},error:text=>{$('library-error').textContent=text;}});
 async function showLibrary(){
  if(writerTransition||busy||credentialBusy||!highlights.beforeRender()||!await writerInk.close())return;
  remember();clearTimeout(scrollTimer);$('updates-panel').hidden=true;libraryMode=true;document.body.classList.add('library-mode');$('library').hidden=false;$('library-toggle').hidden=true;

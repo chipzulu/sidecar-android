@@ -57,6 +57,27 @@ export async function saveBook(book,{sent=false,base=null}={}){
  };
  await done;Object.assign(book,{id:saved.id,revision:saved.revision,syncBase:saved.syncBase,syncDetached:false});return saved;
 }
+// A transport-specific library identity keeps a file copy separate from GitHub books.
+export async function importExchangeBook(book){
+ const d=await db(),remote='exchange:'+book.exchangeId;
+ const tx=d.transaction(['library','snapshots','meta'],'readwrite'),done=completed(tx);
+ const rows=tx.objectStore('library'),lookup=rows.index('remote').get(remote);
+ let id,conflict=false,duplicate=false;
+ lookup.onsuccess=()=>{
+   const old=lookup.result;
+   if(old && old.exchangeRevision!==book.exchangeRevision){conflict=true;return;}
+   id=old?.id||crypto.randomUUID();
+   if(old){duplicate=true;}else{
+     const now=new Date().toISOString();
+     rows.add({id,remote,exchangeRevision:book.exchangeRevision,connection:{type:'file'},title:book.title,createdAt:now,lastReceivedAt:now});
+     tx.objectStore('snapshots').add({...book,id,revision:crypto.randomUUID(),repository:'',branch:'',commit:book.exchangeRevision,syncDetached:true,downloadedAt:now},id);
+   }
+   tx.objectStore('meta').put(id,'active');
+ };
+ await done;
+ if(conflict)throw Error('This book is already on your shelf with a different starting version. Your local copy was kept.');
+ return {book:await readBook(id),duplicate};
+}
 export async function removeBook(book){
  const d=await db(),tx=d.transaction(['library','snapshots','meta'],'readwrite'),done=completed(tx);
  const r=tx.objectStore('snapshots').get(book.id);

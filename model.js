@@ -11,5 +11,5 @@ export function bookModel(snapshot) {
   const card=snapshot.files.find(f=>f.path.toLowerCase()==='book/cards/title.md');const fields={};
   if(card)for(const line of new TextDecoder().decode(card.bytes).split(/\r?\n/)){const match=line.match(/^\s*(title|subtitle|penname|author)\s*:\s*(.*?)\s*$/i);if(match)fields[match[1].toLowerCase()]=match[2];}
   let cover=null;for(const ext of ['png','jpeg','jpg']){cover=snapshot.files.find(f=>f.path.toLowerCase()===`book/cards/cover.${ext}`);if(cover)break;}
-  return {chapters,cover,title:fields.title||snapshot.repository.split('/')[1],subtitle:fields.subtitle||'',author:fields.penname||fields.author||''};
+  return {chapters,cover,title:fields.title||snapshot.title||snapshot.repository.split('/')[1],subtitle:fields.subtitle||'',author:fields.penname||fields.author||''};
 }

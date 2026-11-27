@@ -1,4 +1,8 @@
-# Story Sidecar Android Reader 0.1.76
+# Story Sidecar Android Reader 0.1.79
+
+USB import: On PC select Export → Save book for tablet. Copy the .sidecar-book file into BOOX Download. In Library select Import book. In the BOOX wrapper install APK 0.1.21 for the file picker. Files are verified before the library is changed. An identical package opens your existing copy; a different revision never replaces local work. Tablet-to-PC returns are a later step.
+
+The Reader toolbar carries the turquoise Story Sidecar icon. About includes the author’s copyright notice.
 
 The library includes *A Cup for the Author*. Choose **Maybe later** to put it beside your book, or **I’ve supported Sidecar** for a quiet year on this device. Open the coffee book to enable salty humour. About can reset the coffee timer and remembers whether to show the event log. The Buy me a coffee button opens https://ko-fi.com/cphelweg.
 
