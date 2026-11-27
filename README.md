@@ -1,4 +1,6 @@
-# Story Sidecar Android Reader 0.1.80
+# Story Sidecar Android Reader 0.1.81
+
+Wi-Fi pairing (BOOX APK 0.1.23): Open Paired devices in the Library. On Windows use the top tab bar → Paired devices → Pair tablet. Enter the PC address and five-minute code on the BOOX and choose a device name. Generate a new invitation for each additional tablet. Each device remembers its own list and selection. Forget removes the local pairing. Book transfers still use USB or GitHub.
 
 USB import: On PC select Export → Save book for tablet. Copy the .sidecar-book file into BOOX Download. In Library select Import book. In the BOOX wrapper install APK 0.1.21 for the file picker. Files are verified before the library is changed. An identical package opens your existing copy; a different revision never replaces local work. To return saved edits, open Updates → Send changes to PC. Install APK 0.1.22 for saving in BOOX Download. Copy the .sidecar-return file via USB. In the original PC project use Export → Receive tablet changes.
 

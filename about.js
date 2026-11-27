@@ -5,6 +5,7 @@ if(bridge){
  bridge.onmessage=event=>{try{
   const info=JSON.parse(event.data);
   if(info.type!=='status')return;nativeEvents(info);
+  $('paired-devices').hidden=info.pairing!==true;
   $('about-native-status').textContent=info.status;
   $('about-apk').hidden=false;$('about-apk').textContent='BOOX app '+info.version;
   $('config-eraser').hidden=false;$('config-eraser').textContent=info.eraser;
@@ -24,3 +25,6 @@ $('config-eraser').onclick=()=>bridge?.postMessage('eraser');
 $('about-reload').onclick=()=>{if(confirm('Reload Reader? Finish your current edit before reloading.')){if(bridge)bridge.postMessage('reload');else location.reload();}};
 
 document.getElementById('configuration-toggle').addEventListener('click',()=>bridge?.postMessage('status'));
+
+$('paired-devices').onclick=()=>bridge?.postMessage('paired-devices');
+bridge?.postMessage('status');
