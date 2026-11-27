@@ -7,6 +7,9 @@ import {encodeNote,noteFilename} from './shared/annotation-brush.js';
 import {workKey,readBookIdentity,bookIdentity,saveBook} from './storage.js';
 export async function preparePeerSend(book){
  if(!book.syncBase||book.syncDetached||book.syncBase.identity!==peerIdentity(book.repository,book.branch))throw Error('Shared starting version is unknown. Nothing was sent.');
+ return collectTabletFiles(book);
+}
+export async function collectTabletFiles(book){
  const files=new Map(book.files.map(f=>[f.path,{...f}])),drafts=new Map();
  const prefix=workKey(book,'draft');
  for(const key of Object.keys(localStorage).filter(k=>k.startsWith(prefix))){
@@ -24,7 +27,7 @@ export async function preparePeerSend(book){
  for(const [id,row] of blocks){
   const path=draftBlockPath(id),bytes=new TextEncoder().encode(encodeBlock(row));files.set(path,{path,bytes,sha:await gitBlobSha(bytes)});
  }
- const captured=[...files.values()].map(f=>({...f,size:f.bytes.length}));checkBackupInventory(captured);
+ const captured=[...files.values()].map(f=>({...f,size:f.bytes.length}));if(!book.exchangeId)checkBackupInventory(captured);
  return {files:captured,drafts,notes,blocks};
 }
 export async function publishPeerChanges(book,client,progress=()=>{}){

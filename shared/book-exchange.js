@@ -37,7 +37,7 @@ export async function packBook(book,bookId,title,zipFiles) {
   entries.unshift([manifestPath,JSON.stringify(manifest)]);
   return zipFiles(entries);
 }
-export async function unpackBook(file) {
+async function readPackage(file) {
   if(file.size>limit+12*1024*1024)throw Error('This exchange file exceeds the Reader limit.');
   const bytes=new Uint8Array(await file.arrayBuffer()),view=new DataView(bytes.buffer);
   const u16=i=>view.getUint16(i,true),u32=i=>view.getUint32(i,true);
@@ -58,6 +58,10 @@ export async function unpackBook(file) {
   }
   if(central!==end||offset!==u32(end+16)||!entries.has(manifestPath))throw invalid();
   const raw=entries.get(manifestPath),m=JSON.parse(decoder.decode(raw));entries.delete(manifestPath);
+  return {raw,m,entries};
+}
+export async function unpackBook(file) {
+  const {raw,m,entries}=await readPackage(file);
   if(m.format!=='story-sidecar-book'||m.version!==1||!uuid.test(m.bookId)||typeof m.title!=='string'||!m.title.trim()||
      !Array.isArray(m.directories)||!Array.isArray(m.files)||entries.size!==m.files.length||m.files.length+m.directories.length>10000)throw invalid();
   m.directories.forEach(checkPath);
@@ -69,4 +73,40 @@ export async function unpackBook(file) {
   }
   requireScene(files);
   return {exchangeId:m.bookId,exchangeRevision:await hash(raw),directories:m.directories,title:m.title,files};
+}
+
+function returnPath(path){
+  checkPath(path);
+  if(path.split('/').some(p=>p.startsWith('.')||/[. ]$/.test(p)||/[<>*?"|]/.test(p)))throw invalid();
+  if(path.split('/').some(p=>/^(?:CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\.|$)/i.test(p)))throw invalid();
+  if(!(/^Book\/Chapters\/.+\.html?$/i.test(path)&&!path.split('/').slice(2,-1).some(p=>p.toLowerCase()==='notes')) &&
+     !/^Book\/Notes\/(?:Highlight |Converted draft )[a-f0-9-]{36}\.md$/.test(path))throw invalid();
+}
+export async function packReturn(book,changed,zipFiles){
+  const originals=new Map(book.files.map(f=>[f.path,f]));
+  const files=[],entries=[];
+  if(changed.length>10000||changed.reduce((n,f)=>n+f.bytes.length,0)>limit)throw Error('The return exceeds the 100 MiB or 10,000 file limit.');
+  for(const f of changed){
+    returnPath(f.path);
+    const before=originals.get(f.path);
+    files.push({path:f.path,base:before?.sha||null,size:f.bytes.length,hash:await hash(f.bytes)});
+    entries.push([f.path,f.bytes]);
+  }
+  if(!files.length)throw Error('No saved tablet changes to return.');
+  const manifest={format:'story-sidecar-return',version:1,bookId:book.exchangeId,startingRevision:book.exchangeRevision,files:files.sort((a,b)=>a.path<b.path?-1:1)};
+  return zipFiles([[manifestPath,JSON.stringify(manifest)],...entries]);
+}
+export async function unpackReturn(file,bookId){
+  const {raw,m,entries}=await readPackage(file);
+  if(m.format!=='story-sidecar-return'||m.version!==1||!uuid.test(m.bookId)||!Array.isArray(m.files)||!m.files.length||m.files.length!==entries.size||!/^[a-f0-9]{64}$/.test(m.startingRevision))throw invalid();
+  if(m.bookId!==bookId)throw Error('This return belongs to a different book. Open its original PC project.');
+  const files=[],names=new Set();
+  for(const f of m.files){
+    returnPath(f.path);
+    const key=f.path.toLowerCase(),bytes=entries.get(f.path);
+    if(names.has(key)||!bytes||bytes.length!==f.size||await hash(bytes)!==f.hash||(f.base!==null&&!/^[a-f0-9]{40}$/.test(f.base)))throw invalid();
+    if(f.base===null&&/^Book\/Chapters\//i.test(f.path))throw invalid();
+    names.add(key);files.push({path:f.path,bytes,base:f.base});
+  }
+  return {id:await hash(raw),files};
 }

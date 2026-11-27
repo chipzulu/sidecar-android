@@ -10,7 +10,12 @@ import {tabletTextAllowed} from './shared/book-workflow.js';
 import {publishPeerChanges,reconcilePublished,receivePeerBook} from './peer-send.js';
 import {pressureSensitivity} from './pressure.js';
 import {mountLibrary} from './library-view.js';
-import {unpackBook} from './shared/book-exchange.js';
+import {saveReturnFile} from './save-return.js';
+import {zipFiles} from './shared/stored-zip.js';
+import {collectTabletFiles} from './peer-send.js';
+import {annotationPaths} from './shared/annotation-transfer.js';
+import {sharedBase} from './shared/peer-state.js';
+import {packReturn,unpackBook} from './shared/book-exchange.js';
 import {importExchangeBook} from './storage.js';
 import {blobSha,readerClient,repositoryName} from './api.js';
 import {bookModel,chapterHeadingParts,sceneHeadingParts} from './model.js';
@@ -99,7 +104,7 @@ function layout(){
   if(lastPageWidth!==fit.page){lastPageWidth=fit.page;clearTimeout(layoutTimer);layoutTimer=setTimeout(repaginate,100);}
 }
 function setOpen(id,open){if(id==='outline'||id==='configuration'){dock=open?id:'';$('close-panel').hidden=dock==='configuration';for(const name of ['outline','configuration']){$(name).hidden=dock!==name;$(name+'-toggle').setAttribute('aria-expanded',String(dock===name));}layout();return;}$(id).hidden=!open;if(id!=='connection')$(id+'-toggle').setAttribute('aria-expanded',String(open));layout();}
-$('connection-toggle').onclick=()=>{if(busy||credentialBusy)return;const panel=$('updates-panel');panel.hidden=!panel.hidden;if(!panel.hidden&&snapshot){const drafts=Object.keys(localStorage).filter(k=>k.startsWith('sidecar-book:'+snapshot.id+':draft:')).length;$('peer-status').textContent=(snapshot.syncBase?'Shared base: '+snapshot.syncBase.commit.slice(0,8):'Shared base unknown')+' · '+drafts+' local scene draft(s), including inline annotations. '+(tabletTextAllowed(snapshot)?'Scene text and annotations are sent together.':'Annotation-only book. Prose drafts remain local.');}$('connection-toggle').setAttribute('aria-expanded',String(!panel.hidden));};
+$('connection-toggle').onclick=()=>{if(busy||credentialBusy)return;const panel=$('updates-panel');panel.hidden=!panel.hidden;if(!panel.hidden&&snapshot){const drafts=Object.keys(localStorage).filter(k=>k.startsWith('sidecar-book:'+snapshot.id+':draft:')).length;$('peer-status').textContent=snapshot.exchangeId?'Save a return file, then copy it to the PC.':(snapshot.syncBase?'Shared base: '+snapshot.syncBase.commit.slice(0,8):'Shared base unknown')+' · '+drafts+' local scene draft(s), including inline annotations. '+(tabletTextAllowed(snapshot)?'Scene text and annotations are sent together.':'Annotation-only book. Prose drafts remain local.');}$('connection-toggle').setAttribute('aria-expanded',String(!panel.hidden));};
 $('outline-toggle').onclick=()=>setOpen('outline',$('outline').hidden);
 $('configuration-toggle').onclick=()=>setOpen('configuration',$('configuration').hidden);$('close-panel').onclick=()=>setOpen(dock,false);
 // Closing a panel never consumes the outside action or changes note-edit state.
@@ -335,7 +340,10 @@ async function openBook(value,resume=true){
   if(model.cover){const type=/\.png$/i.test(model.cover.path)?'image/png':'image/jpeg';coverUrl=URL.createObjectURL(new Blob([model.cover.bytes],{type}));}
   document.title=model.title+' · Sidecar Reader';$('repository').value=value.repository;$('branch').value=value.branch;
   credentials.refresh();$('fresh-copy').hidden=false;
-  $('connection-toggle').hidden=!!value.exchangeId;
+  $('connection-toggle').hidden=false;
+  $('return-book').hidden=!value.exchangeId;
+  for(const id of ['send-highlights','receive-updates','fresh-copy'])$(id).hidden=!!value.exchangeId;
+  $('updates-panel').querySelector('.hint').hidden=!!value.exchangeId;
   $('book-status').textContent=value.exchangeId?model.title+' · Imported book · '+value.files.length+' files':`${model.title} · ${value.repository} (${value.branch}) · Offline copy downloaded ${new Date(value.downloadedAt).toLocaleString()} · ${value.commit.slice(0,8)} · ${value.files.length} files`;
   $('outline').replaceChildren();const cover=element('button','Cover');cover.dataset.scope='cover';cover.onclick=()=>navigate(-1);const entire=element('button','Entire Novel');entire.dataset.scope='novel';entire.onclick=()=>navigate(-2);$('outline').append(cover,entire);
   model.chapters.forEach((chapter,n)=>{const details=element('details'),summary=element('summary',chapter.name),children=element('div'),all=element('button','Read chapter');all.dataset.scope=`chapter:${chapter.key}`;all.onclick=()=>navigate(n);children.append(all);
@@ -468,6 +476,30 @@ async function reconcileBook(){
   }catch(error){message(error.message,true);}
   finally{checking=false;if(checkAgain){checkAgain=false;void reconcileBook();}}
 }
+async function returnToPC(id){
+ if(busy||credentialBusy||writerTransition)return;
+ if(!highlights.beforeRender())return;
+ busy=true;
+ if(!await writerInk.close().catch(()=>false)){busy=false;message('Finish saving the handwriting first.',true);return;}
+ busy=true;controls();
+ try{
+   const book=await readBook(id);if(!book?.exchangeId)throw Error('Choose a book imported from a file.');
+   const capture=await collectTabletFiles(book);
+   const originals=new Map(book.files.map(f=>[f.path,f.sha]));
+   const touched=new Set(capture.files.filter(f=>originals.get(f.path)!==f.sha).map(f=>f.path));
+   if(!tabletTextAllowed(book)){
+     const allowed=annotationPaths(sharedBase('usb','exchange',book.exchangeRevision,book.files),capture.files);
+     for(const p of touched)if(!allowed.has(p))touched.delete(p);
+   }
+   const bytes=await packReturn(book,capture.files.filter(f=>touched.has(f.path)),zipFiles);
+   const name=book.title.replace(/[<>:"/\\|?*]/g,'_').slice(0,90)+' - tablet changes.sidecar-return';
+   const status=await saveReturnFile(name,bytes);
+   message(status);if(!libraryMode)$('updates-status').textContent=status;
+ }catch(e){message(e.message,true);}
+ finally{busy=false;controls();if(!libraryMode&&writer.active())await writerInk.open(snapshot);}
+}
+$('return-book').onclick=()=>returnToPC(snapshot?.id);
+$('return-book-menu').onclick=()=>{$('book-menu').close();returnToPC(menuBook?.id);};
 $('exchange-import').onclick=()=>$('exchange-file').click();
 $('exchange-file').onchange=async e=>{
  const file=e.target.files[0];e.target.value='';
@@ -483,7 +515,7 @@ $('exchange-file').onchange=async e=>{
    message(result.duplicate?'Already imported. Opened your existing copy.':'Book imported and available offline.');
  }catch(err){message(err.message,true);}finally{busy=false;controls();}
 };
-libraryView=mountLibrary({open:async id=>{if(busy||credentialBusy||!highlights.beforeRender())return;remember();await openBook(await selectBook(id));},add:()=>{void openSettings();},options:row=>{if(busy||credentialBusy)return;menuBook=row;for(const key of ['book-settings','book-check','book-refresh'])$(key).hidden=row.connection.type==='file';$('book-menu-title').textContent=row.title;$('book-menu').showModal();},error:text=>{$('library-error').textContent=text;}});
+libraryView=mountLibrary({open:async id=>{if(busy||credentialBusy||!highlights.beforeRender())return;remember();await openBook(await selectBook(id));},add:()=>{void openSettings();},options:row=>{if(busy||credentialBusy)return;menuBook=row;$('return-book-menu').hidden=row.connection.type!=='file';for(const key of ['book-settings','book-check','book-refresh'])$(key).hidden=row.connection.type==='file';$('book-menu-title').textContent=row.title;$('book-menu').showModal();},error:text=>{$('library-error').textContent=text;}});
 async function showLibrary(){
  if(writerTransition||busy||credentialBusy||!highlights.beforeRender()||!await writerInk.close())return;
  remember();clearTimeout(scrollTimer);$('updates-panel').hidden=true;libraryMode=true;document.body.classList.add('library-mode');$('library').hidden=false;$('library-toggle').hidden=true;
