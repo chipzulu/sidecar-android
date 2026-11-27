@@ -209,3 +209,4 @@ body.writer-pen-active #writer-column-edge,body.writer-pen-active #writer-row-ed
 
 .brand.app-mark { object-fit:contain; background:transparent; border-radius:0; padding:0; vertical-align:middle; width:2.25rem; height:2.25rem; flex:none; }
 @media(max-width:700px){.brand.app-mark{width:1.85rem;height:1.85rem}}
+#book-receive-progress:not([hidden]){position:fixed;bottom:1rem;left:50%;transform:translateX(-50%);z-index:20;max-width:94vw;width:max-content;padding:.55rem .85rem;border:1px solid #637268;border-radius:5px;color:#243529;background:#faf9ef;font:inherit;font-variant-numeric:tabular-nums;pointer-events:none}

@@ -1,6 +1,8 @@
-# Story Sidecar Android Reader 0.1.82
+# Story Sidecar Android Reader 0.1.83
 
-Wi-Fi book delivery: Install APK 0.1.25 and keep Reader 0.1.82 open. On Desktop 0.1.169 select a book on the shelf → Send to tablet…. Select your BOOX devices and send. Accept Add book on each tablet. Repeat deliveries preserve the existing shelf copy and edits. Tablet updates can still be returned via USB.
+Wi-Fi transfer progress: Desktop 0.1.170 shows the number of files sent to each tablet. Reader 0.1.83 shows the number received and the byte count, followed by library confirmation. BOOX APK 0.1.25 works with this release.
+
+Wi-Fi book delivery: Install APK 0.1.25 and keep Reader 0.1.83 open. On Desktop 0.1.169 select a book on the shelf → Send to tablet…. Select your BOOX devices and send. Accept Add book on each tablet. Repeat deliveries preserve the existing shelf copy and edits. Tablet updates can still be returned via USB.
 
 Wi-Fi pairing: In Library → Paired devices choose Show pairing QR. On Windows use the top tab bar → Paired devices → Scan tablet. Confirm the PC name on the tablet. Pair manually is available on both devices. Each device remembers its own list and selection.
 
