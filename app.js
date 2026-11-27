@@ -10,6 +10,7 @@ import {tabletTextAllowed} from './shared/book-workflow.js';
 import {publishPeerChanges,reconcilePublished,receivePeerBook} from './peer-send.js';
 import {pressureSensitivity} from './pressure.js';
 import {mountLibrary} from './library-view.js';
+import {enableBookInbox} from './book-inbox.js';
 import {saveReturnFile} from './save-return.js';
 import {zipFiles} from './shared/stored-zip.js';
 import {collectTabletFiles} from './peer-send.js';
@@ -525,6 +526,11 @@ async function showLibrary(){
 $('library-toggle').onclick=()=>{void showLibrary();};$('library-about').onclick=()=>$('about-open').click();
 try{await libraryView.refresh((await readBook())?.id);}catch(error){$('library-error').textContent=error.message;}
 
+enableBookInbox({
+ unavailable:()=>busy||credentialBusy||writerTransition||(!libraryMode&&writer.active())||!!document.querySelector('dialog[open]'),
+ added:async book=>{if(libraryMode)await libraryView.refresh(book.id);message('Added '+book.title+' to your library.');},
+ notice:text=>message(text,true)
+});
 bookUpdates.onmessage=()=>{if(libraryMode)void libraryView.refresh();else void reconcileBook();};
 window.addEventListener('pageshow',reconcileBook);
 window.addEventListener('focus',reconcileBook);
